@@ -1,0 +1,117 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>POS · Artyflakes</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="{% static 'css/app.css' %}" rel="stylesheet">
+  <link href="{% static 'css/pos.css' %}" rel="stylesheet">
+</head>
+<body class="pos-body">
+<div class="pos-app">
+
+  <!-- Top bar -->
+  <header class="pos-top">
+    <a class="pos-title" href="{% url 'dashboard:home' %}" title="Back to dashboard">POS Billing System</a>
+
+    <div class="pos-search">
+      <i class="bi bi-search"></i>
+      <input id="posSearch" type="text" placeholder="Search product by name, code or barcode..." autocomplete="off">
+      <button type="button" class="scan-btn" id="scanBtn" disabled title="Barcode scanners type into the search box"><i class="bi bi-upc-scan"></i> Scan Barcode</button>
+    </div>
+
+    <button class="pos-pill pill-brand" disabled title="Coming soon"><i class="bi bi-globe2"></i> Website Orders</button>
+    <button class="pos-pill pill-green" disabled title="Coming soon"><i class="bi bi-whatsapp"></i> WhatsApp Bill</button>
+
+    <div class="pos-user">
+      <i class="bi bi-bell"></i>
+      <div class="pos-user-info">
+        <strong><i class="bi bi-person-circle"></i> {{ user.get_full_name|default:user.username }}</strong>
+        <small><span id="posDate"></span> &nbsp; <span id="posTime"></span></small>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main -->
+  <div class="pos-main">
+
+    <!-- Left: cart -->
+    <section class="pos-cart">
+      <div class="cart-head">
+        <span class="c-name">Product Name</span>
+        <span class="c-qty">Quantity</span>
+        <span class="c-num">Price</span>
+        <span class="c-num">MRP</span>
+        <span class="c-num">Discount</span>
+        <span class="c-num">Amount</span>
+        <span class="c-del"></span>
+      </div>
+
+      <div class="cart-body" id="cartBody">
+        <div class="cart-empty" id="cartEmpty">
+          <strong>No items</strong>
+          <span>Add products to the bill using barcode, code or search (F3)</span>
+          <small id="searchNote"></small>
+        </div>
+      </div>
+
+      <div class="cart-totals">
+        <div class="tot"><span>Items</span><strong id="totItems">0</strong></div>
+        <div class="tot"><span>Subtotal</span><strong id="totSub">₹ 0.00</strong></div>
+        <div class="tot"><span>Tax (0%)</span><strong id="totTax">₹ 0.00</strong></div>
+        <div class="tot grand"><span>Total</span><strong id="totGrand">₹ 0.00</strong></div>
+      </div>
+
+      <div class="cart-strip">
+        <div><i class="bi bi-globe2"></i><span>Website Order<br><small>None</small></span></div>
+        <div><i class="bi bi-box-seam"></i><span>Stock Auto Update<br><small>Coming soon</small></span></div>
+        <div><i class="bi bi-whatsapp"></i><span>WhatsApp Bill<br><small>Coming soon</small></span></div>
+      </div>
+    </section>
+
+    <!-- Right: buttons -->
+    <aside class="pos-keys">
+      <div class="key-row cols-3">
+        <button class="key k-blue" data-action="search"><i class="bi bi-search"></i><span><b>F3</b> Search</span></button>
+        <button class="key k-blue" data-action="quantity"><i class="bi bi-123"></i><span><b>F4</b> Quantity</span></button>
+        <button class="key k-blue" data-action="new"><i class="bi bi-file-earmark-plus"></i><span><b>F8</b> New Sale</span></button>
+      </div>
+      <div class="key-row cols-3">
+        <button class="key k-green" disabled title="Coming soon"><i class="bi bi-cash-stack"></i><span><b>F12</b> Cash</span></button>
+        <button class="key k-blue" disabled title="Coming soon"><i class="bi bi-credit-card"></i><span>Card</span></button>
+        <button class="key k-lilac" disabled title="Coming soon"><i class="bi bi-card-checklist"></i><span>Check</span></button>
+      </div>
+      
+      <div class="key-row cols-4">
+        <button class="key k-blue" disabled title="Coming soon"><i class="bi bi-percent"></i><span><b>F2</b> Discount</span></button>
+        <button class="key k-blue" disabled title="Coming soon"><i class="bi bi-tag"></i><span>Price</span></button>
+        <button class="key k-blue" disabled title="Coming soon"><i class="bi bi-person"></i><span>Customer</span></button>
+      </div>
+      <div class="key-row cols-4">
+        <button class="key k-lilac" disabled title="Coming soon"><i class="bi bi-floppy"></i><span><b>F9</b> Save Sale</span></button>
+        <button class="key k-pink" disabled title="Coming soon"><i class="bi bi-arrow-counterclockwise"></i><span>Refund</span></button>
+        <button class="key k-pay span-2" disabled title="Coming soon"><i class="bi bi-credit-card-2-front"></i><span><b>F10</b> Payment</span></button>
+      </div>
+      <div class="key-row cols-4">
+        <button class="key k-blue" disabled title="Coming soon"><i class="bi bi-lock"></i><span>Lock</span></button>
+        <button class="key k-blue" disabled title="Coming soon"><i class="bi bi-arrow-left-right"></i><span><b>F7</b> Transfer</span></button>
+        <button class="key k-pink" data-action="void"><i class="bi bi-x-circle"></i><span>Void Order</span></button>
+        <button class="key k-blue" disabled title="Coming soon"><i class="bi bi-three-dots"></i><span>More</span></button>
+      </div>
+    </aside>
+  </div>
+
+  <!-- Footer -->
+  <footer class="pos-foot">
+    <span class="ok"><i class="bi bi-wifi"></i> Connected</span>
+    <span>Artyflakes POS &nbsp;|&nbsp; v1.0.0</span>
+    <span><i class="bi bi-heart-fill"></i> Your One Stop Art &amp; Craft Store</span>
+  </footer>
+</div>
+
+<script src="{% static 'js/pos.js' %}"></script>
+</body>
+</html>
