@@ -1,0 +1,11 @@
+<div class="panel h-100">
+  <div class="panel-head">
+    <span class="panel-icon"><i class="bi {{ icon }}"></i></span>
+    <h6>{{ title }}</h6>
+  </div>
+  <div class="panel-body empty-state">
+    <i class="bi {{ empty_icon|default:'bi-inbox' }}"></i>
+    <p>{{ message }}</p>
+    <small>{{ needs }}</small>
+  </div>
+</div>

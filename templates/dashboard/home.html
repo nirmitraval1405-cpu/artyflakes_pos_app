@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Dashboard · Artyflakes POS{% endblock %}
+
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <h3>Welcome, {{ user.get_full_name|default:user.username }}</h3>
+    <p>Here is an overview of your store.</p>
+  </div>
+  <div class="date-chip"><i class="bi bi-calendar3 me-1"></i> {{ today|date:"d/m/Y" }}</div>
+</div>
+
+<!-- Primary cards -->
+<div class="row g-3 mb-3">
+  {% for c in primary_cards %}
+  <div class="col-12 col-sm-6 col-xl-3">
+    <div class="stat-card stat-{{ c.color }}">
+      <div class="stat-icon"><i class="bi {{ c.icon }}"></i></div>
+      <div>
+        <small>{{ c.label }}</small>
+        <div class="stat-value">₹{{ c.value|floatformat:2 }}</div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Secondary cards -->
+<div class="row g-3 mb-3">
+  {% for c in secondary_cards %}
+  <div class="col-12 col-sm-6 col-xl-3">
+    <div class="mini-card">
+      <div class="mini-top">
+        <div>
+          <div class="mini-value">₹{{ c.value|floatformat:2 }}</div>
+          <div class="mini-label">{{ c.label }}</div>
+        </div>
+        <div class="mini-icon tone-{{ c.tone }}"><i class="bi {{ c.icon }}"></i></div>
+      </div>
+      <div class="mini-foot">No comparison data yet</div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Row: Sales & Purchase + Overall Information -->
+<div class="row g-3 mb-3">
+  <div class="col-xl-8">
+    {% include "dashboard/_panel_empty.html" with icon="bi-arrow-left-right" title="Sales & Purchase" empty_icon="bi-bar-chart" message="No sales or purchases yet" needs="Chart appears after Sales (Phase 6) and Purchases (Phase 7)" %}
+  </div>
+  <div class="col-xl-4">
+    {% include "dashboard/_panel_empty.html" with icon="bi-info-circle" title="Overall Information" empty_icon="bi-people" message="No customers or suppliers yet" needs="Needs Customers and Suppliers (Phase 3)" %}
+  </div>
+</div>
+
+<!-- Row: Top Selling + Low Stock -->
+<div class="row g-3 mb-3">
+  <div class="col-xl-6">
+    {% include "dashboard/_panel_empty.html" with icon="bi-trophy" title="Top Selling Products" empty_icon="bi-box-seam" message="No products sold yet" needs="Needs Products (Phase 2) and Sales (Phase 6)" %}
+  </div>
+  <div class="col-xl-6">
+    {% include "dashboard/_panel_empty.html" with icon="bi-exclamation-triangle" title="Low Stock Products" empty_icon="bi-box-seam" message="No products added yet" needs="Needs Products and Inventory (Phase 2 and 4)" %}
+  </div>
+</div>
+
+<!-- Recent Sales -->
+<div class="row g-3 mb-3">
+  <div class="col-12">
+    {% include "dashboard/_panel_empty.html" with icon="bi-receipt" title="Recent Sales" empty_icon="bi-receipt" message="No sales recorded yet" needs="Needs POS billing (Phase 5-6)" %}
+  </div>
+</div>
+
+<!-- Row: Sales Statistics + Recent Transactions -->
+<div class="row g-3 mb-3">
+  <div class="col-xl-6">
+    {% include "dashboard/_panel_empty.html" with icon="bi-graph-up" title="Sales Statistics" empty_icon="bi-graph-up" message="No revenue or expense data yet" needs="Needs Sales and Expenses (Phase 6 and 8)" %}
+  </div>
+  <div class="col-xl-6">
+    {% include "dashboard/_panel_empty.html" with icon="bi-arrow-left-right" title="Recent Transactions" empty_icon="bi-list-ul" message="No transactions yet" needs="Needs Sales, Purchases and Expenses" %}
+  </div>
+</div>
+
+<!-- Row: Top Customers + Top Categories -->
+<div class="row g-3 mb-3">
+  <div class="col-xl-6">
+    {% include "dashboard/_panel_empty.html" with icon="bi-person-heart" title="Top Customers" empty_icon="bi-people" message="No customer purchases yet" needs="Needs Customers and Sales" %}
+  </div>
+  <div class="col-xl-6">
+    {% include "dashboard/_panel_empty.html" with icon="bi-pie-chart" title="Top Categories" empty_icon="bi-pie-chart" message="No categories yet" needs="Needs Categories and Products (Phase 2)" %}
+  </div>
+</div>
+
+<!-- Order Statistics -->
+<div class="row g-3">
+  <div class="col-12">
+    {% include "dashboard/_panel_empty.html" with icon="bi-grid-3x3-gap" title="Order Statistics" empty_icon="bi-clock" message="Not enough order history" needs="Heatmap uses real order timestamps from Sales" %}
+  </div>
+</div>
+
+{% endblock %}
