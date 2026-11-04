@@ -55,12 +55,11 @@
     body.querySelectorAll(".cart-row").forEach((r) => r.remove());
     empty.style.display = state.items.length ? "none" : "flex";
 
-    let units = 0, subtotal = 0;
+    let subtotal = 0;
 
     state.items.forEach((item) => {
       const saving = Math.max(item.mrp - item.price, 0);
       const amount = item.price * item.qty;
-      units += item.qty;
       subtotal += amount;
 
       const row = el("div", "cart-row" + (item.id === state.selected ? " selected" : ""));
@@ -139,7 +138,37 @@
     if (confirm("Void this order? All items will be removed.")) clearCart();
   }
 
-  const actions = { search: focusSearch, quantity: focusQuantity, new: newSale, void: voidOrder };
+  // ---------- Side menu ----------
+  const panel = $("sidePanel");
+  const backdrop = $("sideBackdrop");
+
+  function openMenu() {
+    panel.classList.add("open");
+    backdrop.classList.add("open");
+    panel.setAttribute("aria-hidden", "false");
+  }
+
+  function closeMenu() {
+    panel.classList.remove("open");
+    backdrop.classList.remove("open");
+    panel.setAttribute("aria-hidden", "true");
+  }
+
+  $("sideClose").addEventListener("click", closeMenu);
+  backdrop.addEventListener("click", closeMenu);
+
+  $("userInfoBtn").addEventListener("click", () => {
+    const box = $("userInfoBox");
+    box.hidden = !box.hidden;
+  });
+
+  $("fsBtn").addEventListener("click", () => {
+    if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+    else document.exitFullscreen();
+  });
+
+  // ---------- Button wiring ----------
+  const actions = { search: focusSearch, quantity: focusQuantity, new: newSale, void: voidOrder, menu: openMenu };
 
   document.querySelectorAll("[data-action]").forEach((btn) => {
     btn.addEventListener("click", () => actions[btn.dataset.action]());
@@ -156,6 +185,7 @@
 
   // Keyboard shortcuts
   document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { closeMenu(); return; }
     const map = { F3: focusSearch, F4: focusQuantity, F8: newSale };
     if (map[e.key]) { e.preventDefault(); map[e.key](); return; }
     if ((e.key === "+" || e.key === "-") && document.activeElement !== searchInput && state.selected) {

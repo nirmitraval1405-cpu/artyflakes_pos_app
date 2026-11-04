@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} · Artyflakes POS{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div><h3>{{ title }}</h3></div>
+</div>
+
+<div class="panel" style="max-width: 820px;">
+  <div class="panel-body">
+    <form method="post" novalidate>
+      {% csrf_token %}
+
+      {% if form.non_field_errors %}
+        <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+      {% endif %}
+
+      <div class="row g-3">
+        {% for field in form %}
+        <div class="{% if field.name == 'name' %}col-12{% else %}col-md-6{% endif %}">
+          {% if field.field.widget.input_type == 'checkbox' %}
+            <div class="form-check mt-4">
+              {{ field }}
+              <label class="form-check-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+            </div>
+          {% else %}
+            <label class="form-label fw-semibold" for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {{ field }}
+          {% endif %}
+          {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+          {% for error in field.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+        </div>
+        {% endfor %}
+      </div>
+
+      <div class="mt-4 d-flex gap-2">
+        <button class="btn btn-brand" type="submit">Save</button>
+        <a class="btn btn-outline-secondary" href="{{ back_url }}">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

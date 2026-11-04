@@ -20,6 +20,7 @@ from django.urls import path,include
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("accounts/", include("accounts.urls")),
-    path("", include("dashboard.urls")),
-    path("pos/", include("pos.urls")),
+    path("dashbord/", include("dashboard.urls")),
+    path("", include("pos.urls")),
+    path("inventory/", include("inventory.urls")),
 ]

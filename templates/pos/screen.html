@@ -84,8 +84,8 @@
         <button class="key k-blue" disabled title="Coming soon"><i class="bi bi-credit-card"></i><span>Card</span></button>
         <button class="key k-lilac" disabled title="Coming soon"><i class="bi bi-card-checklist"></i><span>Check</span></button>
       </div>
-      
       <div class="key-row cols-4">
+        <button class="key k-gold" disabled title="Coming soon"><i class="bi bi-inbox"></i><span>Cash Drawer</span></button>
         <button class="key k-blue" disabled title="Coming soon"><i class="bi bi-percent"></i><span><b>F2</b> Discount</span></button>
         <button class="key k-blue" disabled title="Coming soon"><i class="bi bi-tag"></i><span>Price</span></button>
         <button class="key k-blue" disabled title="Coming soon"><i class="bi bi-person"></i><span>Customer</span></button>
@@ -99,7 +99,7 @@
         <button class="key k-blue" disabled title="Coming soon"><i class="bi bi-lock"></i><span>Lock</span></button>
         <button class="key k-blue" disabled title="Coming soon"><i class="bi bi-arrow-left-right"></i><span><b>F7</b> Transfer</span></button>
         <button class="key k-pink" data-action="void"><i class="bi bi-x-circle"></i><span>Void Order</span></button>
-        <button class="key k-blue" disabled title="Coming soon"><i class="bi bi-three-dots"></i><span>More</span></button>
+        <button class="key k-blue" data-action="menu"><i class="bi bi-three-dots"></i><span>More</span></button>
       </div>
     </aside>
   </div>
@@ -111,6 +111,45 @@
     <span><i class="bi bi-heart-fill"></i> Your One Stop Art &amp; Craft Store</span>
   </footer>
 </div>
+
+<!-- Side menu (opened by "More") -->
+<div class="side-backdrop" id="sideBackdrop"></div>
+<aside class="side-panel" id="sidePanel" aria-hidden="true">
+  <div class="sp-head">
+    <span>POS - Artyflakes</span>
+    <button type="button" id="sideClose" title="Close"><i class="bi bi-arrow-right"></i></button>
+  </div>
+
+  {% if user.is_admin_role %}
+  <a class="sp-item" href="{% url 'dashboard:home' %}"><i class="bi bi-tools"></i> Management</a>
+  {% endif %}
+  <hr class="sp-line">
+
+  <button class="sp-item" disabled title="Coming soon"><i class="bi bi-check2-all"></i> View sales history</button>
+  <button class="sp-item" disabled title="Coming soon"><i class="bi bi-layers-fill"></i> View open sales</button>
+  <button class="sp-item" disabled title="Coming soon"><i class="bi bi-box-arrow-in-down"></i> Cash In / Out</button>
+  <button class="sp-item" disabled title="Coming soon"><i class="bi bi-journal-text"></i> Credit payments</button>
+  <button class="sp-item" disabled title="Coming soon"><i class="bi bi-door-open"></i> End of day</button>
+
+  <div class="sp-section"><span>User</span></div>
+  <button class="sp-item" type="button" id="userInfoBtn"><i class="bi bi-person"></i> User info</button>
+  <div class="sp-userbox" id="userInfoBox" hidden>
+    <div><small>Name</small>{{ user.get_full_name|default:user.username }}</div>
+    <div><small>Username</small>{{ user.username }}</div>
+    <div><small>Role</small>{{ user.get_role_display }}</div>
+  </div>
+
+  <div class="sp-date">{% now "d-m-Y" %}</div>
+
+  <div class="sp-foot">
+    <button type="button" disabled title="Coming soon"><i class="bi bi-sliders"></i></button>
+    <button type="button" id="fsBtn" title="Full screen"><i class="bi bi-fullscreen"></i></button>
+    <form method="post" action="{% url 'accounts:logout' %}">
+      {% csrf_token %}
+      <button type="submit" title="Logout"><i class="bi bi-power"></i></button>
+    </form>
+  </div>
+</aside>
 
 <script src="{% static 'js/pos.js' %}"></script>
 </body>

@@ -1,0 +1,255 @@
+/* ---------- Toolbar ---------- */
+.toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .25rem;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: .5rem;
+    margin-bottom: .9rem;
+}
+
+.tb {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: .2rem;
+    min-width: 78px;
+    padding: .5rem .6rem;
+    border: 0;
+    background: transparent;
+    border-radius: 6px;
+    color: var(--primary);
+    font-size: 12px;
+    text-align: center;
+}
+
+.tb i {
+    font-size: 1.35rem;
+}
+
+.tb:hover:not(.disabled) {
+    background: var(--cream);
+    color: var(--primary);
+}
+
+.tb.disabled {
+    color: #BDB0B1;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+/* ---------- Two panes ---------- */
+.split {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    gap: .9rem;
+    align-items: start;
+}
+
+.tree {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: .5rem;
+    min-height: 420px;
+}
+
+.tree-item {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    padding: .45rem .6rem;
+    border-radius: 6px;
+    color: var(--text);
+}
+
+.tree-item.sub {
+    margin-left: 1rem;
+}
+
+.tree-item i {
+    color: var(--secondary);
+}
+
+.tree-item .cnt {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--muted);
+    background: var(--cream);
+    padding: 0 7px;
+    border-radius: 10px;
+}
+
+.tree-item:hover {
+    background: var(--cream);
+}
+
+.tree-item.active {
+    background: var(--primary);
+    color: #fff;
+}
+
+.tree-item.active i {
+    color: var(--accent);
+}
+
+.tree-item.active .cnt {
+    background: rgba(255, 255, 255, .2);
+    color: #fff;
+}
+
+.grid-panel {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    min-width: 0;
+}
+
+.grid-search {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    padding: .55rem .8rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.grid-search i {
+    color: var(--secondary);
+}
+
+.grid-search input {
+    flex: 1;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--text);
+    min-width: 0;
+}
+
+.grid-search .count {
+    color: var(--muted);
+    font-size: 13px;
+    white-space: nowrap;
+}
+
+.grid-wrap {
+    overflow-x: auto;
+    min-height: 360px;
+}
+
+.grid {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+}
+
+.grid th {
+    text-align: left;
+    padding: .55rem .8rem;
+    border-bottom: 2px solid var(--secondary);
+    color: var(--primary);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.grid td {
+    padding: .5rem .8rem;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+}
+
+.grid .num {
+    text-align: right;
+}
+
+.grid tbody tr[data-pk] {
+    cursor: pointer;
+}
+
+.grid tbody tr[data-pk]:hover {
+    background: #fffaf6;
+}
+
+.grid tbody tr.selected {
+    background: var(--cream);
+    box-shadow: inset 3px 0 0 var(--secondary);
+}
+
+.grid tr.inactive td {
+    color: var(--muted);
+}
+
+.grid .tag {
+    font-size: 10px;
+    background: var(--cream);
+    color: var(--muted);
+    padding: 1px 6px;
+    border-radius: 10px;
+    margin-left: .3rem;
+}
+
+.grid-empty {
+    text-align: center;
+    color: var(--muted);
+    padding: 3rem 1rem !important;
+    white-space: normal !important;
+}
+
+.pager {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    padding: .7rem;
+    border-top: 1px solid var(--border);
+    font-size: 13px;
+}
+
+.pager a {
+    color: var(--secondary);
+    font-weight: 600;
+}
+
+@media (max-width: 991.98px) {
+    .split {
+        grid-template-columns: 1fr;
+    }
+
+    .tree {
+        min-height: 0;
+    }
+}
+
+/* ---------- Printing ---------- */
+@media print {
+
+    .sidebar,
+    .topbar,
+    .toolbar,
+    .tree,
+    .grid-search,
+    .pager,
+    .app-footer,
+    .page-head p,
+    .sidebar-backdrop {
+        display: none !important;
+    }
+
+    .main-area {
+        margin-left: 0 !important;
+    }
+
+    .split {
+        display: block;
+    }
+
+    .grid-panel {
+        border: 0;
+    }
+
+    .grid-wrap {
+        overflow: visible;
+    }
+}

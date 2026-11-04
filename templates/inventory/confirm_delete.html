@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} · Artyflakes POS{% endblock %}
+
+{% block content %}
+<div class="page-head"><div><h3>{{ title }}</h3></div></div>
+
+<div class="panel" style="max-width: 560px;">
+  <div class="panel-body">
+    <p class="mb-1">Are you sure you want to delete <strong>{{ object }}</strong>?</p>
+    {% if warning %}<p class="text-muted small">{{ warning }}</p>{% endif %}
+    <p class="text-muted small">This cannot be undone.</p>
+    <form method="post" class="d-flex gap-2 mt-3">
+      {% csrf_token %}
+      <button class="btn btn-danger" type="submit">Delete</button>
+      <a class="btn btn-outline-secondary" href="{{ back_url }}">Cancel</a>
+    </form>
+  </div>
+</div>
+{% endblock %}

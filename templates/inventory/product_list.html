@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Products · Artyflakes POS{% endblock %}
+{% block extra_css %}<link href="{% static 'css/inventory.css' %}" rel="stylesheet">{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h3>Products</h3>
+    <p>Management &bull; Inventory</p>
+  </div>
+</div>
+
+<!-- Toolbar -->
+<div class="toolbar">
+  <a class="tb" href="{{ request.get_full_path }}"><i class="bi bi-arrow-repeat"></i><span>Refresh</span></a>
+
+  {% if can_edit %}
+    <a class="tb" href="{% url 'inventory:group_create' %}"><i class="bi bi-folder-plus"></i><span>New group</span></a>
+    {% if selected_category %}
+      <a class="tb" href="{% url 'inventory:group_update' selected_category.pk %}"><i class="bi bi-pencil-square"></i><span>Edit group</span></a>
+      <a class="tb" href="{% url 'inventory:group_delete' selected_category.pk %}"><i class="bi bi-folder-minus"></i><span>Delete group</span></a>
+    {% else %}
+      <span class="tb disabled"><i class="bi bi-pencil-square"></i><span>Edit group</span></span>
+      <span class="tb disabled"><i class="bi bi-folder-minus"></i><span>Delete group</span></span>
+    {% endif %}
+    <a class="tb" href="{% url 'inventory:product_create' %}"><i class="bi bi-plus-lg"></i><span>New product</span></a>
+    <a class="tb disabled" id="btnEdit"><i class="bi bi-pencil"></i><span>Edit product</span></a>
+    <a class="tb disabled" id="btnDelete"><i class="bi bi-trash"></i><span>Delete product</span></a>
+  {% else %}
+    <span class="tb disabled"><i class="bi bi-folder-plus"></i><span>New group</span></span>
+    <span class="tb disabled"><i class="bi bi-pencil-square"></i><span>Edit group</span></span>
+    <span class="tb disabled"><i class="bi bi-folder-minus"></i><span>Delete group</span></span>
+    <span class="tb disabled"><i class="bi bi-plus-lg"></i><span>New product</span></span>
+    <span class="tb disabled"><i class="bi bi-pencil"></i><span>Edit product</span></span>
+    <span class="tb disabled"><i class="bi bi-trash"></i><span>Delete product</span></span>
+  {% endif %}
+
+  <button type="button" class="tb" onclick="window.print()"><i class="bi bi-printer"></i><span>Print</span></button>
+  <button type="button" class="tb" onclick="window.print()" title="Choose 'Save as PDF' as the printer"><i class="bi bi-file-earmark-pdf"></i><span>Save as PDF</span></button>
+  <span class="tb disabled" title="Coming soon"><i class="bi bi-hash"></i><span>Price tags</span></span>
+  <span class="tb disabled" title="Coming soon"><i class="bi bi-intersect"></i><span>Merge</span></span>
+  <span class="tb disabled" title="Coming soon"><i class="bi bi-sort-down"></i><span>Sorting</span></span>
+  <span class="tb disabled" title="Coming soon"><i class="bi bi-graph-up"></i><span>Mov. avg. price</span></span>
+  <span class="tb disabled" title="Coming soon"><i class="bi bi-arrow-down"></i><span>Import</span></span>
+  <a class="tb" href="{% url 'inventory:product_export' %}"><i class="bi bi-arrow-up"></i><span>Export</span></a>
+  <span class="tb disabled" title="Coming soon"><i class="bi bi-question-circle"></i><span>Help</span></span>
+</div>
+
+<div class="split">
+
+  <!-- Group tree -->
+  <aside class="tree">
+    <a class="tree-item {% if not group %}active{% endif %}" href="{% url 'inventory:product_list' %}">
+      <i class="bi bi-folder-fill"></i> Products <span class="cnt">{{ all_count }}</span>
+    </a>
+    {% for c in categories %}
+      <a class="tree-item sub {% if selected_category.pk == c.pk %}active{% endif %}" href="?group={{ c.pk }}">
+        <i class="bi bi-folder"></i> {{ c.name }} <span class="cnt">{{ c.n }}</span>
+      </a>
+    {% endfor %}
+    {% if ungrouped_count %}
+      <a class="tree-item sub {% if group == 'none' %}active{% endif %}" href="?group=none">
+        <i class="bi bi-folder"></i> No group <span class="cnt">{{ ungrouped_count }}</span>
+      </a>
+    {% endif %}
+  </aside>
+
+  <!-- Table -->
+  <section class="grid-panel">
+    <form class="grid-search" method="get">
+      {% if group %}<input type="hidden" name="group" value="{{ group }}">{% endif %}
+      <i class="bi bi-search"></i>
+      <input type="text" name="q" value="{{ q }}" placeholder="Search by name, code or barcode" autocomplete="off">
+      <span class="count">Products count: <strong>{{ total }}</strong></span>
+    </form>
+
+    <div class="grid-wrap">
+      <table class="grid" id="productRows">
+        <thead>
+          <tr>
+            <th>Code</th><th>Name</th><th>Group</th><th>Barcode</th>
+            <th class="num">Cost</th><th class="num">Sale price</th><th class="num">MRP</th><th class="num">GST %</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in page %}
+          <tr data-pk="{{ p.pk }}"{% if can_edit %} data-edit="{% url 'inventory:product_update' p.pk %}" data-delete="{% url 'inventory:product_delete' p.pk %}"{% endif %} class="{% if not p.is_active %}inactive{% endif %}">
+            <td>{{ p.code|default:"" }}</td>
+            <td>{{ p.name }}{% if not p.is_active %} <span class="tag">Inactive</span>{% endif %}</td>
+            <td>{{ p.category.name|default:"" }}</td>
+            <td>{{ p.barcode|default:"" }}</td>
+            <td class="num">{{ p.cost_price|floatformat:"2g" }}</td>
+            <td class="num">{{ p.sale_price|floatformat:"2g" }}</td>
+            <td class="num">{{ p.mrp|floatformat:"2g" }}</td>
+            <td class="num">{{ p.gst_rate|floatformat:"-2" }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="8" class="grid-empty">
+            {% if q or group %}No products match this search or group.{% else %}No products yet. Click <strong>New product</strong> to add the first one.{% endif %}
+          </td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if page.has_other_pages %}
+    <div class="pager">
+      {% if page.has_previous %}<a href="?{{ querystring }}&page={{ page.previous_page_number }}">&laquo; Previous</a>{% endif %}
+      <span>Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
+      {% if page.has_next %}<a href="?{{ querystring }}&page={{ page.next_page_number }}">Next &raquo;</a>{% endif %}
+    </div>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  (function () {
+    const rows = document.querySelectorAll("#productRows tbody tr[data-pk]");
+    const btnEdit = document.getElementById("btnEdit");
+    const btnDelete = document.getElementById("btnDelete");
+
+    rows.forEach((row) => {
+      row.addEventListener("click", () => {
+        rows.forEach((r) => r.classList.remove("selected"));
+        row.classList.add("selected");
+        if (btnEdit && row.dataset.edit) {
+          btnEdit.href = row.dataset.edit;
+          btnEdit.classList.remove("disabled");
+          btnDelete.href = row.dataset.delete;
+          btnDelete.classList.remove("disabled");
+        }
+      });
+      row.addEventListener("dblclick", () => {
+        if (row.dataset.edit) window.location.href = row.dataset.edit;
+      });
+    });
+  })();
+</script>
+{% endblock %}
