@@ -1,0 +1,358 @@
+/* ---------- Report picker ---------- */
+.rp-layout {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    gap: 0;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    min-height: calc(100vh - 170px);
+}
+
+.rp-list {
+    padding: 1.1rem 1.3rem;
+    border-right: 1px solid var(--border);
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.rp-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.rp-top h4 {
+    margin: 0;
+    font-weight: 400;
+    color: var(--primary);
+    font-size: 1.5rem;
+}
+
+.rp-search {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: .4rem .7rem;
+    min-width: 260px;
+    background: var(--bg);
+}
+
+.rp-search i {
+    color: var(--muted);
+}
+
+.rp-search input {
+    border: 0;
+    outline: 0;
+    background: transparent;
+    width: 100%;
+    color: var(--text);
+    font-size: 13px;
+}
+
+.rp-note {
+    margin: .6rem 0 0;
+    min-height: 1.2em;
+    font-size: 12.5px;
+    color: var(--secondary);
+}
+
+.rp-scroll {
+    flex: 1;
+    overflow-y: auto;
+    max-height: calc(100vh - 300px);
+    padding-right: .5rem;
+    margin-top: .4rem;
+}
+
+.rp-section {
+    margin-bottom: 1rem;
+}
+
+.rp-section h5 {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    margin: 0 0 .4rem;
+    font-weight: 400;
+    font-size: 1.15rem;
+    color: var(--primary);
+}
+
+.rp-section h5::after {
+    content: "";
+    flex: 1;
+    border-top: 1px solid var(--border);
+}
+
+.rp-item {
+    display: flex;
+    align-items: center;
+    gap: .7rem;
+    width: 100%;
+    border: 0;
+    background: transparent;
+    text-align: left;
+    padding: .5rem .5rem;
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 13.5px;
+}
+
+.rp-item i {
+    color: var(--primary);
+}
+
+.rp-item:hover {
+    background: var(--cream);
+}
+
+.rp-item.active {
+    background: var(--primary);
+    color: #fff;
+}
+
+.rp-item.active i {
+    color: var(--accent);
+}
+
+.rp-item.soon {
+    color: #A89A9B;
+}
+
+.rp-item.soon i {
+    color: #BDB0B1;
+}
+
+/* ---------- Filter panel ---------- */
+.rp-filter {
+    padding: 1.1rem 1.1rem;
+}
+
+.rp-filter h4 {
+    margin: 0 0 .6rem;
+    font-weight: 400;
+    font-size: 1.5rem;
+    color: var(--primary);
+}
+
+.rp-filter label {
+    display: block;
+    font-size: 12.5px;
+    color: var(--primary);
+    margin-top: .55rem;
+}
+
+.rp-filter select {
+    width: 100%;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: .35rem .5rem;
+    background: #fff;
+    color: var(--text);
+    font-size: 13px;
+}
+
+.rp-filter select:disabled {
+    background: #faf6f6;
+    color: #A89A9B;
+}
+
+.rp-check {
+    margin-top: .6rem;
+    font-size: 13px;
+}
+
+.rp-dates {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: .5rem .6rem;
+    margin-top: .9rem;
+}
+
+.rp-dates i {
+    color: var(--primary);
+    font-size: 1.2rem;
+}
+
+.rp-dates input {
+    border: 0;
+    outline: 0;
+    background: transparent;
+    font-size: 12.5px;
+    color: var(--text);
+    min-width: 0;
+    width: 100%;
+}
+
+.rp-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: .4rem;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+}
+
+.rp-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: .5rem;
+    padding: .7rem .5rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: #fff;
+    color: var(--primary);
+    font-size: 13.5px;
+}
+
+.rp-btn:hover:not(:disabled) {
+    background: var(--cream);
+}
+
+.rp-btn:disabled {
+    color: #BDB0B1;
+    cursor: not-allowed;
+    background: #fcfafa;
+}
+
+/* ---------- Report page ---------- */
+.rv-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: .9rem;
+    gap: .5rem;
+    flex-wrap: wrap;
+}
+
+.rv-sheet {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.3rem;
+}
+
+.rv-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    border-bottom: 2px solid var(--secondary);
+    padding-bottom: .8rem;
+}
+
+.rv-head h3 {
+    margin: 0;
+    font-weight: 700;
+    color: var(--primary);
+}
+
+.rv-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .4rem;
+    margin: .9rem 0;
+}
+
+.rv-chip {
+    background: var(--cream);
+    color: var(--primary);
+    font-size: 12px;
+    padding: 2px 10px;
+    border-radius: 12px;
+}
+
+.rv-wrap {
+    overflow-x: auto;
+}
+
+.rv-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.rv-table th {
+    text-align: left;
+    padding: .5rem .6rem;
+    background: var(--cream);
+    color: var(--primary);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+}
+
+.rv-table td {
+    padding: .45rem .6rem;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+}
+
+.rv-table .num {
+    text-align: right;
+}
+
+.rv-empty {
+    text-align: center;
+    color: var(--muted);
+    padding: 2rem !important;
+}
+
+@media (max-width: 991.98px) {
+    .rp-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .rp-list {
+        border-right: 0;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .rp-scroll {
+        max-height: 380px;
+    }
+}
+
+@media print {
+
+    .sidebar,
+    .topbar,
+    .rv-bar,
+    .app-footer,
+    .sidebar-backdrop {
+        display: none !important;
+    }
+
+    .main-area {
+        margin-left: 0 !important;
+    }
+
+    .content {
+        padding: 0 !important;
+    }
+
+    .rv-sheet {
+        border: 0;
+        padding: 0;
+    }
+
+    .rv-wrap {
+        overflow: visible;
+    }
+
+    .rv-table th {
+        background: #eee !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+}

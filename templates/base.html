@@ -84,7 +84,7 @@
         </div>
       </div>
 
-      <div class="nav-label">Insights</div>
+      {% comment %} <div class="nav-label">Insights</div>
 
       <!-- Reports -->
       <button class="side-link nav-toggle collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#grpReports" aria-expanded="false">
@@ -97,7 +97,13 @@
           <span class="sub-link disabled">Inventory Report <em>Soon</em></span>
           <span class="sub-link disabled">Profit &amp; Loss <em>Soon</em></span>
         </div>
-      </div>
+      </div> {% endcomment %}
+        {% if user.is_admin_role %}
+      <div class="nav-label">Insights</div>
+      <a class="side-link {% if request.resolver_match.app_name == 'reports' %}active{% endif %}" href="{% url 'reports:index' %}">
+        <i class="bi bi-bar-chart"></i> Reports
+      </a>
+      {% endif %}
 
       <div class="nav-label">System</div>
       <a class="side-link disabled"><i class="bi bi-shop"></i> Store Settings <em>Soon</em></a>

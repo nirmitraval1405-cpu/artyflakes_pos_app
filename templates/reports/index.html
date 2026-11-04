@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Reports · Artyflakes POS{% endblock %}
+{% block extra_css %}<link href="{% static 'css/reports.css' %}" rel="stylesheet">{% endblock %}
+
+{% block content %}
+<div class="rp-layout">
+
+  <!-- Report list -->
+  <section class="rp-list">
+    <div class="rp-top">
+      <h4>Select report to view or print</h4>
+      <div class="rp-search">
+        <i class="bi bi-search"></i>
+        <input id="rpSearch" type="text" placeholder="Search reports" autocomplete="off">
+      </div>
+    </div>
+    <p class="rp-note" id="rpNote"></p>
+
+    <div class="rp-scroll">
+      {% for section in sections %}
+      <div class="rp-section">
+        <h5><span>{{ section.title }}</span></h5>
+        {% for r in section.reports %}
+          <button type="button" class="rp-item{% if not r.ready %} soon{% endif %}" data-slug="{{ r.slug }}" data-ready="{% if r.ready %}1{% else %}0{% endif %}">
+            <i class="bi bi-clipboard"></i> {{ r.title }}
+          </button>
+        {% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <!-- Filter -->
+  <aside class="rp-filter">
+    <h4>Filter</h4>
+    <form id="rpForm" onsubmit="return false">
+      <label>Customers &amp; suppliers</label>
+      <select disabled title="Available with sales and purchase reports"><option>All</option></select>
+
+      <label>User</label>
+      <select disabled title="Available with sales reports"><option>All</option></select>
+
+      <label>Cash register</label>
+      <select disabled title="Available with sales reports"><option>All</option></select>
+
+      <label>Product</label>
+      <select name="product">
+        <option value="">All</option>
+        {% for p in products %}<option value="{{ p.pk }}">{{ p.name }}</option>{% endfor %}
+      </select>
+
+      <label>Product group</label>
+      <select name="group">
+        <option value="">All</option>
+        {% for c in categories %}<option value="{{ c.pk }}">{{ c.name }}</option>{% endfor %}
+      </select>
+
+      <div class="form-check rp-check">
+        <input class="form-check-input" type="checkbox" id="rpSub" checked disabled>
+        <label class="form-check-label" for="rpSub">Include subgroups</label>
+      </div>
+
+      <div class="rp-dates" title="Used by sales and purchase reports">
+        <i class="bi bi-calendar3"></i>
+        <input type="date" name="date_from" value="{{ date_from|date:'Y-m-d' }}">
+        <span>-</span>
+        <input type="date" name="date_to" value="{{ date_to|date:'Y-m-d' }}">
+      </div>
+    </form>
+
+    <div class="rp-actions">
+      <button type="button" class="rp-btn" id="btnShow" disabled><i class="bi bi-search"></i> Show report</button>
+      <button type="button" class="rp-btn" id="btnPrint" disabled><i class="bi bi-printer"></i> Print</button>
+      <button type="button" class="rp-btn" id="btnExcel" disabled title="Downloads a CSV file that opens in Excel"><i class="bi bi-file-earmark-excel"></i> Excel</button>
+      <button type="button" class="rp-btn" id="btnPdf" disabled title="Choose 'Save as PDF' in the print window"><i class="bi bi-file-earmark-pdf"></i> PDF</button>
+    </div>
+  </aside>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  (function () {
+    const viewUrl = "{% url 'reports:view' 'SLUG' %}";
+    const items = document.querySelectorAll(".rp-item");
+    const note = document.getElementById("rpNote");
+    const form = document.getElementById("rpForm");
+    const buttons = ["btnShow", "btnPrint", "btnExcel", "btnPdf"].map((id) => document.getElementById(id));
+    let selected = null;
+
+    function setButtons(on) { buttons.forEach((b) => (b.disabled = !on)); }
+
+    items.forEach((item) => {
+      item.addEventListener("click", () => {
+        items.forEach((i) => i.classList.remove("active"));
+        if (item.dataset.ready !== "1") {
+          selected = null;
+          setButtons(false);
+          note.textContent = "\u201C" + item.textContent.trim() + "\u201D needs sales, purchase or stock data. It will be available in a later phase.";
+          return;
+        }
+        item.classList.add("active");
+        selected = item.dataset.slug;
+        note.textContent = "";
+        setButtons(true);
+      });
+    });
+
+    function go(extra) {
+      if (!selected) return;
+      const params = new URLSearchParams(new FormData(form));
+      if (extra) extra.split("&").forEach((pair) => { const [k, v] = pair.split("="); params.set(k, v); });
+      window.location.href = viewUrl.replace("SLUG", selected) + "?" + params.toString();
+    }
+
+    document.getElementById("btnShow").addEventListener("click", () => go(""));
+    document.getElementById("btnPrint").addEventListener("click", () => go("print=1"));
+    document.getElementById("btnPdf").addEventListener("click", () => go("print=1"));
+    document.getElementById("btnExcel").addEventListener("click", () => go("format=csv"));
+
+    // Search box
+    document.getElementById("rpSearch").addEventListener("input", (e) => {
+      const q = e.target.value.trim().toLowerCase();
+      document.querySelectorAll(".rp-section").forEach((section) => {
+        let any = false;
+        section.querySelectorAll(".rp-item").forEach((item) => {
+          const show = !q || item.textContent.toLowerCase().includes(q);
+          item.style.display = show ? "" : "none";
+          if (show) any = true;
+        });
+        section.style.display = any ? "" : "none";
+      });
+    });
+  })();
+</script>
+{% endblock %}
