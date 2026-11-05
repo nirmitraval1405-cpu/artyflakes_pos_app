@@ -29,18 +29,20 @@
       <div class="nav-label">Manage</div>
 
       <!-- Inventory -->
-      {% with inv=request.resolver_match.app_name %}
+       <!-- Inventory -->
+      {% with inv=request.resolver_match.app_name pu=request.resolver_match.url_name %}
       <button class="side-link nav-toggle {% if inv != 'inventory' %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#grpInventory" aria-expanded="{% if inv == 'inventory' %}true{% else %}false{% endif %}">
         <i class="bi bi-box-seam"></i> Inventory
         <span class="chev"><i class="bi bi-chevron-right"></i></span>
       </button>
       <div class="collapse {% if inv == 'inventory' %}show{% endif %}" id="grpInventory">
         <div class="sub-list">
-          <a class="sub-link {% if inv == 'inventory' %}active{% endif %}" href="{% url 'inventory:product_list' %}">Products</a>
+          <a class="sub-link {% if inv == 'inventory' and pu|slice:':7' == 'product' or pu|slice:':5' == 'group' %}active{% endif %}" href="{% url 'inventory:product_list' %}">Products</a>
+          <a class="sub-link {% if pu|slice:':5' == 'stock' or pu == 'movement_list' %}{% if request.GET.filter != 'low' %}active{% endif %}{% endif %}" href="{% url 'inventory:stock_list' %}">Stock</a>
+          <a class="sub-link {% if pu == 'stock_list' and request.GET.filter == 'low' %}active{% endif %}" href="{% url 'inventory:stock_list' %}?filter=low">Low Stock</a>
           <span class="sub-link disabled">Categories <em>Soon</em></span>
           <span class="sub-link disabled">Brands <em>Soon</em></span>
           <span class="sub-link disabled">Units <em>Soon</em></span>
-          <span class="sub-link disabled">Low Stock <em>Soon</em></span>
         </div>
       </div>
       {% endwith %}

@@ -80,7 +80,7 @@
         <thead>
           <tr>
             <th>Code</th><th>Name</th><th>Group</th><th>Barcode</th>
-            <th class="num">Cost</th><th class="num">Sale price</th><th class="num">MRP</th><th class="num">GST %</th>
+            <th class="num">Cost</th><th class="num">Sale price</th><th class="num">MRP</th><th class="num">GST %</th><th class="num">Stock</th>
           </tr>
         </thead>
         <tbody>
@@ -94,9 +94,10 @@
             <td class="num">{{ p.sale_price|floatformat:"2g" }}</td>
             <td class="num">{{ p.mrp|floatformat:"2g" }}</td>
             <td class="num">{{ p.gst_rate|floatformat:"-2" }}</td>
+            <td class="num">{% if p.track_stock %}{{ p.stock|floatformat:"-3" }}{% else %}&mdash;{% endif %}</td>
           </tr>
           {% empty %}
-          <tr><td colspan="8" class="grid-empty">
+          <tr><td colspan="9" class="grid-empty">
             {% if q or group %}No products match this search or group.{% else %}No products yet. Click <strong>New product</strong> to add the first one.{% endif %}
           </td></tr>
           {% endfor %}

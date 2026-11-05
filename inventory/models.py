@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
@@ -35,9 +36,12 @@ class Product(TimeStampedModel):
         Category, null=True, blank=True, on_delete=models.SET_NULL, related_name="products"
     )
     barcode = models.CharField(max_length=64, unique=True, null=True, blank=True)
-    barcode_image = models.ImageField(upload_to="barcodes/", blank=True)
     hsn_code = models.CharField("HSN code", max_length=10, blank=True)
     unit = models.CharField(max_length=10, choices=Unit.choices, default=Unit.PCS)
+    track_stock = models.BooleanField(
+        "Track stock", default=True,
+        help_text="Untick for services or custom work that has no stock.",
+    )
 
     cost_price = models.DecimalField(max_digits=10, decimal_places=2, default=0, validators=[MinValueValidator(0)])
     sale_price = models.DecimalField(max_digits=10, decimal_places=2, default=0, validators=[MinValueValidator(0)])
@@ -67,3 +71,33 @@ class Product(TimeStampedModel):
         if not self.code:
             self.code = f"ART-{self.pk:05d}"
             super().save(update_fields=["code"])
+
+
+class StockMovement(TimeStampedModel):
+    """One row per stock change. Current stock = the sum of a product's rows.
+    Rows are never edited or deleted; mistakes are fixed with a new row."""
+
+    class Type(models.TextChoices):
+        OPENING = "opening", "Opening stock"
+        ADJUSTMENT = "adjustment", "Stock adjustment"
+        DAMAGE = "damage", "Damage / loss"
+        PURCHASE = "purchase", "Purchase"
+        PURCHASE_RETURN = "purchase_return", "Purchase return"
+        SALE = "sale", "Sale"
+        SALE_RETURN = "sale_return", "Sale return"
+
+    product = models.ForeignKey(Product, on_delete=models.PROTECT, related_name="movements")
+    quantity = models.DecimalField(max_digits=12, decimal_places=3)   # + stock in, - stock out
+    movement_type = models.CharField(max_length=20, choices=Type.choices)
+    reference = models.CharField(max_length=50, blank=True)           # invoice number, later
+    note = models.CharField(max_length=255, blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        indexes = [models.Index(fields=["product", "created_at"])]
+
+    def __str__(self):
+        return f"{self.product} {self.quantity:+}"

@@ -257,3 +257,13 @@
 /* ---------- Search-by-field dropdown ---------- */
 .grid-field { border: 0; border-right: 1px solid var(--border); background: transparent; color: var(--text); padding: .2rem .6rem .2rem 0; font-size: 13px; outline: 0; }
 .grid-search .count { margin-left: auto; }
+
+
+/* ---------- Stock status + movements ---------- */
+.st { font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 10px; white-space: nowrap; }
+.st-ok  { background: var(--tint-green); color: #5e6f4b; }
+.st-low { background: var(--tint-gold);  color: #8d6a3f; }
+.st-out { background: var(--tint-red);   color: #a85a5a; }
+.st-na  { background: var(--cream);      color: var(--muted); }
+.qty-in  { color: #5e6f4b; font-weight: 600; }
+.qty-out { color: #a85a5a; font-weight: 600; }

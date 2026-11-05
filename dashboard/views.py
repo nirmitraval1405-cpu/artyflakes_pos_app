@@ -4,6 +4,7 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
 from django.utils import timezone
 
+from inventory.stock import low_stock, qty_fmt, with_stock
 from people.models import Contact
 
 ZERO = Decimal("0.00")
@@ -27,6 +28,18 @@ def home(request):
         {"label": "Total Expenses", "value": ZERO, "icon": "bi-wallet2", "tone": "red"},
         {"label": "Total Payment Returns", "value": ZERO, "icon": "bi-cash-coin", "tone": "blue"},
     ]
+
+    low = low_stock(with_stock()).order_by("stock", "name")[:5]
+    low_rows = [
+        {
+            "name": p.name,
+            "code": p.code or "",
+            "stock": qty_fmt(p.stock),
+            "out": p.stock <= 0,
+        }
+        for p in low
+    ]
+
     context = {
         "today": timezone.localdate(),
         "primary_cards": primary_cards,
@@ -35,5 +48,6 @@ def home(request):
             "suppliers": Contact.objects.filter(is_supplier=True, is_active=True).count(),
             "customers": Contact.objects.filter(is_customer=True, is_system=False, is_active=True).count(),
         },
+        "low_stock": low_rows,
     }
     return render(request, "dashboard/home.html", context)

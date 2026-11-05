@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Stock · Artyflakes POS{% endblock %}
+{% block extra_css %}<link href="{% static 'css/inventory.css' %}" rel="stylesheet">{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h3>{% if flt == 'low' %}Low stock{% else %}Stock{% endif %}</h3>
+    <p>Management &bull; Inventory</p>
+  </div>
+</div>
+
+<div class="toolbar">
+  <a class="tb" href="{{ request.get_full_path }}"><i class="bi bi-arrow-repeat"></i><span>Refresh</span></a>
+  {% if can_edit %}
+    <a class="tb" id="btnAdd" href="{% url 'inventory:stock_add' %}"><i class="bi bi-box-arrow-in-down"></i><span>Add stock</span></a>
+    <a class="tb" id="btnCount" href="{% url 'inventory:stock_count' %}"><i class="bi bi-clipboard-check"></i><span>Stock count</span></a>
+    <a class="tb" id="btnDamage" href="{% url 'inventory:stock_damage' %}"><i class="bi bi-exclamation-octagon"></i><span>Damage / loss</span></a>
+    <a class="tb" href="{% url 'inventory:movement_list' %}"><i class="bi bi-clock-history"></i><span>Movements</span></a>
+    <a class="tb" href="{% url 'inventory:stock_export' %}"><i class="bi bi-arrow-up"></i><span>Export</span></a>
+  {% endif %}
+</div>
+
+<section class="grid-panel">
+  <form class="grid-search" method="get">
+    <select name="filter" class="grid-field" onchange="this.form.submit()">
+      <option value="" {% if not flt %}selected{% endif %}>All stock</option>
+      <option value="low" {% if flt == 'low' %}selected{% endif %}>Low stock</option>
+    </select>
+    <select name="group" class="grid-field" onchange="this.form.submit()">
+      <option value="">All groups</option>
+      {% for c in categories %}<option value="{{ c.pk }}" {% if group == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
+    </select>
+    <input type="text" name="q" value="{{ q }}" placeholder="Search by name, code or barcode" autocomplete="off">
+    <i class="bi bi-search"></i>
+    <span class="count">Products: <strong>{{ total }}</strong></span>
+  </form>
+
+  <div class="grid-wrap">
+    <table class="grid" id="stockRows">
+      <thead>
+        <tr>
+          <th>Code</th><th>Name</th><th>Group</th><th>Unit</th>
+          <th class="num">Stock</th><th class="num">Low stock level</th><th>Status</th>
+          {% if can_edit %}<th class="num">Stock value (cost)</th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr data-pk="{{ r.pk }}">
+          <td>{{ r.code }}</td>
+          <td>{{ r.name }}</td>
+          <td>{{ r.group }}</td>
+          <td>{{ r.unit }}</td>
+          <td class="num"><strong>{{ r.stock }}</strong></td>
+          <td class="num">{{ r.min_stock }}</td>
+          <td><span class="st st-{{ r.kind }}">{{ r.label }}</span></td>
+          {% if can_edit %}<td class="num">{{ r.value }}</td>{% endif %}
+        </tr>
+        {% empty %}
+        <tr><td colspan="{% if can_edit %}8{% else %}7{% endif %}" class="grid-empty">
+          {% if flt == 'low' %}Nothing is running low. 
+          {% elif q or group %}No products match this search.
+          {% else %}No products yet. Add products first, then add their stock here.{% endif %}
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if page.has_other_pages %}
+  <div class="pager">
+    {% if page.has_previous %}<a href="?{{ querystring }}&page={{ page.previous_page_number }}">&laquo; Previous</a>{% endif %}
+    <span>Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
+    {% if page.has_next %}<a href="?{{ querystring }}&page={{ page.next_page_number }}">Next &raquo;</a>{% endif %}
+  </div>
+  {% endif %}
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  (function () {
+    const rows = document.querySelectorAll("#stockRows tbody tr[data-pk]");
+    const links = ["btnAdd", "btnCount", "btnDamage"].map((id) => document.getElementById(id)).filter(Boolean);
+    const bases = links.map((l) => l.getAttribute("href"));
+
+    // Selecting a row makes the three buttons open with that product already chosen
+    rows.forEach((row) => {
+      row.addEventListener("click", () => {
+        rows.forEach((r) => r.classList.remove("selected"));
+        row.classList.add("selected");
+        links.forEach((l, i) => (l.href = bases[i] + "?product=" + row.dataset.pk));
+      });
+    });
+  })();
+</script>
+{% endblock %}
