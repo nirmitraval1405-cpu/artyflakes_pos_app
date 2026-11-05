@@ -1,0 +1,75 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Receipt {{ sale.invoice_no }}</title>
+  <link href="{% static 'css/bill.css' %}" rel="stylesheet">
+  <style>@page { size: 80mm auto; margin: 3mm; }</style>
+</head>
+<body class="receipt">
+<div class="no-print">
+  <button onclick="window.print()">Print</button>
+  <button onclick="window.close()">Close</button>
+</div>
+
+<div class="r-sheet">
+  {% if sale.status == 'voided' %}<div class="void-banner">VOIDED</div>{% endif %}
+
+  <div class="r-center">
+    <h1>{{ store.name }}</h1>
+    {% if store.tagline %}<div>{{ store.tagline }}</div>{% endif %}
+    {% if store.address %}<div>{{ store.address|linebreaksbr }}</div>{% endif %}
+    {% if store.phone %}<div>Ph: {{ store.phone }}</div>{% endif %}
+    {% if store.gstin %}<div>GSTIN: {{ store.gstin }}</div>{% endif %}
+  </div>
+  <hr>
+
+  <div class="r-row"><span>Invoice</span><strong>{{ sale.invoice_no }}</strong></div>
+  <div class="r-row"><span>Date</span><span>{{ sale.created_at|date:"d-m-Y H:i" }}</span></div>
+  <div class="r-row"><span>Cashier</span><span>{{ cashier_name }}</span></div>
+  {% if not walk_in %}<div class="r-row"><span>Customer</span><span>{{ sale.customer.name }}</span></div>{% endif %}
+  <hr>
+
+  {% for it in items %}
+  <div class="r-name">{{ it.name }}</div>
+  <div class="r-line">
+    <span>{{ it.qty|floatformat:"-3" }} x {{ it.price|floatformat:"2g" }}{% if it.discount > 0 %} (-{{ it.discount|floatformat:"2g" }}){% endif %}</span>
+    <span>{{ it.total|floatformat:"2g" }}</span>
+  </div>
+  {% endfor %}
+  <hr>
+
+  <div class="r-row"><span>Subtotal</span><span>{{ sale.subtotal|floatformat:"2g" }}</span></div>
+  {% if sale.discount_total > 0 %}
+  <div class="r-row"><span>Discount</span><span>-{{ sale.discount_total|floatformat:"2g" }}</span></div>
+  {% endif %}
+  <div class="r-row r-total"><span>TOTAL</span><span>{{ sale.total|floatformat:"2g" }}</span></div>
+  {% if sale.tax_total > 0 %}
+  <div class="r-row r-small"><span>Includes GST</span><span>{{ sale.tax_total|floatformat:"2g" }}</span></div>
+  {% endif %}
+  <hr>
+
+  {% for p in pay_lines %}
+  <div class="r-row"><span>{{ p.label }}{% if p.reference %} ({{ p.reference }}){% endif %}</span><span>{{ p.amount|floatformat:"2g" }}</span></div>
+  {% endfor %}
+  {% if sale.change_due > 0 %}
+  <div class="r-row"><span>Change</span><span>{{ sale.change_due|floatformat:"2g" }}</span></div>
+  {% endif %}
+
+  {% if sale.note %}<hr><div class="r-note">Note: {{ sale.note }}</div>{% endif %}
+  <hr>
+  <div class="r-center r-small">{{ store.footer }}</div>
+</div>
+
+<script>
+(function () {
+  var auto = {{ autoprint|yesno:"true,false" }};
+  if (!auto) return;
+  window.addEventListener("load", function () { window.print(); });
+  window.addEventListener("afterprint", function () { if (window.opener) window.close(); });
+})();
+</script>
+</body>
+</html>

@@ -1072,3 +1072,243 @@
     font-weight: 700;
     color: var(--primary);
 }
+
+/* ---------- After-payment screen ---------- */
+.done-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 2100;
+    background: var(--card-bg);
+    display: grid;
+    grid-template-columns: 320px 1fr;
+}
+
+.done-screen[hidden] {
+    display: none;
+}
+
+.ds-left {
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.ds-title {
+    padding: .9rem 1rem;
+    font-size: 1.15rem;
+    color: var(--primary);
+    border-bottom: 1px solid var(--border);
+}
+
+.ds-items {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.ds-item {
+    display: flex;
+    justify-content: space-between;
+    gap: .6rem;
+    padding: .55rem 1rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.ds-name {
+    font-weight: 700;
+    color: var(--primary);
+}
+
+.ds-qty {
+    font-size: 12px;
+    color: var(--muted);
+}
+
+.ds-amt {
+    font-weight: 700;
+    white-space: nowrap;
+    color: var(--primary);
+}
+
+.ds-totals {
+    border-top: 1px solid var(--border);
+    padding: .7rem 1rem;
+}
+
+.ds-totals>div {
+    display: flex;
+    justify-content: space-between;
+    padding: .15rem 0;
+    color: var(--muted);
+}
+
+.ds-totals>div[hidden] {
+    display: none;
+}
+
+.ds-totals .big {
+    color: var(--primary);
+    font-size: 1.4rem;
+    font-weight: 700;
+    border-top: 1px dashed var(--border);
+    border-bottom: 1px dashed var(--border);
+    margin: .3rem 0;
+    padding: .35rem 0;
+}
+
+.ds-right {
+    padding: 1.2rem 1.8rem;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.ds-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 1.15rem;
+    color: var(--primary);
+    padding-bottom: .8rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.ds-change {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: .6rem;
+    margin: 1.2rem 0 1rem;
+    font-size: 1.4rem;
+    color: var(--primary);
+}
+
+.ds-change i {
+    font-size: 2rem;
+}
+
+.ds-change strong {
+    font-size: 2rem;
+    color: var(--success);
+}
+
+.ds-question {
+    text-align: center;
+    font-weight: 300;
+    font-size: 1.9rem;
+    color: var(--primary);
+    margin: 1rem 0 1.2rem;
+}
+
+.ds-tiles {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: .8rem;
+    max-width: 980px;
+    width: 100%;
+    margin: 0 auto;
+}
+
+.ds-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: .6rem;
+    min-height: 112px;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--primary);
+    font-weight: 600;
+}
+
+.ds-tile i {
+    font-size: 2rem;
+}
+
+.ds-tile:hover:not(:disabled),
+.ds-tile:focus-visible {
+    border-color: var(--secondary);
+    background: var(--cream);
+    outline: 0;
+}
+
+.ds-tile:disabled {
+    opacity: .45;
+    cursor: not-allowed;
+}
+
+.ds-panel {
+    max-width: 980px;
+    width: 100%;
+    margin: 1rem auto 0;
+    padding: .9rem 1rem;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+.ds-panel[hidden],
+.ds-msg[hidden] {
+    display: none;
+}
+
+.ds-panel label {
+    display: block;
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--primary);
+    margin-bottom: .35rem;
+}
+
+.ds-inline {
+    display: flex;
+    gap: .5rem;
+}
+
+.ds-hint {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: .4rem;
+}
+
+.ds-msg {
+    max-width: 980px;
+    width: 100%;
+    margin: .8rem auto 0;
+    padding: .5rem .9rem;
+    background: var(--tint-gold);
+    color: #8d6a3f;
+    border-radius: 6px;
+    font-size: 13px;
+}
+
+.ds-foot {
+    margin-top: auto;
+    padding-top: 1.2rem;
+    display: flex;
+    justify-content: flex-end;
+}
+
+@media (max-width: 860px) {
+    .done-screen {
+        grid-template-columns: 1fr;
+        overflow-y: auto;
+    }
+
+    .ds-left {
+        border-right: 0;
+        border-bottom: 1px solid var(--border);
+        max-height: 40vh;
+    }
+
+    .ds-tiles {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .ds-question {
+        font-size: 1.4rem;
+    }
+}

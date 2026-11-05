@@ -223,9 +223,13 @@
     backdrop.hidden = false;
   }
 
-  function closeDialogs() {
+  function hideDialogs() {
     backdrop.hidden = true;
     dialogs.forEach((d) => (d.hidden = true));
+  }
+
+  function closeDialogs() {
+    hideDialogs();
     searchInput.focus();
   }
 
@@ -378,7 +382,22 @@
     if (e.key === "Enter") { e.preventDefault(); completeSale(); }
   });
 
+  // ---------- After the sale ----------
+  function startNewSale() {
+    resetSale();
+    searchInput.value = "";
+    searchInput.focus();
+  }
+
   function showDone(data) {
+    // The full-screen Actions page (receipt, invoice, WhatsApp, PDF, notes) lives in pos-done.js
+    if (window.PosDone) {
+      hideDialogs();
+      window.PosDone.open(data, startNewSale);
+      return;
+    }
+
+    // Fallback if pos-done.js is not loaded: the simple result window
     $("doneInvoice").textContent = data.invoice_no;
     $("doneTotal").textContent = "₹ " + data.total;
     $("doneChange").textContent = "₹ " + data.change;
@@ -390,8 +409,7 @@
   }
 
   $("doneNew").addEventListener("click", () => {
-    resetSale();
-    searchInput.value = "";
+    startNewSale();
     closeDialogs();
   });
 

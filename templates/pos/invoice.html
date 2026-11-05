@@ -1,0 +1,132 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% if store.gstin %}Tax invoice{% else %}Invoice{% endif %} {{ sale.invoice_no }}</title>
+  <link href="{% static 'css/bill.css' %}" rel="stylesheet">
+  <style>@page { size: A4; margin: 12mm; }</style>
+</head>
+<body class="invoice">
+<div class="no-print">
+  <button onclick="window.print()">Print</button>
+  <button onclick="window.close()">Close</button>
+</div>
+
+<div class="i-sheet">
+  {% if sale.status == 'voided' %}<div class="void-banner">VOIDED</div>{% endif %}
+
+  <div class="i-head">
+    <div class="i-store">
+      <h1>{{ store.name }}</h1>
+      {% if store.tagline %}<div>{{ store.tagline }}</div>{% endif %}
+      {% if store.address %}<div>{{ store.address|linebreaksbr }}</div>{% endif %}
+      {% if store.phone %}<div>Phone: {{ store.phone }}</div>{% endif %}
+      {% if store.gstin %}<div>GSTIN: {{ store.gstin }}</div>{% endif %}
+    </div>
+    <div class="i-doc">
+      <h2>{% if store.gstin %}TAX INVOICE{% else %}INVOICE{% endif %}</h2>
+      <table>
+        <tr><td>Invoice no.</td><td><strong>{{ sale.invoice_no }}</strong></td></tr>
+        <tr><td>Date</td><td>{{ sale.created_at|date:"d-m-Y H:i" }}</td></tr>
+        <tr><td>Cashier</td><td>{{ cashier_name }}</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="i-bill">
+    <b>Billed to</b>
+    {% if walk_in %}
+      Walk-in customer
+    {% else %}
+      <strong>{{ sale.customer.name }}</strong>
+      {% if sale.customer.phone %}<br>Phone: {{ sale.customer.phone }}{% endif %}
+      {% if sale.customer.address %}<br>{{ sale.customer.address|linebreaksbr }}{% endif %}
+      {% if sale.customer.gstin %}<br>GSTIN: {{ sale.customer.gstin }}{% endif %}
+    {% endif %}
+  </div>
+
+  <table class="i-items">
+    <thead>
+      <tr>
+        <th>#</th><th>Item</th><th>HSN</th><th class="n">Qty</th><th class="n">Rate (incl. GST)</th>
+        <th class="n">Disc.</th><th class="n">Taxable</th><th class="n">GST %</th><th class="n">GST</th><th class="n">Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for it in items %}
+      <tr>
+        <td>{{ forloop.counter }}</td>
+        <td>{{ it.name }}</td>
+        <td>{{ it.hsn }}</td>
+        <td class="n">{{ it.qty|floatformat:"-3" }}</td>
+        <td class="n">{{ it.price|floatformat:"2g" }}</td>
+        <td class="n">{{ it.discount|floatformat:"2g" }}</td>
+        <td class="n">{{ it.taxable|floatformat:"2g" }}</td>
+        <td class="n">{{ it.gst_rate|floatformat:"-2" }}</td>
+        <td class="n">{{ it.tax|floatformat:"2g" }}</td>
+        <td class="n">{{ it.total|floatformat:"2g" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="i-lower">
+    <div>
+      {% if tax_summary %}
+      <table class="i-tax">
+        <thead>
+          <tr><th>GST rate</th><th class="n">Taxable</th><th class="n">CGST</th><th class="n">SGST</th></tr>
+        </thead>
+        <tbody>
+          {% for g in tax_summary %}
+          <tr>
+            <td>{{ g.rate|floatformat:"-2" }}%</td>
+            <td class="n">{{ g.taxable|floatformat:"2g" }}</td>
+            <td class="n">{{ g.half_rate|floatformat:"-2" }}% &nbsp; {{ g.cgst|floatformat:"2g" }}</td>
+            <td class="n">{{ g.half_rate|floatformat:"-2" }}% &nbsp; {{ g.sgst|floatformat:"2g" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% endif %}
+
+      <div style="margin-top:10px;">
+        <b>Payment</b>
+        {% for p in pay_lines %}
+        <div>{{ p.label }}{% if p.reference %} ({{ p.reference }}){% endif %}: {{ p.amount|floatformat:"2g" }}</div>
+        {% endfor %}
+        {% if sale.change_due > 0 %}<div>Change returned: {{ sale.change_due|floatformat:"2g" }}</div>{% endif %}
+      </div>
+
+      {% if sale.note %}<div style="margin-top:10px;"><b>Note</b><br>{{ sale.note }}</div>{% endif %}
+    </div>
+
+    <div>
+      <table class="i-sum">
+        <tr><td>Subtotal (incl. GST)</td><td>{{ sale.subtotal|floatformat:"2g" }}</td></tr>
+        {% if sale.discount_total > 0 %}<tr><td>Discount</td><td>-{{ sale.discount_total|floatformat:"2g" }}</td></tr>{% endif %}
+        {% if sale.tax_total > 0 %}
+        <tr><td>Taxable value</td><td>{{ taxable_total|floatformat:"2g" }}</td></tr>
+        <tr><td>CGST</td><td>{{ cgst_total|floatformat:"2g" }}</td></tr>
+        <tr><td>SGST</td><td>{{ sgst_total|floatformat:"2g" }}</td></tr>
+        {% endif %}
+        <tr class="grand"><td>Total</td><td>{{ sale.total|floatformat:"2g" }}</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="i-foot">{{ store.footer }} &nbsp;&bull;&nbsp; This is a computer-generated invoice.</div>
+</div>
+
+<script>
+(function () {
+  var auto = {{ autoprint|yesno:"true,false" }};
+  if (!auto) return;
+  window.addEventListener("load", function () { window.print(); });
+  window.addEventListener("afterprint", function () { if (window.opener) window.close(); });
+})();
+</script>
+</body>
+</html>

@@ -1,5 +1,5 @@
 from decimal import Decimal, InvalidOperation
-
+from django.utils import timezone
 from django.conf import settings
 from django.db import IntegrityError, transaction
 
@@ -139,14 +139,28 @@ def compute_bill(lines, bill_kind=None, bill_value=0):
 
 # ---------- Checkout ----------
 def _result(sale, warnings, duplicate=False):
-    return {
+     return {
         "ok": True,
         "duplicate": duplicate,
         "sale_id": sale.pk,
         "invoice_no": sale.invoice_no,
+        "created": timezone.localtime(sale.created_at).strftime("%d-%m-%Y %H:%M"),
+        "subtotal": f"{sale.subtotal:,.2f}",
+        "discount": f"{sale.discount_total:,.2f}",
+        "tax": f"{sale.tax_total:,.2f}",
         "total": f"{sale.total:,.2f}",
         "paid": f"{sale.amount_paid:,.2f}",
         "change": f"{sale.change_due:,.2f}",
+        "customer_phone": "" if sale.customer.is_system else sale.customer.phone,
+        "lines": [
+            {
+                "name": i.product_name,
+                "qty": f"{i.quantity.normalize():f}",
+                "price": f"{i.unit_price:,.2f}",
+                "amount": f"{i.line_total:,.2f}",
+            }
+            for i in sale.items.all()
+        ],
         "warnings": warnings,
     }
 

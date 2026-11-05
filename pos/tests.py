@@ -220,3 +220,62 @@ class CheckoutTests(TestCase):
         Contact.objects.create(name="Vendor Co", is_customer=False, is_supplier=True)
         names = [c["name"] for c in self.client.get(reverse("pos:customer_search")).json()["results"]]
         self.assertEqual(names, ["Asha"])
+
+
+class BillPrintTests(TestCase):
+    def setUp(self):
+        User.objects.create_user("c1", password="pw12345!", role="cashier")
+        User.objects.create_user("c2", password="pw12345!", role="cashier")
+        User.objects.create_user("boss2", password="pw12345!", role="admin")
+        product = Product.objects.create(
+            name="Resin", sale_price=Decimal("250.00"), mrp=Decimal("300.00"),
+            gst_rate=Decimal("18"), hsn_code="3906",
+        )
+        StockMovement.objects.create(product=product, quantity=5, movement_type="opening")
+
+        self.client.login(username="c1", password="pw12345!")
+        body = {
+            "items": [{"product_id": product.pk, "quantity": "2"}],
+            "payments": [{"method": "cash", "amount": "500.00"}],
+        }
+        response = self.client.post(reverse("pos:checkout"), data=json.dumps(body), content_type="application/json")
+        self.result = response.json()
+        self.sale = Sale.objects.get()
+
+    def test_checkout_result_includes_lines_for_the_after_payment_screen(self):
+        self.assertEqual(self.result["lines"][0]["name"], "Resin")
+        self.assertEqual(self.result["lines"][0]["qty"], "2")
+        self.assertIn("created", self.result)
+
+    def test_receipt_shows_invoice_number_and_total(self):
+        response = self.client.get(reverse("pos:receipt", args=[self.sale.pk]))
+        self.assertContains(response, self.sale.invoice_no)
+        self.assertContains(response, "500.00")
+
+    def test_invoice_shows_the_gst_split(self):
+        response = self.client.get(reverse("pos:invoice", args=[self.sale.pk]))
+        self.assertContains(response, "CGST")
+        self.assertContains(response, "76.27")
+        self.assertContains(response, "38.14")
+
+    def test_another_cashier_cannot_open_the_bill(self):
+        self.client.logout()
+        self.client.login(username="c2", password="pw12345!")
+        self.assertEqual(self.client.get(reverse("pos:receipt", args=[self.sale.pk])).status_code, 404)
+        self.assertEqual(self.client.get(reverse("pos:invoice", args=[self.sale.pk])).status_code, 404)
+
+    def test_admin_can_open_any_bill(self):
+        self.client.logout()
+        self.client.login(username="boss2", password="pw12345!")
+        self.assertEqual(self.client.get(reverse("pos:receipt", args=[self.sale.pk])).status_code, 200)
+
+    def test_bills_require_login(self):
+        self.client.logout()
+        self.assertEqual(self.client.get(reverse("pos:receipt", args=[self.sale.pk])).status_code, 302)
+
+    def test_note_is_saved(self):
+        url = reverse("pos:sale_note", args=[self.sale.pk])
+        response = self.client.post(url, data=json.dumps({"note": "Gift wrap"}), content_type="application/json")
+        self.assertEqual(response.status_code, 200)
+        self.sale.refresh_from_db()
+        self.assertEqual(self.sale.note, "Gift wrap")

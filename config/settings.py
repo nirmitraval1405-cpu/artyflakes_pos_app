@@ -154,3 +154,13 @@ TIME_ZONE = "Asia/Kolkata"
 
 # Highest total discount (percent of the bill) a Cashier may give. Admins have no limit.
 POS_CASHIER_MAX_DISCOUNT_PERCENT = 10
+
+
+STORE = {
+    "name": "Artyflakes",
+    "tagline": "Your One Stop Art & Craft Store",
+    "address": "",          # e.g. "Shop 12, Main Road\nAhmedabad 380001"
+    "phone": "",
+    "gstin": "",            # leave blank if not GST registered
+    "footer": "Thank you! Visit again.",
+}

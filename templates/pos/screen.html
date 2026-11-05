@@ -247,7 +247,69 @@
     </form>
   </div>
 </aside>
+<div class="done-screen" id="doneScreen" hidden
+     data-receipt-url="{% url 'pos:receipt' 0 %}"
+     data-invoice-url="{% url 'pos:invoice' 0 %}"
+     data-note-url="{% url 'pos:sale_note' 0 %}"
+     data-store="{{ store.name }}"
+     data-footer="{{ store.footer }}">
+
+  <div class="ds-left">
+    <div class="ds-title">Items</div>
+    <div class="ds-items" id="dsItems"></div>
+    <div class="ds-totals">
+      <div><span>Subtotal</span><span id="dsSub"></span></div>
+      <div id="dsDiscRow"><span>Discount</span><span id="dsDisc"></span></div>
+      <div id="dsTaxRow"><span>GST (included)</span><span id="dsTax"></span></div>
+      <div class="big"><span>Total</span><strong id="dsTotal"></strong></div>
+      <div><span>Paid</span><span id="dsPaid"></span></div>
+    </div>
+  </div>
+
+  <div class="ds-right">
+    <div class="ds-head"><span>Actions</span><strong id="dsInvoice"></strong></div>
+
+    <div class="ds-change"><i class="bi bi-cash-coin"></i> Change: <strong id="dsChange"></strong></div>
+    <div class="dlg-warn" id="dsWarn" hidden></div>
+
+    <h2 class="ds-question">How would the customer like their receipt?</h2>
+
+    <div class="ds-tiles">
+      <button type="button" class="ds-tile" id="dsReceipt" data-do="receipt"><i class="bi bi-receipt"></i><span>Print receipt</span></button>
+      <button type="button" class="ds-tile" data-do="invoice"><i class="bi bi-printer"></i><span>Print invoice</span></button>
+      <button type="button" class="ds-tile" data-do="whatsapp"><i class="bi bi-whatsapp"></i><span>WhatsApp bill</span></button>
+      <button type="button" class="ds-tile" data-do="pdf"><i class="bi bi-file-earmark-pdf"></i><span>Save as PDF</span></button>
+      <button type="button" class="ds-tile" data-do="note"><i class="bi bi-pencil"></i><span>Add notes</span></button>
+      <button type="button" class="ds-tile" disabled title="Coming soon"><i class="bi bi-envelope"></i><span>Send email</span></button>
+    </div>
+
+    <div class="ds-panel" id="dsWa" hidden>
+      <label for="waPhone">Customer's WhatsApp number</label>
+      <div class="ds-inline">
+        <input id="waPhone" class="form-control" inputmode="tel" autocomplete="off" placeholder="10-digit mobile number">
+        <button type="button" class="btn btn-brand" id="waOpen">Open WhatsApp</button>
+      </div>
+      <div class="dlg-error" id="waError" hidden></div>
+      <div class="ds-hint">WhatsApp opens with the bill typed in. Press Send there.</div>
+    </div>
+
+    <div class="ds-panel" id="dsNote" hidden>
+      <label for="noteText">Note on this bill</label>
+      <div class="ds-inline">
+        <input id="noteText" class="form-control" maxlength="255" autocomplete="off" placeholder="e.g. Gift wrap, deliver on Friday">
+        <button type="button" class="btn btn-brand" id="noteSave">Save note</button>
+      </div>
+    </div>
+
+    <div class="ds-msg" id="dsMsg" hidden></div>
+
+    <div class="ds-foot">
+      <button type="button" class="btn btn-brand btn-lg" id="dsDone">Done</button>
+    </div>
+  </div>
+</div>
 
 <script src="{% static 'js/pos.js' %}"></script>
+<script src="{% static 'js/pos-done.js' %}"></script>
 </body>
 </html>
