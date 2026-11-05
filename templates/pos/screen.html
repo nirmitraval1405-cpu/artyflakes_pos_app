@@ -17,10 +17,13 @@
   <header class="pos-top">
     <a class="pos-title" href="{% url 'dashboard:home' %}" title="Back to dashboard">POS Billing System</a>
 
-    <div class="pos-search">
-      <i class="bi bi-search"></i>
-      <input id="posSearch" type="text" placeholder="Search product by name, code or barcode..." autocomplete="off">
-      <button type="button" class="scan-btn" id="scanBtn" disabled title="Barcode scanners type into the search box"><i class="bi bi-upc-scan"></i> Scan Barcode</button>
+    <div class="pos-search-wrap">
+      <div class="pos-search">
+        <i class="bi bi-search"></i>
+        <input id="posSearch" type="text" placeholder="Search product by name, code or barcode..." autocomplete="off">
+        <button type="button" class="scan-btn" id="scanBtn" title="Focus search for a barcode scanner"><i class="bi bi-upc-scan"></i> Scan Barcode</button>
+      </div>
+      <div class="product-results" id="productResults" role="listbox" hidden></div>
     </div>
 
     <button class="pos-pill pill-brand" disabled title="Coming soon"><i class="bi bi-globe2"></i> Website Orders</button>
@@ -61,13 +64,14 @@
       <div class="cart-totals">
         <div class="tot"><span>Items</span><strong id="totItems">0</strong></div>
         <div class="tot"><span>Subtotal</span><strong id="totSub">₹ 0.00</strong></div>
-        <div class="tot"><span>Tax (0%)</span><strong id="totTax">₹ 0.00</strong></div>
+        <div class="tot"><span>Discount</span><strong id="totDiscount">₹ 0.00</strong></div>
+        <div class="tot"><span>Tax</span><strong id="totTax">₹ 0.00</strong></div>
         <div class="tot grand"><span>Total</span><strong id="totGrand">₹ 0.00</strong></div>
       </div>
 
       <div class="cart-strip">
-        <div><i class="bi bi-globe2"></i><span>Website Order<br><small>None</small></span></div>
-        <div><i class="bi bi-box-seam"></i><span>Stock Auto Update<br><small>Coming soon</small></span></div>
+        <div><i class="bi bi-person"></i><span>Customer<br><small id="customerDisplay">Walk-in</small></span></div>
+        <div><i class="bi bi-box-seam"></i><span>Stock Auto Update<br><small>At checkout</small></span></div>
         <div><i class="bi bi-whatsapp"></i><span>WhatsApp Bill<br><small>Coming soon</small></span></div>
       </div>
     </section>
@@ -80,24 +84,24 @@
         <button class="key k-blue" data-action="new"><i class="bi bi-file-earmark-plus"></i><span><b>F8</b> New Sale</span></button>
       </div>
       <div class="key-row cols-3">
-        <button class="key k-green" disabled title="Coming soon"><i class="bi bi-cash-stack"></i><span><b>F12</b> Cash</span></button>
-        <button class="key k-blue" disabled title="Coming soon"><i class="bi bi-credit-card"></i><span>Card</span></button>
-        <button class="key k-lilac" disabled title="Coming soon"><i class="bi bi-card-checklist"></i><span>Check</span></button>
+        <button class="key k-green" data-action="cash"><i class="bi bi-cash-stack"></i><span><b>F12</b> Cash</span></button>
+        <button class="key k-blue" data-action="card"><i class="bi bi-credit-card"></i><span>Card</span></button>
+        <button class="key k-lilac" data-action="check"><i class="bi bi-card-checklist"></i><span>Check</span></button>
       </div>
       <div class="key-row cols-4">
-        <button class="key k-gold" disabled title="Coming soon"><i class="bi bi-inbox"></i><span>Cash Drawer</span></button>
-        <button class="key k-blue" disabled title="Coming soon"><i class="bi bi-percent"></i><span><b>F2</b> Discount</span></button>
-        <button class="key k-blue" disabled title="Coming soon"><i class="bi bi-tag"></i><span>Price</span></button>
-        <button class="key k-blue" disabled title="Coming soon"><i class="bi bi-person"></i><span>Customer</span></button>
+        <button class="key k-gold" data-action="drawer"><i class="bi bi-inbox"></i><span>Cash Drawer</span></button>
+        <button class="key k-blue" data-action="discount"><i class="bi bi-percent"></i><span><b>F2</b> Discount</span></button>
+        <button class="key k-blue" data-action="price"><i class="bi bi-tag"></i><span>Price</span></button>
+        <button class="key k-blue" data-action="customer"><i class="bi bi-person"></i><span>Customer</span></button>
       </div>
       <div class="key-row cols-4">
-        <button class="key k-lilac" disabled title="Coming soon"><i class="bi bi-floppy"></i><span><b>F9</b> Save Sale</span></button>
-        <button class="key k-pink" disabled title="Coming soon"><i class="bi bi-arrow-counterclockwise"></i><span>Refund</span></button>
-        <button class="key k-pay span-2" disabled title="Coming soon"><i class="bi bi-credit-card-2-front"></i><span><b>F10</b> Payment</span></button>
+        <button class="key k-lilac" data-action="hold"><i class="bi bi-floppy"></i><span><b>F9</b> Save Sale</span></button>
+        <button class="key k-pink" data-action="refund"><i class="bi bi-arrow-counterclockwise"></i><span>Refund</span></button>
+        <button class="key k-pay span-2" data-action="payment"><i class="bi bi-credit-card-2-front"></i><span><b>F10</b> Payment</span></button>
       </div>
       <div class="key-row cols-4">
-        <button class="key k-blue" disabled title="Coming soon"><i class="bi bi-lock"></i><span>Lock</span></button>
-        <button class="key k-blue" disabled title="Coming soon"><i class="bi bi-arrow-left-right"></i><span><b>F7</b> Transfer</span></button>
+        <button class="key k-blue" data-action="lock"><i class="bi bi-lock"></i><span>Lock</span></button>
+        <button class="key k-blue" data-action="transfer"><i class="bi bi-arrow-left-right"></i><span><b>F7</b> Transfer</span></button>
         <button class="key k-pink" data-action="void"><i class="bi bi-x-circle"></i><span>Void Order</span></button>
         <button class="key k-blue" data-action="menu"><i class="bi bi-three-dots"></i><span>More</span></button>
       </div>
@@ -126,7 +130,7 @@
   <hr class="sp-line">
 
   <button class="sp-item" disabled title="Coming soon"><i class="bi bi-check2-all"></i> View sales history</button>
-  <button class="sp-item" disabled title="Coming soon"><i class="bi bi-layers-fill"></i> View open sales</button>
+  <button class="sp-item" type="button" data-action="held"><i class="bi bi-layers-fill"></i> View held sales</button>
   <button class="sp-item" disabled title="Coming soon"><i class="bi bi-box-arrow-in-down"></i> Cash In / Out</button>
   <button class="sp-item" disabled title="Coming soon"><i class="bi bi-journal-text"></i> Credit payments</button>
   <button class="sp-item" disabled title="Coming soon"><i class="bi bi-door-open"></i> End of day</button>
@@ -151,6 +155,39 @@
   </div>
 </aside>
 
-<script src="{% static 'js/pos.js' %}"></script>
+<dialog id="paymentDialog" class="pos-dialog">
+  <form id="paymentForm">
+    <h2>Complete payment</h2>
+    <p>Amount due: <strong id="paymentDue">₹ 0.00</strong></p>
+    <label for="paymentMethod">Payment method</label>
+    <select id="paymentMethod" required>
+      <option value="cash">Cash</option>
+      <option value="card">Card</option>
+      <option value="upi">UPI</option>
+      <option value="check">Check</option>
+      <option value="split">Split payment</option>
+    </select>
+    <div id="splitFields" hidden>
+      <label>Cash <input id="payCash" type="number" min="0" step="0.01" value="0"></label>
+      <label>Card <input id="payCard" type="number" min="0" step="0.01" value="0"></label>
+      <label>UPI <input id="payUpi" type="number" min="0" step="0.01" value="0"></label>
+    </div>
+    <div class="dialog-actions">
+      <button type="button" id="paymentCancel">Cancel</button>
+      <button type="submit">Charge sale</button>
+    </div>
+  </form>
+</dialog>
+<dialog id="receiptDialog" class="pos-dialog">
+  <h2>Sale complete</h2>
+  <pre id="receiptContent"></pre>
+  <div class="dialog-actions">
+    <button type="button" id="receiptClose">Close</button>
+    <button type="button" id="receiptPrint">Print receipt</button>
+  </div>
+</dialog>
+
+<form hidden>{% csrf_token %}</form>
+<script src="{% static 'js/pos_billing.js' %}"></script>
 </body>
 </html>
