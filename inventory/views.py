@@ -1,18 +1,29 @@
 import csv
+import json
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
+from django.core.files.storage import default_storage
 from django.core.paginator import Paginator
+from django.db import IntegrityError, transaction
 from django.db.models import Count, Q
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import render
 from django.urls import reverse_lazy
+from django.views.decorators.http import require_POST
 from django.views.generic import CreateView, DeleteView, UpdateView
 
 from core.permissions import AdminRequiredMixin
 
 from .forms import CategoryForm, ProductForm
 from .models import Category, Product
+from .utils.barcode_generator import (
+    create_barcode_image,
+    generate_barcode,
+    get_barcode_image_name,
+    validate_barcode,
+)
 
 LIST_URL = reverse_lazy("inventory:product_list")
 
@@ -90,18 +101,70 @@ class FormPage(AdminRequiredMixin):
         return super().form_valid(form)
 
 
-class ProductCreate(FormPage, CreateView):
+class ProductFormPage(FormPage):
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["product_form"] = True
+        return context
+
+    def form_valid(self, form):
+        barcode = form.cleaned_data.get("barcode")
+        if not barcode:
+            barcode = generate_barcode(sku=form.cleaned_data.get("code"))
+        else:
+            barcode = validate_barcode(barcode, exclude_pk=form.instance.pk)
+
+        old_image_name = form.instance.barcode_image.name
+        image_name = get_barcode_image_name(barcode)
+        if not default_storage.exists(image_name):
+            image_name = create_barcode_image(barcode)
+
+        form.instance.barcode = barcode
+        form.instance.barcode_image.name = image_name
+        try:
+            with transaction.atomic():
+                self.object = form.save()
+        except IntegrityError:
+            form.add_error("barcode", "This barcode is already assigned to another product.")
+            return self.form_invalid(form)
+
+        if old_image_name and old_image_name != image_name:
+            default_storage.delete(old_image_name)
+        messages.success(self.request, self.saved_message)
+        return HttpResponseRedirect(self.get_success_url())
+
+
+class ProductCreate(ProductFormPage, CreateView):
     model = Product
     form_class = ProductForm
     saved_message = "Product added."
     extra_context = {"title": "New product", "back_url": LIST_URL}
 
 
-class ProductUpdate(FormPage, UpdateView):
+class ProductUpdate(ProductFormPage, UpdateView):
     model = Product
     form_class = ProductForm
     saved_message = "Product updated."
     extra_context = {"title": "Edit product", "back_url": LIST_URL}
+
+
+@login_required
+@require_POST
+def generate_product_barcode(request):
+    if not request.user.is_admin_role:
+        return JsonResponse({"error": "You do not have permission to generate barcodes."}, status=403)
+
+    sku = request.POST.get("code", "").strip()
+    try:
+        barcode = generate_barcode(sku=sku or None)
+    except ValidationError as exc:
+        return JsonResponse({"error": exc.messages[0]}, status=400)
+
+    image_name = create_barcode_image(barcode)
+    return JsonResponse({
+        "barcode": barcode,
+        "image_url": default_storage.url(image_name),
+    })
 
 
 class CategoryCreate(FormPage, CreateView):

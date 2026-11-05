@@ -4,6 +4,8 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
 from django.utils import timezone
 
+from people.models import Contact
+
 ZERO = Decimal("0.00")
 
 
@@ -29,5 +31,9 @@ def home(request):
         "today": timezone.localdate(),
         "primary_cards": primary_cards,
         "secondary_cards": secondary_cards,
+        "overall": {
+            "suppliers": Contact.objects.filter(is_supplier=True, is_active=True).count(),
+            "customers": Contact.objects.filter(is_customer=True, is_system=False, is_active=True).count(),
+        },
     }
     return render(request, "dashboard/home.html", context)

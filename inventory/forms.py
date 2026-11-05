@@ -1,5 +1,6 @@
 from django import forms
 
+from .utils.barcode_generator import validate_barcode
 from .models import Category, Product
 
 
@@ -34,7 +35,7 @@ class ProductForm(forms.ModelForm):
         ]
         help_texts = {
             "code": "Leave blank to auto-generate (ART-00001).",
-            "barcode": "Optional. Scan or type it. Must be unique.",
+            "barcode": "Optional. Scan or type it. Must be unique. Generated values use CODE128, not EAN-13.",
             "mrp": "Maximum retail price. Sale price cannot be higher.",
             "min_stock": "Used later for low-stock warnings.",
         }
@@ -45,7 +46,12 @@ class ProductForm(forms.ModelForm):
 
     def clean_barcode(self):
         value = self.cleaned_data.get("barcode")
-        return value.strip() or None if value else None
+        if not value:
+            return None
+        value = value.strip()
+        if not value:
+            return None
+        return validate_barcode(value, exclude_pk=self.instance.pk)
 
     def clean_code(self):
         value = self.cleaned_data.get("code")

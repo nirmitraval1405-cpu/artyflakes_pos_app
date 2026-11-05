@@ -50,7 +50,37 @@
     {% include "dashboard/_panel_empty.html" with icon="bi-arrow-left-right" title="Sales & Purchase" empty_icon="bi-bar-chart" message="No sales or purchases yet" needs="Chart appears after Sales (Phase 6) and Purchases (Phase 7)" %}
   </div>
   <div class="col-xl-4">
-    {% include "dashboard/_panel_empty.html" with icon="bi-info-circle" title="Overall Information" empty_icon="bi-people" message="No customers or suppliers yet" needs="Needs Customers and Suppliers (Phase 3)" %}
+    <div class="panel h-100">
+      <div class="panel-head">
+        <span class="panel-icon"><i class="bi bi-info-circle"></i></span>
+        <h6>Overall Information</h6>
+      </div>
+      <div class="panel-body">
+        <div class="row g-2 text-center">
+          <div class="col-4">
+            <div class="mini-card">
+              <i class="bi bi-truck fs-5" style="color: var(--secondary);"></i>
+              <div class="mini-label small">Suppliers</div>
+              <div class="mini-value">{{ overall.suppliers }}</div>
+            </div>
+          </div>
+          <div class="col-4">
+            <div class="mini-card">
+              <i class="bi bi-people fs-5" style="color: var(--secondary);"></i>
+              <div class="mini-label small">Customers</div>
+              <div class="mini-value">{{ overall.customers }}</div>
+            </div>
+          </div>
+          <div class="col-4">
+            <div class="mini-card" title="Available after Sales (Phase 5)">
+              <i class="bi bi-cart3 fs-5" style="color: var(--secondary);"></i>
+              <div class="mini-label small">Orders</div>
+              <div class="mini-value">&mdash;</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 

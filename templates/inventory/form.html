@@ -27,6 +27,33 @@
             <label class="form-label fw-semibold" for="{{ field.id_for_label }}">{{ field.label }}</label>
             {{ field }}
           {% endif %}
+          {% if field.name == 'barcode' %}
+            <span id="product-barcode-config" class="d-none"
+                  data-generate-url="{% url 'inventory:barcode_generate' %}"></span>
+            <div class="mt-2 d-flex flex-wrap gap-2">
+              <button class="btn btn-outline-primary btn-sm" type="button" id="generate-barcode">
+                <i class="bi bi-upc-scan me-1"></i>Generate Barcode
+              </button>
+              <button class="btn btn-outline-secondary btn-sm d-none" type="button" id="regenerate-barcode">
+                <i class="bi bi-arrow-clockwise me-1"></i>Regenerate Barcode
+              </button>
+              <button class="btn btn-outline-secondary btn-sm {% if not field.value %}d-none{% endif %}" type="button" id="copy-barcode">
+                <i class="bi bi-clipboard me-1"></i>Copy Barcode
+              </button>
+              <a class="btn btn-outline-secondary btn-sm {% if not form.instance.barcode_image %}d-none{% endif %}"
+                 id="download-barcode" {% if form.instance.barcode_image %}href="{{ form.instance.barcode_image.url }}"{% endif %}
+                 download="barcode.png">
+                <i class="bi bi-download me-1"></i>Download Barcode
+              </a>
+            </div>
+            <div class="mt-3 p-3 border rounded bg-light {% if not form.instance.barcode_image %}d-none{% endif %}" id="barcode-preview">
+              <div class="small text-muted mb-2">Barcode preview</div>
+              <img class="img-fluid" id="barcode-image"
+                   {% if form.instance.barcode_image %}src="{{ form.instance.barcode_image.url }}"{% endif %}
+                   alt="Barcode preview">
+            </div>
+            <div class="small text-danger mt-2 d-none" id="barcode-error" role="alert"></div>
+          {% endif %}
           {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
           {% for error in field.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
         </div>
@@ -40,4 +67,78 @@
     </form>
   </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+{% if product_form %}
+<script>
+(() => {
+  const barcodeField = document.getElementById("id_barcode");
+  const skuField = document.getElementById("id_code");
+  const config = document.getElementById("product-barcode-config");
+  const preview = document.getElementById("barcode-preview");
+  const image = document.getElementById("barcode-image");
+  const download = document.getElementById("download-barcode");
+  const copy = document.getElementById("copy-barcode");
+  const generate = document.getElementById("generate-barcode");
+  const regenerate = document.getElementById("regenerate-barcode");
+  const error = document.getElementById("barcode-error");
+  if (!barcodeField || !config) return;
+
+  const updateControls = () => {
+    const hasBarcode = Boolean(barcodeField.value);
+    copy.classList.toggle("d-none", !hasBarcode);
+    generate.classList.toggle("d-none", hasBarcode);
+    regenerate.classList.toggle("d-none", !hasBarcode);
+  };
+  barcodeField.addEventListener("input", updateControls);
+  updateControls();
+
+  const requestBarcode = async () => {
+    error.textContent = "";
+    error.classList.add("d-none");
+    generate.disabled = true;
+    regenerate.disabled = true;
+    try {
+      const csrfToken = document.querySelector("[name=csrfmiddlewaretoken]").value;
+      const formData = new FormData();
+      formData.set("code", skuField ? skuField.value : "");
+      const response = await fetch(config.dataset.generateUrl, {
+        method: "POST",
+        headers: {"X-CSRFToken": csrfToken},
+        body: formData,
+        credentials: "same-origin"
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Unable to generate barcode.");
+      barcodeField.value = result.barcode;
+      image.src = result.image_url;
+      preview.classList.remove("d-none");
+      download.href = result.image_url;
+      download.classList.remove("d-none");
+      updateControls();
+    } catch (exception) {
+      error.textContent = exception.message;
+      error.classList.remove("d-none");
+    } finally {
+      generate.disabled = false;
+      regenerate.disabled = false;
+    }
+  };
+
+  generate.addEventListener("click", requestBarcode);
+  regenerate.addEventListener("click", requestBarcode);
+  copy.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(barcodeField.value);
+      copy.innerHTML = '<i class="bi bi-check2 me-1"></i>Copied';
+    } catch (exception) {
+      error.textContent = "Could not copy the barcode. Please copy it from the input field.";
+      error.classList.remove("d-none");
+    }
+  });
+})();
+</script>
+{% endif %}
 {% endblock %}

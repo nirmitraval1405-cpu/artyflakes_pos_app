@@ -35,6 +35,7 @@ class Product(TimeStampedModel):
         Category, null=True, blank=True, on_delete=models.SET_NULL, related_name="products"
     )
     barcode = models.CharField(max_length=64, unique=True, null=True, blank=True)
+    barcode_image = models.ImageField(upload_to="barcodes/", blank=True)
     hsn_code = models.CharField("HSN code", max_length=10, blank=True)
     unit = models.CharField(max_length=10, choices=Unit.choices, default=Unit.PCS)
 

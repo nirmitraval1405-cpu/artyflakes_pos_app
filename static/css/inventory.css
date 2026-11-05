@@ -253,3 +253,7 @@
         overflow: visible;
     }
 }
+
+/* ---------- Search-by-field dropdown ---------- */
+.grid-field { border: 0; border-right: 1px solid var(--border); background: transparent; color: var(--text); padding: .2rem .6rem .2rem 0; font-size: 13px; outline: 0; }
+.grid-search .count { margin-left: auto; }

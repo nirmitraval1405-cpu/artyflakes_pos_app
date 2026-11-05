@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Customers &amp; suppliers · Artyflakes POS{% endblock %}
+{% block extra_css %}<link href="{% static 'css/inventory.css' %}" rel="stylesheet">{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h3>Customers &amp; suppliers</h3>
+    <p>
+      Management &bull; People
+      {% if kind %}&bull; showing {{ kind }}s only &ndash; <a href="{% url 'people:contact_list' %}">show all</a>{% endif %}
+    </p>
+  </div>
+</div>
+
+<div class="toolbar">
+  <a class="tb" href="{{ request.get_full_path }}"><i class="bi bi-arrow-repeat"></i><span>Refresh</span></a>
+  <a class="tb" href="{% url 'people:contact_create' %}"><i class="bi bi-plus-lg"></i><span>Add</span></a>
+  <a class="tb disabled" id="btnEdit"><i class="bi bi-pencil"></i><span>Edit</span></a>
+  <a class="tb disabled" id="btnDelete"><i class="bi bi-trash"></i><span>Delete</span></a>
+  <span class="tb disabled" title="Coming soon"><i class="bi bi-arrow-down"></i><span>Import</span></span>
+  <a class="tb" href="{% url 'people:contact_export' %}"><i class="bi bi-arrow-up"></i><span>Export</span></a>
+  <span class="tb disabled" title="Coming soon"><i class="bi bi-question-circle"></i><span>Help</span></span>
+</div>
+
+<section class="grid-panel">
+  <form class="grid-search" method="get">
+    {% if kind %}<input type="hidden" name="type" value="{{ kind }}">{% endif %}
+    <select name="field" class="grid-field" onchange="this.form.q.focus()">
+      {% for key, label in search_fields.items %}
+        <option value="{{ key }}" {% if key == field %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    <input type="text" name="q" value="{{ q }}" placeholder="Search customers &amp; suppliers" autocomplete="off">
+    <i class="bi bi-search"></i>
+    <span class="count">Count: <strong>{{ total }}</strong></span>
+  </form>
+
+  <div class="grid-wrap">
+    <table class="grid" id="partyRows">
+      <thead>
+        <tr>
+          <th>Code</th><th>Name</th><th>Tax number</th><th>Address</th>
+          <th>Country</th><th>Phone number</th><th>Email</th><th>Type</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr data-pk="{{ r.pk }}" data-edit="{{ r.edit }}" data-delete="{{ r.delete }}" class="{% if r.inactive %}inactive{% endif %}">
+          {% for cell in r.cells %}
+            <td>{{ cell }}{% if forloop.counter == 2 and r.inactive %} <span class="tag">Inactive</span>{% endif %}</td>
+          {% endfor %}
+        </tr>
+        {% empty %}
+        <tr><td colspan="8" class="grid-empty">Nothing matches this search.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if page.has_other_pages %}
+  <div class="pager">
+    {% if page.has_previous %}<a href="?{{ querystring }}&page={{ page.previous_page_number }}">&laquo; Previous</a>{% endif %}
+    <span>Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
+    {% if page.has_next %}<a href="?{{ querystring }}&page={{ page.next_page_number }}">Next &raquo;</a>{% endif %}
+  </div>
+  {% endif %}
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  (function () {
+    const rows = document.querySelectorAll("#partyRows tbody tr[data-pk]");
+    const btnEdit = document.getElementById("btnEdit");
+    const btnDelete = document.getElementById("btnDelete");
+
+    function set(btn, url) {
+      if (url) { btn.href = url; btn.classList.remove("disabled"); }
+      else { btn.removeAttribute("href"); btn.classList.add("disabled"); }
+    }
+
+    rows.forEach((row) => {
+      row.addEventListener("click", () => {
+        rows.forEach((r) => r.classList.remove("selected"));
+        row.classList.add("selected");
+        set(btnEdit, row.dataset.edit);      // empty for the Walk-in customer
+        set(btnDelete, row.dataset.delete);
+      });
+      row.addEventListener("dblclick", () => {
+        if (row.dataset.edit) window.location.href = row.dataset.edit;
+      });
+    });
+  })();
+</script>
+{% endblock %}
