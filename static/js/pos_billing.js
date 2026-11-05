@@ -12,6 +12,7 @@
   const body = $("cartBody");
   const empty = $("cartEmpty");
   const searchInput = $("posSearch");
+  const searchUrl = searchInput.dataset.url;
   const results = $("productResults");
   const csrfToken = document.querySelector("[name=csrfmiddlewaretoken]").value;
   const paymentDialog = $("paymentDialog");
@@ -54,13 +55,13 @@
     return {
       id: product.id,
       name: product.name,
-      sku: product.sku || "",
+      sku: product.code || "",
       barcode: product.barcode || "",
       price: toPaise(product.price),
       mrp: toPaise(product.mrp || product.price),
-      gstRate: Number(product.gst_rate || 0),
+      gstRate: Number(product.gst || 0),
       stock: Number(product.stock || 0),
-      trackStock: Boolean(product.track_stock),
+      trackStock: Boolean(product.track),
       qty: 1,
       discount: 0,
     };
@@ -70,9 +71,9 @@
     const item = state.items.find((entry) => entry.id === product.id);
     const currentQuantity = item ? item.qty : 0;
     const stock = Number(product.stock || (item && item.stock) || 0);
-    const trackStock = product.track_stock === undefined
+    const trackStock = product.track === undefined
       ? Boolean(item && item.trackStock)
-      : Boolean(product.track_stock);
+      : Boolean(product.track);
     if (trackStock && currentQuantity + 1 > stock) {
       $("searchNote").textContent = `Insufficient stock. Available: ${stock}.`;
       return;
@@ -210,7 +211,7 @@
   async function searchProducts(query) {
     const sequence = ++searchSequence;
     try {
-      const data = await api(`/api/products/search/?q=${encodeURIComponent(query)}`, { method: "GET" });
+      const data = await api(`${searchUrl}?q=${encodeURIComponent(query)}`, { method: "GET" });
       if (sequence !== searchSequence) return [];
       latestResults = data.results;
       showResults(data.results);
@@ -242,8 +243,8 @@
       button.setAttribute("role", "option");
       const name = element("span");
       name.appendChild(element("strong", "", product.name));
-      name.appendChild(element("small", "", product.sku || product.barcode || "No code"));
-      const stockText = product.track_stock ? `Stock: ${product.stock}` : "Not tracked";
+      name.appendChild(element("small", "", product.code || product.barcode || "No code"));
+      const stockText = product.track ? `Stock: ${product.stock}` : "Not tracked";
       const stock = element("span", "product-result-stock");
       stock.appendChild(element("strong", "", money(toPaise(product.price))));
       stock.appendChild(element("small", "", stockText));
@@ -268,7 +269,7 @@
     if (!products.length) products = await searchProducts(query);
     const exact = products.find((product) =>
       product.barcode.toLowerCase() === query.toLowerCase()
-      || product.sku.toLowerCase() === query.toLowerCase()
+      || product.code.toLowerCase() === query.toLowerCase()
     );
     if (exact || (rapidScan && products.length === 1)) {
       addItem(exact || products[0]);

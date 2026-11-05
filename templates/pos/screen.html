@@ -11,19 +11,21 @@
   <link href="{% static 'css/pos.css' %}" rel="stylesheet">
 </head>
 <body class="pos-body">
-<div class="pos-app">
+<div class="pos-app"
+     data-checkout-url="{% url 'pos:checkout' %}"
+     data-customer-url="{% url 'pos:customer_search' %}"
+     data-csrf="{{ csrf_token }}"
+     data-max-discount="{{ max_discount }}">
 
   <!-- Top bar -->
   <header class="pos-top">
     <a class="pos-title" href="{% url 'dashboard:home' %}" title="Back to dashboard">POS Billing System</a>
 
-    <div class="pos-search-wrap">
-      <div class="pos-search">
-        <i class="bi bi-search"></i>
-        <input id="posSearch" type="text" placeholder="Search product by name, code or barcode..." autocomplete="off">
-        <button type="button" class="scan-btn" id="scanBtn" title="Focus search for a barcode scanner"><i class="bi bi-upc-scan"></i> Scan Barcode</button>
-      </div>
-      <div class="product-results" id="productResults" role="listbox" hidden></div>
+    <div class="pos-search">
+      <i class="bi bi-search"></i>
+      <input id="posSearch" type="text" placeholder="Search product by name, code or barcode..." autocomplete="off" data-url="{% url 'pos:product_search' %}">
+      <button type="button" class="scan-btn" id="scanBtn" disabled title="Barcode scanners type into the search box"><i class="bi bi-upc-scan"></i> Scan Barcode</button>
+      <div class="pos-results" id="posResults" hidden></div>
     </div>
 
     <button class="pos-pill pill-brand" disabled title="Coming soon"><i class="bi bi-globe2"></i> Website Orders</button>
@@ -37,6 +39,8 @@
       </div>
     </div>
   </header>
+
+  <div class="pos-note" id="posNote" hidden></div>
 
   <!-- Main -->
   <div class="pos-main">
@@ -61,17 +65,21 @@
         </div>
       </div>
 
+      <div class="cart-meta">
+        <span><i class="bi bi-person"></i> Customer: <strong id="metaCustomer">Walk-in customer</strong></span>
+        <button type="button" id="metaClear" class="meta-clear" hidden title="Use Walk-in customer">&times;</button>
+      </div>
+
       <div class="cart-totals">
         <div class="tot"><span>Items</span><strong id="totItems">0</strong></div>
         <div class="tot"><span>Subtotal</span><strong id="totSub">₹ 0.00</strong></div>
-        <div class="tot"><span>Discount</span><strong id="totDiscount">₹ 0.00</strong></div>
-        <div class="tot"><span>Tax</span><strong id="totTax">₹ 0.00</strong></div>
-        <div class="tot grand"><span>Total</span><strong id="totGrand">₹ 0.00</strong></div>
+        <div class="tot"><span>GST (incl.)</span><strong id="totTax">₹ 0.00</strong></div>
+        <div class="tot grand"><span>Total</span><strong id="totGrand">₹ 0.00</strong><small id="totDisc"></small></div>
       </div>
 
       <div class="cart-strip">
-        <div><i class="bi bi-person"></i><span>Customer<br><small id="customerDisplay">Walk-in</small></span></div>
-        <div><i class="bi bi-box-seam"></i><span>Stock Auto Update<br><small>At checkout</small></span></div>
+        <div><i class="bi bi-globe2"></i><span>Website Order<br><small>None</small></span></div>
+        <div><i class="bi bi-box-seam"></i><span>Stock Auto Update<br><small>On</small></span></div>
         <div><i class="bi bi-whatsapp"></i><span>WhatsApp Bill<br><small>Coming soon</small></span></div>
       </div>
     </section>
@@ -84,24 +92,24 @@
         <button class="key k-blue" data-action="new"><i class="bi bi-file-earmark-plus"></i><span><b>F8</b> New Sale</span></button>
       </div>
       <div class="key-row cols-3">
-        <button class="key k-green" data-action="cash"><i class="bi bi-cash-stack"></i><span><b>F12</b> Cash</span></button>
+        <button class="key k-green" data-action="cash"><i class="bi bi-cash-stack"></i><span>Cash</span></button>
         <button class="key k-blue" data-action="card"><i class="bi bi-credit-card"></i><span>Card</span></button>
-        <button class="key k-lilac" data-action="check"><i class="bi bi-card-checklist"></i><span>Check</span></button>
+        <button class="key k-lilac" disabled title="Coming soon"><i class="bi bi-card-checklist"></i><span>Check</span></button>
       </div>
       <div class="key-row cols-4">
-        <button class="key k-gold" data-action="drawer"><i class="bi bi-inbox"></i><span>Cash Drawer</span></button>
+        <button class="key k-gold" disabled title="Coming soon"><i class="bi bi-inbox"></i><span>Cash Drawer</span></button>
         <button class="key k-blue" data-action="discount"><i class="bi bi-percent"></i><span><b>F2</b> Discount</span></button>
-        <button class="key k-blue" data-action="price"><i class="bi bi-tag"></i><span>Price</span></button>
+        <button class="key k-blue" disabled title="Coming soon"><i class="bi bi-tag"></i><span>Price</span></button>
         <button class="key k-blue" data-action="customer"><i class="bi bi-person"></i><span>Customer</span></button>
       </div>
       <div class="key-row cols-4">
-        <button class="key k-lilac" data-action="hold"><i class="bi bi-floppy"></i><span><b>F9</b> Save Sale</span></button>
-        <button class="key k-pink" data-action="refund"><i class="bi bi-arrow-counterclockwise"></i><span>Refund</span></button>
-        <button class="key k-pay span-2" data-action="payment"><i class="bi bi-credit-card-2-front"></i><span><b>F10</b> Payment</span></button>
+        <button class="key k-lilac" disabled title="Coming soon"><i class="bi bi-floppy"></i><span><b>F9</b> Save Sale</span></button>
+        <button class="key k-pink" disabled title="Coming soon"><i class="bi bi-arrow-counterclockwise"></i><span>Refund</span></button>
+        <button class="key k-pay span-2" data-action="pay"><i class="bi bi-credit-card-2-front"></i><span><b>F10</b> Payment</span></button>
       </div>
       <div class="key-row cols-4">
-        <button class="key k-blue" data-action="lock"><i class="bi bi-lock"></i><span>Lock</span></button>
-        <button class="key k-blue" data-action="transfer"><i class="bi bi-arrow-left-right"></i><span><b>F7</b> Transfer</span></button>
+        <button class="key k-blue" disabled title="Coming soon"><i class="bi bi-lock"></i><span>Lock</span></button>
+        <button class="key k-blue" disabled title="Coming soon"><i class="bi bi-arrow-left-right"></i><span><b>F7</b> Transfer</span></button>
         <button class="key k-pink" data-action="void"><i class="bi bi-x-circle"></i><span>Void Order</span></button>
         <button class="key k-blue" data-action="menu"><i class="bi bi-three-dots"></i><span>More</span></button>
       </div>
@@ -114,6 +122,91 @@
     <span>Artyflakes POS &nbsp;|&nbsp; v1.0.0</span>
     <span><i class="bi bi-heart-fill"></i> Your One Stop Art &amp; Craft Store</span>
   </footer>
+</div>
+
+<!-- Dialogs -->
+<div class="dlg-backdrop" id="dlgBackdrop" hidden>
+
+  <!-- Payment -->
+  <div class="dlg" id="dlgPay" hidden role="dialog" aria-modal="true" aria-label="Payment">
+    <h5>Payment</h5>
+    <div class="dlg-total"><span>Total to pay</span><strong id="payTotal">₹ 0.00</strong></div>
+
+    <div class="pay-row">
+      <label for="payCash">Cash</label>
+      <input id="payCash" inputmode="decimal" autocomplete="off" placeholder="0.00">
+      <button type="button" class="fill" data-fill="payCash" title="Fill the remaining amount">Fill</button>
+    </div>
+    <div class="pay-row">
+      <label for="payUpi">UPI</label>
+      <input id="payUpi" inputmode="decimal" autocomplete="off" placeholder="0.00">
+      <button type="button" class="fill" data-fill="payUpi" title="Fill the remaining amount">Fill</button>
+      <input id="payUpiRef" class="ref" autocomplete="off" placeholder="UPI reference (optional)" maxlength="60">
+    </div>
+    <div class="pay-row">
+      <label for="payCard">Card</label>
+      <input id="payCard" inputmode="decimal" autocomplete="off" placeholder="0.00">
+      <button type="button" class="fill" data-fill="payCard" title="Fill the remaining amount">Fill</button>
+      <input id="payCardRef" class="ref" autocomplete="off" placeholder="Card reference (optional)" maxlength="60">
+    </div>
+
+    <div class="dlg-sum">
+      <div><span>Paid</span><strong id="payPaid">₹ 0.00</strong></div>
+      <div><span id="payLeftLabel">Due</span><strong id="payLeft">₹ 0.00</strong></div>
+    </div>
+    <div class="dlg-error" id="payError" hidden></div>
+
+    <div class="dlg-actions">
+      <button type="button" class="btn btn-outline-secondary" data-close>Cancel</button>
+      <button type="button" class="btn btn-brand" id="payConfirm" disabled>Complete sale</button>
+    </div>
+  </div>
+
+  <!-- Discount -->
+  <div class="dlg" id="dlgDisc" hidden role="dialog" aria-modal="true" aria-label="Discount">
+    <h5>Discount</h5>
+    <label class="dlg-label" for="discScope">Apply to</label>
+    <select id="discScope" class="form-select"></select>
+    <label class="dlg-label" for="discType">Type</label>
+    <select id="discType" class="form-select">
+      <option value="percent">Percent (%)</option>
+      <option value="amount">Amount (₹)</option>
+    </select>
+    <label class="dlg-label" for="discValue">Value</label>
+    <input id="discValue" class="form-control" inputmode="decimal" autocomplete="off" placeholder="0">
+    <div class="dlg-hint" id="discHint"></div>
+    <div class="dlg-error" id="discError" hidden></div>
+    <div class="dlg-actions">
+      <button type="button" class="btn btn-outline-danger me-auto" id="discRemove">Remove</button>
+      <button type="button" class="btn btn-outline-secondary" data-close>Cancel</button>
+      <button type="button" class="btn btn-brand" id="discApply">Apply</button>
+    </div>
+  </div>
+
+  <!-- Customer -->
+  <div class="dlg" id="dlgCust" hidden role="dialog" aria-modal="true" aria-label="Customer">
+    <h5>Customer</h5>
+    <input id="custSearch" class="form-control" autocomplete="off" placeholder="Search by name or phone">
+    <div class="cust-list" id="custList"></div>
+    <div class="dlg-actions">
+      <button type="button" class="btn btn-outline-secondary" data-close>Close</button>
+    </div>
+  </div>
+
+  <!-- Result -->
+  <div class="dlg" id="dlgDone" hidden role="dialog" aria-modal="true" aria-label="Sale complete">
+    <div class="done-icon"><i class="bi bi-check-circle-fill"></i></div>
+    <h5 class="text-center">Sale complete</h5>
+    <div class="done-invoice" id="doneInvoice"></div>
+    <div class="dlg-sum">
+      <div><span>Total</span><strong id="doneTotal"></strong></div>
+      <div><span>Change to return</span><strong id="doneChange"></strong></div>
+    </div>
+    <div class="dlg-warn" id="doneWarn" hidden></div>
+    <div class="dlg-actions">
+      <button type="button" class="btn btn-brand w-100" id="doneNew">New sale</button>
+    </div>
+  </div>
 </div>
 
 <!-- Side menu (opened by "More") -->
@@ -130,7 +223,7 @@
   <hr class="sp-line">
 
   <button class="sp-item" disabled title="Coming soon"><i class="bi bi-check2-all"></i> View sales history</button>
-  <button class="sp-item" type="button" data-action="held"><i class="bi bi-layers-fill"></i> View held sales</button>
+  <button class="sp-item" disabled title="Coming soon"><i class="bi bi-layers-fill"></i> View open sales</button>
   <button class="sp-item" disabled title="Coming soon"><i class="bi bi-box-arrow-in-down"></i> Cash In / Out</button>
   <button class="sp-item" disabled title="Coming soon"><i class="bi bi-journal-text"></i> Credit payments</button>
   <button class="sp-item" disabled title="Coming soon"><i class="bi bi-door-open"></i> End of day</button>
@@ -155,39 +248,6 @@
   </div>
 </aside>
 
-<dialog id="paymentDialog" class="pos-dialog">
-  <form id="paymentForm">
-    <h2>Complete payment</h2>
-    <p>Amount due: <strong id="paymentDue">₹ 0.00</strong></p>
-    <label for="paymentMethod">Payment method</label>
-    <select id="paymentMethod" required>
-      <option value="cash">Cash</option>
-      <option value="card">Card</option>
-      <option value="upi">UPI</option>
-      <option value="check">Check</option>
-      <option value="split">Split payment</option>
-    </select>
-    <div id="splitFields" hidden>
-      <label>Cash <input id="payCash" type="number" min="0" step="0.01" value="0"></label>
-      <label>Card <input id="payCard" type="number" min="0" step="0.01" value="0"></label>
-      <label>UPI <input id="payUpi" type="number" min="0" step="0.01" value="0"></label>
-    </div>
-    <div class="dialog-actions">
-      <button type="button" id="paymentCancel">Cancel</button>
-      <button type="submit">Charge sale</button>
-    </div>
-  </form>
-</dialog>
-<dialog id="receiptDialog" class="pos-dialog">
-  <h2>Sale complete</h2>
-  <pre id="receiptContent"></pre>
-  <div class="dialog-actions">
-    <button type="button" id="receiptClose">Close</button>
-    <button type="button" id="receiptPrint">Print receipt</button>
-  </div>
-</dialog>
-
-<form hidden>{% csrf_token %}</form>
-<script src="{% static 'js/pos_billing.js' %}"></script>
+<script src="{% static 'js/pos.js' %}"></script>
 </body>
 </html>

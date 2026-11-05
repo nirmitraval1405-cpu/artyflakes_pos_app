@@ -151,3 +151,6 @@ LOGOUT_REDIRECT_URL = "accounts:login"
 
 STATICFILES_DIRS = [BASE_DIR / "static"]
 TIME_ZONE = "Asia/Kolkata"  
+
+# Highest total discount (percent of the bill) a Cashier may give. Admins have no limit.
+POS_CASHIER_MAX_DISCOUNT_PERCENT = 10

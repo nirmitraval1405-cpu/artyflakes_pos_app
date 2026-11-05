@@ -8,7 +8,7 @@ from django.urls import reverse
 from accounts.models import User
 
 from .forms import ProductForm
-from .models import Product
+from .models import Product, StockMovement
 from .utils.barcode_generator import (
     create_barcode_image,
     generate_barcode,
@@ -158,7 +158,6 @@ class BarcodeEndpointTests(TestCase):
             "min_stock": "0",
         })
         self.assertTrue(no_stock_form.is_valid(), no_stock_form.errors)
-
         form = ProductForm(data={
             "name": "Untracked product",
             "track_stock": "",
@@ -200,3 +199,49 @@ class BarcodeEndpointTests(TestCase):
             self.assertEqual(product.name, "After edit")
             self.assertEqual(product.barcode_image.name, image_name)
             self.assertTrue(default_storage.exists(image_name))
+
+
+class ProductDeleteTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="inventory-admin",
+            password="test-password",
+            role=User.Role.ADMIN,
+        )
+        self.client.force_login(self.user)
+        self.product = Product.objects.create(name="Historical product")
+        self.delete_url = reverse("inventory:product_delete", args=[self.product.pk])
+
+    def test_product_with_stock_history_is_archived(self):
+        movement = StockMovement.objects.create(
+            product=self.product,
+            quantity=2,
+            movement_type=StockMovement.Type.OPENING,
+            created_by=self.user,
+        )
+
+        response = self.client.post(self.delete_url)
+
+        self.assertRedirects(response, reverse("inventory:product_list"))
+        self.product.refresh_from_db()
+        self.assertFalse(self.product.is_active)
+        self.assertTrue(Product.objects.filter(pk=self.product.pk).exists())
+        self.assertTrue(StockMovement.objects.filter(pk=movement.pk).exists())
+
+    def test_confirmation_explains_historical_product_will_be_archived(self):
+        StockMovement.objects.create(
+            product=self.product,
+            quantity=2,
+            movement_type=StockMovement.Type.OPENING,
+        )
+
+        response = self.client.get(self.delete_url)
+
+        self.assertContains(response, "Archive product")
+        self.assertContains(response, "mark it inactive")
+
+    def test_product_without_history_is_deleted(self):
+        response = self.client.post(self.delete_url)
+
+        self.assertRedirects(response, reverse("inventory:product_list"))
+        self.assertFalse(Product.objects.filter(pk=self.product.pk).exists())

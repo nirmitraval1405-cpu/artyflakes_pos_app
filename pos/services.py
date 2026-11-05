@@ -1,0 +1,313 @@
+from decimal import Decimal, InvalidOperation
+
+from django.conf import settings
+from django.db import IntegrityError, transaction
+
+from inventory.models import Product, StockMovement
+from inventory.stock import current_stock, qty_fmt
+from people.models import Contact
+
+from .models import InvoiceCounter, Payment, Sale, SaleItem
+
+MAX_LINES = 100
+MAX_RUPEES = Decimal("10000000")        # sanity limit: Rs 1 crore per amount
+COUNT_UNITS = {"pcs", "set", "box", "pack"}   # these must be sold in whole numbers
+
+
+class CheckoutError(Exception):
+    def __init__(self, message, status=400):
+        super().__init__(message)
+        self.status = status
+
+
+# ---------- Small helpers (all money is whole paise) ----------
+def div_round(a, b):
+    """a / b rounded half-up, for non-negative whole numbers."""
+    return (2 * a + b) // (2 * b)
+
+
+def rupees(paise):
+    return (Decimal(paise) / 100).quantize(Decimal("0.01"))
+
+
+def _money_text(paise):
+    return f"{rupees(paise):,.2f}"
+
+
+def _decimal(value, label):
+    if isinstance(value, bool) or value is None or value == "":
+        raise CheckoutError(f"{label} is required.")
+    try:
+        d = Decimal(str(value).strip())
+    except InvalidOperation:
+        raise CheckoutError(f"{label} is not a valid number.")
+    if not d.is_finite():
+        raise CheckoutError(f"{label} is not a valid number.")
+    return d
+
+
+def _hundredths(value, label, upper):
+    """'12.50' -> 1250. Rejects negatives, more than 2 decimals, and values above `upper`."""
+    d = _decimal(value, label)
+    if d < 0 or d > upper:
+        raise CheckoutError(f"{label} is out of range.")
+    scaled = d * 100
+    if scaled != scaled.to_integral_value():
+        raise CheckoutError(f"{label} can have at most 2 decimal places.")
+    return int(scaled)
+
+
+def to_paise(value, label):
+    return _hundredths(value, label, MAX_RUPEES)
+
+
+def to_basis_points(value, label):
+    return _hundredths(value, label, Decimal(100))
+
+
+def parse_discount(spec, label):
+    if not spec:
+        return None, 0
+    if not isinstance(spec, dict):
+        raise CheckoutError(f"{label} is invalid.")
+    kind = spec.get("type", "none")
+    if kind == "none":
+        return None, 0
+    if kind == "percent":
+        return "percent", to_basis_points(spec.get("value", 0), label)
+    if kind == "amount":
+        return "amount", to_paise(spec.get("value", 0), label)
+    raise CheckoutError(f"{label} has an unknown type.")
+
+
+def _apply_discount(base, kind, value):
+    if kind == "percent":
+        amount = div_round(base * value, 10000)
+    elif kind == "amount":
+        amount = value
+    else:
+        amount = 0
+    return min(amount, base)
+
+
+# ---------- The money maths (pure, no database) ----------
+def compute_bill(lines, bill_kind=None, bill_value=0):
+    """
+    lines: list of {price, qty_milli, gst_bp, disc_kind, disc_value}   (price in paise, GST in basis points)
+    Prices include GST. Returns paise totals and per-line results.
+    The browser (pos.js) runs the same steps; keep the two in sync.
+    """
+    rows = []
+    for ln in lines:
+        gross = div_round(ln["price"] * ln["qty_milli"], 1000)
+        line_disc = _apply_discount(gross, ln["disc_kind"], ln["disc_value"])
+        rows.append({"gross": gross, "line_disc": line_disc, "net": gross - line_disc, "share": 0})
+
+    base = sum(r["net"] for r in rows)
+    bill_disc = _apply_discount(base, bill_kind, bill_value)
+
+    # Share the bill discount across lines in proportion to what each line costs
+    if bill_disc and base:
+        for r in rows:
+            r["share"] = bill_disc * r["net"] // base
+        left = bill_disc - sum(r["share"] for r in rows)
+        i = 0
+        while left > 0:
+            r = rows[i % len(rows)]
+            if r["share"] < r["net"]:
+                r["share"] += 1
+                left -= 1
+            i += 1
+
+    result_lines = []
+    for r, ln in zip(rows, lines):
+        discount = r["line_disc"] + r["share"]
+        total = r["gross"] - discount
+        gst_bp = ln["gst_bp"]
+        tax = div_round(total * gst_bp, 10000 + gst_bp)    # GST already inside the price
+        result_lines.append({"gross": r["gross"], "discount": discount, "tax": tax, "total": total})
+
+    return {
+        "lines": result_lines,
+        "subtotal": sum(l["gross"] for l in result_lines),
+        "bill_discount": bill_disc,
+        "discount_total": sum(l["discount"] for l in result_lines),
+        "tax_total": sum(l["tax"] for l in result_lines),
+        "total": sum(l["total"] for l in result_lines),
+    }
+
+
+# ---------- Checkout ----------
+def _result(sale, warnings, duplicate=False):
+    return {
+        "ok": True,
+        "duplicate": duplicate,
+        "sale_id": sale.pk,
+        "invoice_no": sale.invoice_no,
+        "total": f"{sale.total:,.2f}",
+        "paid": f"{sale.amount_paid:,.2f}",
+        "change": f"{sale.change_due:,.2f}",
+        "warnings": warnings,
+    }
+
+
+def create_sale(user, data):
+    token = str(data.get("client_token") or "")[:40] or None
+    if token:
+        existing = Sale.objects.filter(client_token=token).first()
+        if existing:
+            return _result(existing, [], duplicate=True)
+
+    # ---- 1. Read and check the request (no database changes yet) ----
+    raw_items = data.get("items")
+    if not isinstance(raw_items, list) or not raw_items:
+        raise CheckoutError("The bill is empty.")
+    if len(raw_items) > MAX_LINES:
+        raise CheckoutError(f"A bill can have at most {MAX_LINES} lines.")
+
+    specs, seen = [], set()
+    for raw in raw_items:
+        if not isinstance(raw, dict):
+            raise CheckoutError("An item on the bill is invalid.")
+        pid = raw.get("product_id")
+        if not isinstance(pid, int) or isinstance(pid, bool):
+            raise CheckoutError("An item on the bill is invalid.")
+        if pid in seen:
+            raise CheckoutError("The same product appears twice on the bill.")
+        seen.add(pid)
+
+        qty = _decimal(raw.get("quantity"), "Quantity")
+        milli = qty * 1000
+        if qty <= 0 or qty > 100000 or milli != milli.to_integral_value():
+            raise CheckoutError("Quantity must be above zero with at most 3 decimals.")
+        kind, value = parse_discount(raw.get("discount"), "Item discount")
+        specs.append({"pid": pid, "qty_milli": int(milli), "disc_kind": kind, "disc_value": value})
+
+    bill_kind, bill_value = parse_discount(data.get("bill_discount"), "Bill discount")
+
+    pay_rows = data.get("payments")
+    if not isinstance(pay_rows, list) or not pay_rows:
+        raise CheckoutError("Add at least one payment.")
+    payments = []
+    for raw in pay_rows:
+        if not isinstance(raw, dict):
+            raise CheckoutError("A payment is invalid.")
+        method = raw.get("method")
+        if method not in Payment.Method.values:
+            raise CheckoutError("Unknown payment method.")
+        amount = to_paise(raw.get("amount"), "Payment amount")
+        if amount <= 0:
+            raise CheckoutError("Payment amounts must be above zero.")
+        payments.append({"method": method, "amount": amount, "reference": str(raw.get("reference") or "")[:60]})
+
+    customer_id = data.get("customer_id")
+    expected_total = data.get("expected_total")
+
+    # ---- 2. Save everything or nothing ----
+    try:
+        with transaction.atomic():
+            # Lock the products being sold (in a fixed order, so two checkouts cannot deadlock)
+            products = {
+                p.pk: p for p in Product.objects.select_for_update().filter(pk__in=seen).order_by("pk")
+            }
+
+            lines = []
+            for s in specs:
+                p = products.get(s["pid"])
+                if p is None:
+                    raise CheckoutError("A product on the bill no longer exists.")
+                if not p.is_active:
+                    raise CheckoutError(f"{p.name} is inactive and cannot be sold.")
+                if p.unit in COUNT_UNITS and s["qty_milli"] % 1000:
+                    raise CheckoutError(f"{p.name} must be sold in whole numbers.")
+                lines.append({
+                    "price": int((p.sale_price * 100).to_integral_value()),   # the server's price, never the browser's
+                    "qty_milli": s["qty_milli"],
+                    "gst_bp": int((p.gst_rate * 100).to_integral_value()),
+                    "disc_kind": s["disc_kind"],
+                    "disc_value": s["disc_value"],
+                })
+
+            calc = compute_bill(lines, bill_kind, bill_value)
+            total = calc["total"]
+
+            if total <= 0:
+                raise CheckoutError("Nothing to pay on this bill.")
+
+            if expected_total is not None and expected_total != total:
+                raise CheckoutError(
+                    "The bill total changed (a price may have been updated). "
+                    "Reload the POS page and rebuild the bill.", status=409,
+                )
+
+            if not user.is_admin_role:
+                max_pct = Decimal(str(getattr(settings, "POS_CASHIER_MAX_DISCOUNT_PERCENT", 10)))
+                max_bp = int(max_pct * 100)
+                if calc["discount_total"] * 10000 > max_bp * calc["subtotal"]:
+                    raise CheckoutError(f"Discount is above your limit of {max_pct}%. Ask an admin to bill this.")
+
+            tendered = sum(p["amount"] for p in payments)
+            if tendered < total:
+                raise CheckoutError(f"Payment is short by \u20b9{_money_text(total - tendered)}.")
+            cash = sum(p["amount"] for p in payments if p["method"] == Payment.Method.CASH)
+            change = tendered - total
+            if change > cash:
+                raise CheckoutError("Only cash can be overpaid. UPI and card cannot be more than the bill.")
+
+            if customer_id in (None, ""):
+                customer = Contact.walk_in()
+            else:
+                customer = Contact.objects.filter(pk=customer_id, is_customer=True, is_active=True).first()
+                if customer is None:
+                    raise CheckoutError("That customer was not found.")
+
+            invoice_no = InvoiceCounter.next_invoice_no()
+            sale = Sale.objects.create(
+                invoice_no=invoice_no, customer=customer, cashier=user, client_token=token,
+                subtotal=rupees(calc["subtotal"]), bill_discount=rupees(calc["bill_discount"]),
+                discount_total=rupees(calc["discount_total"]), tax_total=rupees(calc["tax_total"]),
+                total=rupees(total), amount_paid=rupees(tendered), change_due=rupees(change),
+                note=str(data.get("note") or "")[:255],
+            )
+
+            items, movements, warnings = [], [], []
+            for s, line, result in zip(specs, lines, calc["lines"]):
+                p = products[s["pid"]]
+                qty = (Decimal(s["qty_milli"]) / 1000).quantize(Decimal("0.001"))
+                items.append(SaleItem(
+                    sale=sale, product=p, product_name=p.name, product_code=p.code or "",
+                    hsn_code=p.hsn_code, unit=p.unit, quantity=qty,
+                    unit_price=p.sale_price, mrp=p.mrp or p.sale_price, cost_price=p.cost_price,
+                    gst_rate=p.gst_rate, discount=rupees(result["discount"]),
+                    tax_amount=rupees(result["tax"]), line_total=rupees(result["total"]),
+                ))
+                if p.track_stock:
+                    before = current_stock(p)
+                    movements.append(StockMovement(
+                        product=p, quantity=-qty, movement_type=StockMovement.Type.SALE,
+                        reference=invoice_no, note="Sale", created_by=user,
+                    ))
+                    if before - qty < 0:
+                        warnings.append(f"{p.name}: stock is now {qty_fmt(before - qty)}. Please check the count.")
+            SaleItem.objects.bulk_create(items)
+            StockMovement.objects.bulk_create(movements)
+
+            # Payments add up to the bill: cash is recorded after change is handed back
+            pay_objs = [
+                Payment(sale=sale, method=p["method"], amount=rupees(p["amount"]), reference=p["reference"])
+                for p in payments if p["method"] != Payment.Method.CASH
+            ]
+            net_cash = cash - change
+            if net_cash > 0:
+                pay_objs.append(Payment(sale=sale, method=Payment.Method.CASH, amount=rupees(net_cash)))
+            Payment.objects.bulk_create(pay_objs)
+
+            return _result(sale, warnings)
+
+    except IntegrityError:
+        # Two identical submits raced each other: return the one that won
+        if token:
+            existing = Sale.objects.filter(client_token=token).first()
+            if existing:
+                return _result(existing, [], duplicate=True)
+        raise

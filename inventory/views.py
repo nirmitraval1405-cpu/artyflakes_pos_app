@@ -186,6 +186,34 @@ class ProductDelete(DeletePage, DeleteView):
         "warning": "Products that already have stock history cannot be deleted. Mark them inactive instead.",
     }
 
+    def has_history(self, product):
+        return product.movements.exists() or product.sale_items.exists()
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        if self.has_history(self.object):
+            context["title"] = "Archive product"
+            context["warning"] = (
+                "This product has stock or sales history and cannot be permanently deleted. "
+                "Confirm to mark it inactive. Its history will be preserved."
+            )
+            context["confirm_label"] = "Archive product"
+        return context
+
+    def form_valid(self, form):
+        with transaction.atomic():
+            product = Product.objects.select_for_update().get(pk=self.object.pk)
+            if self.has_history(product):
+                product.is_active = False
+                product.save(update_fields=["is_active", "updated_at"])
+                messages.success(
+                    self.request,
+                    f'"{product.name}" was archived and is no longer available for new sales.',
+                )
+                return redirect(self.success_url)
+            self.object = product
+            return super().form_valid(form)
+
 
 class CategoryDelete(DeletePage, DeleteView):
     model = Category
