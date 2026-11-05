@@ -27,6 +27,16 @@ class CategoryForm(forms.ModelForm):
 
 
 class ProductForm(forms.ModelForm):
+    opening_stock = forms.DecimalField(
+        required=False,
+        min_value=Decimal("0"),
+        max_digits=12,
+        decimal_places=3,
+        initial=Decimal("0"),
+        label="Opening stock",
+        help_text="Optional. Set the current quantity when creating this product.",
+    )
+
     class Meta:
         model = Product
         fields = [
@@ -43,7 +53,25 @@ class ProductForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        if self.instance.pk:
+            self.fields.pop("opening_stock")
+        else:
+            self.order_fields([
+                "name", "category", "barcode", "code", "unit", "track_stock",
+                "opening_stock", "cost_price", "sale_price", "mrp", "gst_rate",
+                "hsn_code", "min_stock", "is_active",
+            ])
         _style(self)
+
+    def clean(self):
+        cleaned_data = super().clean()
+        opening_stock = cleaned_data.get("opening_stock") or Decimal("0")
+        if (
+            not cleaned_data.get("track_stock")
+            and opening_stock > 0
+        ):
+            self.add_error("opening_stock", "Opening stock requires stock tracking to be enabled.")
+        return cleaned_data
 
     def clean_barcode(self):
         value = self.cleaned_data.get("barcode")

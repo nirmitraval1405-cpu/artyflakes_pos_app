@@ -81,6 +81,16 @@ class BarcodeEndpointTests(TestCase):
             image_name = response.json()["image_url"].removeprefix("/media/")
             self.assertTrue(Path(default_storage.path(image_name)).exists())
 
+    def test_barcode_generation_route_is_registered(self):
+        self.assertEqual(reverse("inventory:barcode_generate"), "/inventory/products/barcode/generate/")
+        response = self.client.get(reverse("inventory:product_create"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'data-generate-url="/inventory/products/barcode/generate/"')
+        self.assertContains(response, "requestBarcode")
+        self.assertContains(response, "Opening stock")
+        self.assertContains(response, 'name="opening_stock"')
+
     def test_product_creation_generates_and_saves_barcode_and_image(self):
         with tempfile.TemporaryDirectory() as media_root, override_settings(MEDIA_ROOT=media_root):
             self.client.get(reverse("inventory:product_create"))
@@ -106,6 +116,57 @@ class BarcodeEndpointTests(TestCase):
             self.assertEqual(response.status_code, 302)
             self.assertRegex(product.barcode, r"^\d{12}$")
             self.assertTrue(default_storage.exists(product.barcode_image.name))
+
+    def test_product_creation_records_optional_opening_stock(self):
+        self.client.get(reverse("inventory:product_create"))
+        response = self.client.post(
+            reverse("inventory:product_create"),
+            {
+                "name": "Stocked product",
+                "barcode": "",
+                "code": "",
+                "unit": Product.Unit.PCS,
+                "track_stock": "on",
+                "opening_stock": "12.5",
+                "cost_price": "0",
+                "sale_price": "0",
+                "mrp": "0",
+                "gst_rate": "0",
+                "hsn_code": "",
+                "min_stock": "0",
+                "is_active": "on",
+            },
+            HTTP_X_CSRFTOKEN=self.client.cookies["csrftoken"].value,
+        )
+
+        product = Product.objects.get(name="Stocked product")
+        movement = product.movements.get()
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(movement.quantity, 12.5)
+        self.assertEqual(movement.movement_type, "opening")
+        self.assertEqual(movement.created_by, self.user)
+
+    def test_opening_stock_requires_stock_tracking(self):
+        no_stock_form = ProductForm(data={
+            "name": "Untracked service",
+            "track_stock": "",
+            "unit": Product.Unit.PCS,
+            "cost_price": "0",
+            "sale_price": "0",
+            "mrp": "0",
+            "gst_rate": "0",
+            "min_stock": "0",
+        })
+        self.assertTrue(no_stock_form.is_valid(), no_stock_form.errors)
+
+        form = ProductForm(data={
+            "name": "Untracked product",
+            "track_stock": "",
+            "opening_stock": "3",
+        })
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("opening_stock", form.errors)
 
     def test_product_edit_preserves_existing_barcode_image(self):
         with tempfile.TemporaryDirectory() as media_root, override_settings(MEDIA_ROOT=media_root):

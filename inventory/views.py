@@ -2,12 +2,15 @@ import csv
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
+from django.core.files.storage import default_storage
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Count, ProtectedError, Q
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse_lazy
+from django.views.decorators.http import require_POST
 from django.views.generic import CreateView, DeleteView, FormView, UpdateView
 
 from core.permissions import AdminRequiredMixin
@@ -15,6 +18,7 @@ from core.permissions import AdminRequiredMixin
 from .forms import AddStockForm, CategoryForm, CountForm, DamageForm, ProductForm
 from .models import Category, Product, StockMovement
 from .stock import current_stock, low_stock, qty_fmt, stock_status, with_stock
+from .utils.barcode_generator import create_barcode_image, generate_barcode
 
 LIST_URL = reverse_lazy("inventory:product_list")
 STOCK_URL = reverse_lazy("inventory:stock_list")
@@ -84,6 +88,24 @@ def product_export(request):
     return response
 
 
+@login_required
+@require_POST
+def generate_product_barcode(request):
+    if not request.user.is_admin_role:
+        return JsonResponse({"error": "You do not have permission to generate barcodes."}, status=403)
+
+    try:
+        barcode = generate_barcode(sku=request.POST.get("code", "").strip() or None)
+    except ValidationError as exc:
+        return JsonResponse({"error": exc.messages[0]}, status=400)
+
+    image_name = create_barcode_image(barcode)
+    return JsonResponse({
+        "barcode": barcode,
+        "image_url": default_storage.url(image_name),
+    })
+
+
 # ---------- Create / edit pages (admin only) ----------
 class FormPage(AdminRequiredMixin):
     template_name = "inventory/form.html"
@@ -99,14 +121,28 @@ class ProductCreate(FormPage, CreateView):
     model = Product
     form_class = ProductForm
     saved_message = "Product added."
-    extra_context = {"title": "New product", "back_url": LIST_URL}
+    extra_context = {"title": "New product", "back_url": LIST_URL, "product_form": True}
+
+    def form_valid(self, form):
+        with transaction.atomic():
+            response = super().form_valid(form)
+            opening_stock = form.cleaned_data["opening_stock"]
+            if form.cleaned_data["track_stock"] and opening_stock > 0:
+                StockMovement.objects.create(
+                    product=self.object,
+                    quantity=opening_stock,
+                    movement_type=StockMovement.Type.OPENING,
+                    note="Opening stock",
+                    created_by=self.request.user,
+                )
+        return response
 
 
 class ProductUpdate(FormPage, UpdateView):
     model = Product
     form_class = ProductForm
     saved_message = "Product updated."
-    extra_context = {"title": "Edit product", "back_url": LIST_URL}
+    extra_context = {"title": "Edit product", "back_url": LIST_URL, "product_form": True}
 
 
 class CategoryCreate(FormPage, CreateView):
