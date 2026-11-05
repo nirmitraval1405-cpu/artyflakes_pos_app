@@ -108,7 +108,7 @@
       </div>
 
       <div class="topbar-right">
-        <span class="store-chip d-none d-md-inline-flex"><i class="bi bi-shop"></i> Artyflakes</span>
+                <a class="store-chip d-none d-md-inline-flex" href="{% url 'pos:screen' %}" title="Open POS"><i class="bi bi-shop"></i> Artyflakes</a>
         <button class="icon-btn" id="fullscreenBtn" title="Full screen"><i class="bi bi-arrows-fullscreen"></i></button>
         {% if user.is_admin_role %}
         <a class="icon-btn" href="{% url 'admin:index' %}" title="Admin panel"><i class="bi bi-gear"></i></a>

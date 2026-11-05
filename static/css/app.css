@@ -667,4 +667,14 @@ a.sub-link:hover::before {
     .topbar {
         padding: .6rem 1rem;
     }
-}   
+}
+
+/* Store button links to the POS */
+a.store-chip {
+    color: var(--text);
+}
+
+a.store-chip:hover {
+    background: var(--sidebar-active);
+    color: var(--secondary);
+}
