@@ -117,7 +117,7 @@
 
   <div class="main-area">
     <header class="topbar">
-      <button class="icon-btn d-lg-none" id="sidebarToggle" aria-label="Menu"><i class="bi bi-list"></i></button>
+      <button class="icon-btn d-lg-none" id="sidebarToggle" type="button" aria-label="Open navigation menu" aria-controls="sidebar" aria-expanded="false"><i class="bi bi-list"></i></button>
 
       <div class="topbar-search d-none d-md-flex">
         <i class="bi bi-search"></i>
@@ -161,7 +161,7 @@
     <footer class="app-footer">© {% now "Y" %} Artyflakes POS</footer>
   </div>
 </div>
-<div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+<div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
 {% else %}
   {% block auth_content %}{% endblock %}
 {% endif %}

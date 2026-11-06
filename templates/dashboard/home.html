@@ -1,27 +1,40 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}Dashboard · Artyflakes POS{% endblock %}
+{% block extra_css %}<link href="{% static 'css/dashboard.css' %}" rel="stylesheet">{% endblock %}
+
 {% block content %}
+<div class="dashboard-page">
 
 <div class="page-head">
   <div>
     <h3>Welcome, {{ user.get_full_name|default:user.username }}</h3>
     <p>Here is an overview of your store.</p>
   </div>
-  <div class="date-chip">
-    <i class="bi bi-calendar3 me-1"></i> {{ today|date:"d/m/Y" }}
+  <div class="date-chip"><i class="bi bi-calendar3 me-1"></i> {{ today|date:"d/m/Y" }}</div>
+</div>
+
+<div class="d-flex align-items-center flex-wrap mb-1">
+  <div class="range-tabs">
+    {% for key, label in ranges %}
+      <a class="{% if key == range_key %}active{% endif %}" {% if key == range_key %}aria-current="page"{% endif %} href="?range={{ key }}">{{ label }}</a>
+    {% endfor %}
   </div>
+  {% if range_key != "today" %}<span class="period-note">{{ period_text }}</span>{% endif %}
 </div>
 
 <!-- Primary cards -->
 <div class="row g-3 mb-3">
   {% for c in primary_cards %}
   <div class="col-12 col-sm-6 col-xl-3">
-    <div class="stat-card stat-{{ c.color }}">
-      <div class="stat-icon"><i class="bi {{ c.icon }}"></i></div>
-      <div>
-        <small>{{ c.label }}</small>
-        <div class="stat-value">₹{{ c.value|floatformat:2 }}</div>
+    <div class="metric-card" data-metric="{{ c.label }}">
+      <div class="metric-top">
+        <small class="metric-label">{{ c.label }}</small>
+        <i class="bi {{ c.icon }} metric-icon" aria-hidden="true"></i>
       </div>
+      <div class="metric-value">{{ c.display }}</div>
+      {% if c.change %}<div class="metric-context"><span class="chg chg-{{ c.change.dir }}">{{ c.change.text }}</span></div>
+      {% elif c.note %}<div class="metric-context"><span class="metric-foot-label">{{ c.note }}</span></div>{% endif %}
     </div>
   </div>
   {% endfor %}
@@ -31,27 +44,32 @@
 <div class="row g-3 mb-3">
   {% for c in secondary_cards %}
   <div class="col-12 col-sm-6 col-xl-3">
-    <div class="mini-card">
-      <div class="mini-top">
-        <div>
-          <div class="mini-value">₹{{ c.value|floatformat:2 }}</div>
-          <div class="mini-label">{{ c.label }}</div>
-        </div>
-        <div class="mini-icon tone-{{ c.tone }}">
-          <i class="bi {{ c.icon }}"></i>
-        </div>
+    <div class="metric-card" data-metric="{{ c.label }}">
+      <div class="metric-top">
+        <small class="metric-label">{{ c.label }}</small>
+        <i class="bi {{ c.icon }} metric-icon" aria-hidden="true"></i>
       </div>
-      <div class="mini-foot">No comparison data yet</div>
+      <div class="metric-value">{{ c.display }}</div>
+      {% if c.change %}<div class="metric-context"><span class="chg chg-{{ c.change.dir }}">{{ c.change.text }}</span>{% if c.foot %}<span class="metric-foot-label">{{ c.foot }}</span>{% endif %}</div>
+      {% elif c.note %}<div class="metric-context"><span class="metric-foot-label">{{ c.note }}</span></div>{% endif %}
     </div>
   </div>
   {% endfor %}
 </div>
 
-<!-- Row: Sales & Purchase + Overall Information -->
+<!-- Row: Sales chart + Overall Information -->
 <div class="row g-3 mb-3">
   <div class="col-xl-8">
-    {% include "dashboard/_panel_empty.html" with icon="bi-arrow-left-right" title="Sales & Purchase" empty_icon="bi-bar-chart" message="No sales or purchases yet" needs="Chart appears after Sales (Phase 6) and Purchases (Phase 7)" %}
+    <div class="panel h-100">
+      <div class="panel-head">
+        <span class="panel-icon"><i class="bi bi-bar-chart"></i></span>
+        <h6>Sales</h6>
+        <span class="ms-auto small text-muted">{{ range_label }}</span>
+      </div>
+      <div class="panel-body"><div class="chart-box"><canvas id="salesChart"></canvas></div></div>
+    </div>
   </div>
+
   <div class="col-xl-4">
     <div class="panel h-100">
       <div class="panel-head">
@@ -59,29 +77,17 @@
         <h6>Overall Information</h6>
       </div>
       <div class="panel-body">
-        <div class="row g-2 text-center">
-          <div class="col-4">
-            <div class="mini-card">
-              <i class="bi bi-truck fs-5" style="color: var(--secondary)"></i>
-              <div class="mini-label small">Suppliers</div>
-              <div class="mini-value">{{ overall.suppliers }}</div>
-            </div>
-          </div>
-          <div class="col-4">
-            <div class="mini-card">
-              <i class="bi bi-people fs-5" style="color: var(--secondary)"></i>
-              <div class="mini-label small">Customers</div>
-              <div class="mini-value">{{ overall.customers }}</div>
-            </div>
-          </div>
-          <div class="col-4">
-            <div class="mini-card" title="Available after Sales (Phase 5)">
-              <i class="bi bi-cart3 fs-5" style="color: var(--secondary)"></i>
-              <div class="mini-label small">Orders</div>
-              <div class="mini-value">&mdash;</div>
-            </div>
-          </div>
+        <div class="row g-2 text-center overview-stats">
+          <div class="col-4"><div class="overview-stat"><i class="bi bi-truck" aria-hidden="true"></i><div class="mini-label">Suppliers</div><div class="mini-value">{{ overall.suppliers }}</div></div></div>
+          <div class="col-4"><div class="overview-stat"><i class="bi bi-people" aria-hidden="true"></i><div class="mini-label">Customers</div><div class="mini-value">{{ overall.customers }}</div></div></div>
+          <div class="col-4"><div class="overview-stat" title="All completed bills"><i class="bi bi-cart3" aria-hidden="true"></i><div class="mini-label">Orders</div><div class="mini-value">{{ overall.orders }}</div></div></div>
         </div>
+        <div class="fw-semibold mt-3">Customers overview <span class="small text-muted fw-normal">({{ range_label }})</span></div>
+        <div class="split-stat">
+          <div><strong>{{ overall.first_time }}</strong><span>First-time</span></div>
+          <div><strong>{{ overall.returning }}</strong><span>Returning</span></div>
+        </div>
+        <div class="small text-muted mt-2">Walk-in customers are not counted.</div>
       </div>
     </div>
   </div>
@@ -90,47 +96,42 @@
 <!-- Row: Top Selling + Low Stock -->
 <div class="row g-3 mb-3">
   <div class="col-xl-6">
-    {% include "dashboard/_panel_empty.html" with icon="bi-trophy" title="Top Selling Products" empty_icon="bi-box-seam" message="No products sold yet" needs="Needs Products (Phase 2) and Sales (Phase 6)" %}
-  </div>
-  <div class="col-xl-6">
-    {% if low_stock %}
+    {% if top_products %}
     <div class="panel h-100">
-      <div class="panel-head">
-        <span class="panel-icon"
-          ><i class="bi bi-exclamation-triangle"></i
-        ></span>
-        <h6>Low Stock Products</h6>
-        <a
-          class="ms-auto small"
-          style="color: var(--secondary)"
-          href="{% url 'inventory:stock_list' %}?filter=low"
-          >View All</a
-        >
-      </div>
+      <div class="panel-head"><span class="panel-icon"><i class="bi bi-trophy"></i></span><h6>Top Selling Products</h6><span class="ms-auto small text-muted">{{ range_label }}</span></div>
       <div class="panel-body p-0">
-        {% for p in low_stock %}
-        <div
-          class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom"
-        >
-          <div>
-            <div class="fw-semibold">{{ p.name }}</div>
-            <div class="small text-muted">{{ p.code }}</div>
-          </div>
-          <div class="text-end">
-            <div class="small text-muted">In stock</div>
-            <div
-              class="fw-bold"
-              style="color: {% if p.out %}var(--danger){% else %}var(--secondary){% endif %};"
-            >
-              {{ p.stock }}
-            </div>
-          </div>
+        {% for p in top_products %}
+        <div class="list-row">
+          <div><div class="lr-name">{{ p.name }}</div><div class="lr-sub">{{ p.code }}{% if p.code %} &bull; {% endif %}{{ p.qty }} sold</div></div>
+          <div class="lr-amt">{{ p.amount }}</div>
         </div>
         {% endfor %}
       </div>
     </div>
     {% else %}
-    {% include "dashboard/_panel_empty.html" with icon="bi-exclamation-triangle" title="Low Stock Products" empty_icon="bi-check2-circle" message="Nothing is running low" needs="Products appear here when stock reaches their low-stock level" %}
+      {% include "dashboard/_panel_empty.html" with icon="bi-trophy" title="Top Selling Products" empty_icon="bi-box-seam" message="No products sold in this period" needs="Try a longer period above" %}
+    {% endif %}
+  </div>
+
+  <div class="col-xl-6">
+    {% if low_stock %}
+    <div class="panel h-100">
+      <div class="panel-head">
+        <span class="panel-icon"><i class="bi bi-exclamation-triangle"></i></span>
+        <h6>Low Stock Products</h6>
+        <a class="ms-auto small" style="color: var(--secondary);" href="{% url 'inventory:stock_list' %}?filter=low">View All</a>
+      </div>
+      <div class="panel-body p-0">
+        {% for p in low_stock %}
+        <div class="list-row">
+          <div><div class="lr-name">{{ p.name }}</div><div class="lr-sub">{{ p.code }}</div></div>
+          <div class="lr-amt"><span class="small text-muted d-block fw-normal">In stock</span><span style="color: {% if p.out %}var(--danger){% else %}var(--secondary){% endif %};">{{ p.stock }}</span></div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% else %}
+      {% include "dashboard/_panel_empty.html" with icon="bi-exclamation-triangle" title="Low Stock Products" empty_icon="bi-check2-circle" message="Nothing is running low" needs="Products appear here when stock reaches their low-stock level" %}
     {% endif %}
   </div>
 </div>
@@ -138,35 +139,144 @@
 <!-- Recent Sales -->
 <div class="row g-3 mb-3">
   <div class="col-12">
-    {% include "dashboard/_panel_empty.html" with icon="bi-receipt" title="Recent Sales" empty_icon="bi-receipt" message="No sales recorded yet" needs="Needs POS billing (Phase 5-6)" %}
-  </div>
-</div>
-
-<!-- Row: Sales Statistics + Recent Transactions -->
-<div class="row g-3 mb-3">
-  <div class="col-xl-6">
-    {% include "dashboard/_panel_empty.html" with icon="bi-graph-up" title="Sales Statistics" empty_icon="bi-graph-up" message="No revenue or expense data yet" needs="Needs Sales and Expenses (Phase 6 and 8)" %}
-  </div>
-  <div class="col-xl-6">
-    {% include "dashboard/_panel_empty.html" with icon="bi-arrow-left-right" title="Recent Transactions" empty_icon="bi-list-ul" message="No transactions yet" needs="Needs Sales, Purchases and Expenses" %}
+    {% if recent_sales %}
+    <div class="panel">
+      <div class="panel-head">
+        <span class="panel-icon"><i class="bi bi-receipt"></i></span>
+        <h6>Recent Sales</h6>
+        <a class="ms-auto small" style="color: var(--secondary);" href="{% url 'pos:sale_list' %}">View All</a>
+      </div>
+      <div class="panel-body p-0">
+        {% for s in recent_sales %}
+        <div class="list-row">
+          <div>
+            <a class="lr-name" href="{% url 'pos:sale_detail' s.pk %}">{{ s.invoice_no }}</a>
+            <div class="lr-sub">{{ s.customer.name }} &bull; {{ s.created_at|date:"d-m-Y H:i" }}</div>
+          </div>
+          <div class="text-end">
+            <div class="lr-amt">₹{{ s.total|floatformat:"2g" }}</div>
+            {% if s.status == 'voided' %}<span class="badge badge-danger">Voided</span>{% else %}<span class="badge badge-success">Completed</span>{% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% else %}
+      {% include "dashboard/_panel_empty.html" with icon="bi-receipt" title="Recent Sales" empty_icon="bi-receipt" message="No sales recorded yet" needs="Make a sale on the POS screen" %}
+    {% endif %}
   </div>
 </div>
 
 <!-- Row: Top Customers + Top Categories -->
 <div class="row g-3 mb-3">
   <div class="col-xl-6">
-    {% include "dashboard/_panel_empty.html" with icon="bi-person-heart" title="Top Customers" empty_icon="bi-people" message="No customer purchases yet" needs="Needs Customers and Sales" %}
+    {% if top_customers %}
+    <div class="panel h-100">
+      <div class="panel-head"><span class="panel-icon"><i class="bi bi-person-heart"></i></span><h6>Top Customers</h6><span class="ms-auto small text-muted">{{ range_label }}</span></div>
+      <div class="panel-body p-0">
+        {% for c in top_customers %}
+        <div class="list-row">
+          <div><div class="lr-name">{{ c.name }}</div><div class="lr-sub">{{ c.orders }} order{{ c.orders|pluralize }}</div></div>
+          <div class="lr-amt">{{ c.amount }}</div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% else %}
+      {% include "dashboard/_panel_empty.html" with icon="bi-person-heart" title="Top Customers" empty_icon="bi-people" message="No named customers bought in this period" needs="Walk-in customers are not ranked" %}
+    {% endif %}
   </div>
+
   <div class="col-xl-6">
-    {% include "dashboard/_panel_empty.html" with icon="bi-pie-chart" title="Top Categories" empty_icon="bi-pie-chart" message="No categories yet" needs="Needs Categories and Products (Phase 2)" %}
+    {% if categories %}
+    <div class="panel h-100">
+      <div class="panel-head"><span class="panel-icon"><i class="bi bi-pie-chart"></i></span><h6>Top Categories</h6><span class="ms-auto small text-muted">{{ range_label }}</span></div>
+      <div class="panel-body">
+        <div class="chart-box small"><canvas id="catChart"></canvas></div>
+        <div class="cat-legend" id="catLegend">
+          {% for c in categories %}<div><span><span class="cat-dot" data-i="{{ forloop.counter0 }}"></span>{{ c.name }}</span><span>{{ c.amount }}</span></div>{% endfor %}
+        </div>
+      </div>
+    </div>
+    {% else %}
+      {% include "dashboard/_panel_empty.html" with icon="bi-pie-chart" title="Top Categories" empty_icon="bi-pie-chart" message="No sales in this period" needs="Try a longer period above" %}
+    {% endif %}
   </div>
 </div>
 
 <!-- Order Statistics -->
 <div class="row g-3">
   <div class="col-12">
-    {% include "dashboard/_panel_empty.html" with icon="bi-grid-3x3-gap" title="Order Statistics" empty_icon="bi-clock" message="Not enough order history" needs="Heatmap uses real order timestamps from Sales" %}
+    {% if heat.total %}
+    <div class="panel">
+      <div class="panel-head"><span class="panel-icon"><i class="bi bi-grid-3x3-gap"></i></span><h6>Order Statistics</h6><span class="ms-auto small text-muted">Bills per weekday and time, last 90 days</span></div>
+      <div class="panel-body">
+        <div class="heat-wrap"><table class="heat">
+          <thead><tr><th></th>{% for d in heat.days %}<th>{{ d }}</th>{% endfor %}</tr></thead>
+          <tbody>
+            {% for row in heat.rows %}
+            <tr>
+              <th>{{ row.label }}</th>
+              {% for cell in row.cells %}<td style="background: rgba(198, 156, 109, {{ cell.alpha }});" title="{{ cell.n }} bill{{ cell.n|pluralize }}"></td>{% endfor %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table></div>
+      </div>
+    </div>
+    {% else %}
+      {% include "dashboard/_panel_empty.html" with icon="bi-grid-3x3-gap" title="Order Statistics" empty_icon="bi-clock" message="Not enough order history" needs="This fills in as bills are made over time" %}
+    {% endif %}
   </div>
 </div>
 
+{{ chart_data|json_script:"dashData" }}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
+<script>
+  (function () {
+    if (typeof Chart === "undefined") return;
+    const data = JSON.parse(document.getElementById("dashData").textContent);
+    const styles = getComputedStyle(document.querySelector(".dashboard-page"));
+    const themeColor = (name) => styles.getPropertyValue(name).trim();
+    const inr = (v) => new Intl.NumberFormat("en-IN", {
+      style: "currency", currency: "INR", minimumFractionDigits: 2, maximumFractionDigits: 2,
+    }).format(Number(v));
+    const palette = ["--primary", "--secondary", "--accent", "--info", "--success", "--danger"].map(themeColor);
+
+    const bar = document.getElementById("salesChart");
+    if (bar) {
+      new Chart(bar, {
+        type: "bar",
+        data: { labels: data.sales.labels, datasets: [{ label: "Sales", data: data.sales.values, backgroundColor: themeColor("--secondary"), borderRadius: 3, maxBarThickness: 32 }] },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => inr(c.parsed.y) } } },
+          scales: {
+            x: { grid: { display: false }, ticks: { color: themeColor("--muted") } },
+            y: { beginAtZero: true, grid: { color: themeColor("--border") }, ticks: { color: themeColor("--muted"), callback: (v) => inr(v) } },
+          },
+        },
+      });
+    }
+
+    const donut = document.getElementById("catChart");
+    if (donut && data.cats.labels.length) {
+      new Chart(donut, {
+        type: "doughnut",
+        data: { labels: data.cats.labels, datasets: [{ data: data.cats.values, backgroundColor: palette, borderColor: themeColor("--card-bg"), borderWidth: 2 }] },
+        options: {
+          responsive: true, maintainAspectRatio: false, cutout: "68%",
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => c.label + ": " + inr(c.parsed) } } },
+        },
+      });
+      document.querySelectorAll("#catLegend .cat-dot").forEach((d) => {
+        d.style.background = palette[Number(d.dataset.i) % palette.length];
+      });
+    }
+  })();
+</script>
 {% endblock %}

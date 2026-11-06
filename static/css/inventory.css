@@ -258,6 +258,84 @@
 .grid-field { border: 0; border-right: 1px solid var(--border); background: transparent; color: var(--text); padding: .2rem .6rem .2rem 0; font-size: 13px; outline: 0; }
 .grid-search .count { margin-left: auto; }
 
+/* ---------- Responsive tables and controls ---------- */
+.grid-search {
+    flex-wrap: wrap;
+    min-width: 0;
+}
+
+.grid-search > input[type="text"] {
+    flex: 1 1 13rem;
+    min-width: 0;
+}
+
+.grid-search > .grid-field {
+    min-height: 44px;
+    max-width: 100%;
+}
+
+.grid-wrap {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+}
+
+.toolbar,
+.split,
+.grid-panel,
+.grid-search > * {
+    min-width: 0;
+}
+
+.tb {
+    min-height: 58px;
+}
+
+.pager a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+}
+
+@media (max-width: 575.98px) {
+    .toolbar {
+        gap: .15rem;
+        padding: .35rem;
+    }
+
+    .tb {
+        flex: 1 1 74px;
+        min-width: 68px;
+        padding-inline: .35rem;
+        font-size: 11px;
+    }
+
+    .grid-search {
+        gap: .45rem;
+        padding: .65rem;
+    }
+
+    .grid-search .count {
+        flex: 1 0 100%;
+        margin-left: 0;
+        white-space: normal;
+    }
+
+    .grid-wrap {
+        min-height: 220px;
+    }
+
+    .grid th,
+    .grid td {
+        padding: .55rem .65rem;
+    }
+
+    .pager {
+        flex-wrap: wrap;
+        align-items: center;
+        gap: .25rem .75rem;
+    }
+}
+
 
 /* ---------- Stock status + movements ---------- */
 .st { font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 10px; white-space: nowrap; }

@@ -308,6 +308,20 @@
     padding: 2rem !important;
 }
 
+.rv-wrap {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+}
+
+.rp-search input {
+    min-width: 0;
+}
+
+.rp-item,
+.rp-btn {
+    min-height: 44px;
+}
+
 @media (max-width: 991.98px) {
     .rp-layout {
         grid-template-columns: 1fr;
@@ -320,6 +334,56 @@
 
     .rp-scroll {
         max-height: 380px;
+    }
+}
+
+@media (max-width: 575.98px) {
+    .rp-layout {
+        min-height: 0;
+    }
+
+    .rp-list,
+    .rp-filter {
+        padding: .85rem;
+    }
+
+    .rp-top {
+        align-items: stretch;
+    }
+
+    .rp-top h4 {
+        font-size: 1.2rem;
+    }
+
+    .rp-search {
+        flex: 1 1 100%;
+        min-width: 0;
+        min-height: 44px;
+    }
+
+    .rp-scroll {
+        max-height: none;
+        padding-right: 0;
+    }
+
+    .rp-dates {
+        flex-wrap: wrap;
+    }
+
+    .rp-dates input {
+        flex: 1 1 8rem;
+    }
+
+    .rv-sheet {
+        padding: .85rem;
+    }
+
+    .rv-head {
+        flex-wrap: wrap;
+    }
+
+    .rv-head > .text-end {
+        text-align: left !important;
     }
 }
 
