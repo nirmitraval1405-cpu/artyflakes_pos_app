@@ -13,7 +13,7 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 from pathlib import Path
 import os
 from dotenv import load_dotenv
-
+from django.contrib.messages import constants as message_constants
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -164,3 +164,5 @@ STORE = {
     "gstin": "",            # leave blank if not GST registered
     "footer": "Thank you! Visit again.",
 }
+
+MESSAGE_TAGS = {message_constants.ERROR: "danger"}

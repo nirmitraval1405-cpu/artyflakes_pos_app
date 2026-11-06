@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Return · {{ sale.invoice_no }}{% endblock %}
+{% block extra_css %}<link href="{% static 'css/inventory.css' %}" rel="stylesheet">{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h3>Return items</h3>
+    <p>{{ sale.invoice_no }} &bull; {{ sale.customer.name }} &bull; {{ sale.created_at|date:"d-m-Y H:i" }}</p>
+  </div>
+  <a class="btn btn-outline-secondary btn-sm" href="{% url 'pos:sale_detail' sale.pk %}"><i class="bi bi-arrow-left"></i> Back to bill</a>
+</div>
+
+{% if voided %}
+  <div class="alert alert-warning">This bill was voided, so nothing can be returned.</div>
+{% else %}
+<form method="post" id="returnForm">
+  {% csrf_token %}
+  <input type="hidden" name="client_token" value="{{ token }}">
+
+  <section class="grid-panel">
+    <div class="grid-wrap" style="min-height: 0;">
+      <table class="grid">
+        <thead>
+          <tr><th>Item</th><th class="num">Sold</th><th class="num">Already returned</th><th class="num">Can return</th><th class="num">Amount left</th><th style="width:150px;">Return qty</th></tr>
+        </thead>
+        <tbody>
+          {% for r in rows %}
+          <tr>
+            <td>{{ r.it.product_name }}</td>
+            <td class="num">{{ r.it.quantity|floatformat:"-3" }}</td>
+            <td class="num">{% if r.returned %}{{ r.returned|floatformat:"-3" }}{% else %}&mdash;{% endif %}</td>
+            <td class="num">{{ r.left_q|floatformat:"-3" }}</td>
+            <td class="num">{{ r.left_a|floatformat:"2g" }}</td>
+            <td>
+              {% if r.left_q > 0 %}
+              <input type="number" name="qty_{{ r.it.pk }}" value="{{ r.value }}" min="0" max="{{ r.left_q|floatformat:'-3u' }}"
+                     step="{% if r.whole %}1{% else %}0.001{% endif %}" class="form-control form-control-sm ret-qty"
+                     data-qty="{{ r.left_q|floatformat:'-3u' }}" data-amt="{{ r.left_a|floatformat:'2u' }}" placeholder="0">
+              {% else %}<span class="text-muted">&mdash;</span>{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="panel mt-3" style="max-width: 640px;">
+    <div class="panel-body">
+      <div class="row g-3">
+        <div class="col-md-5">
+          <label class="form-label fw-semibold" for="refund_method">Refund paid by</label>
+          <select name="refund_method" id="refund_method" class="form-select">
+            {% for value, label in methods %}<option value="{{ value }}" {% if value == method %}selected{% endif %}>{{ label }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-md-7">
+          <label class="form-label fw-semibold" for="reason">Reason (optional)</label>
+          <input name="reason" id="reason" class="form-control" maxlength="255" value="{{ reason }}" placeholder="e.g. Damaged, wrong colour">
+        </div>
+      </div>
+      <div class="mt-3 d-flex align-items-center justify-content-between">
+        <div>Refund: about <strong id="preview">₹0.00</strong>
+          <div class="small text-muted">The exact amount is worked out when you save.</div>
+        </div>
+        <button class="btn btn-brand" id="returnSave">Save return</button>
+      </div>
+    </div>
+  </div>
+</form>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  (function () {
+    const inputs = document.querySelectorAll(".ret-qty");
+    const preview = document.getElementById("preview");
+    const form = document.getElementById("returnForm");
+    if (!form) return;
+
+    function update() {
+      let sum = 0;
+      inputs.forEach((i) => {
+        const q = parseFloat(i.value);
+        const left = parseFloat(i.dataset.qty);
+        const amt = parseFloat(i.dataset.amt);
+        if (q > 0 && left > 0) sum += amt * Math.min(q, left) / left;
+      });
+      preview.textContent = "₹" + sum.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    inputs.forEach((i) => i.addEventListener("input", update));
+    update();
+
+    form.addEventListener("submit", function (e) {
+      if (!confirm("Save this return? The refund and the stock change cannot be undone.")) { e.preventDefault(); return; }
+      document.getElementById("returnSave").disabled = true;   // stops a double click
+    });
+  })();
+</script>
+{% endblock %}

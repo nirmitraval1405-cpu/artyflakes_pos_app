@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Sales returns · Artyflakes POS{% endblock %}
+{% block extra_css %}<link href="{% static 'css/inventory.css' %}" rel="stylesheet">{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h3>Sales returns</h3>
+    <p>Sales &bull; To make a return, open a bill from Sales List and click Return items.</p>
+  </div>
+</div>
+
+<div class="toolbar">
+  <a class="tb" href="{{ request.get_full_path }}"><i class="bi bi-arrow-repeat"></i><span>Refresh</span></a>
+  <a class="tb" href="{% url 'pos:sale_list' %}"><i class="bi bi-receipt"></i><span>Sales list</span></a>
+</div>
+
+<section class="grid-panel">
+  <form class="grid-search" method="get">
+    <i class="bi bi-search"></i>
+    <input type="text" name="q" value="{{ q }}" placeholder="Return no., invoice or customer" autocomplete="off">
+    <span class="count">Returns: <strong>{{ total }}</strong></span>
+  </form>
+
+  <div class="grid-wrap">
+    <table class="grid">
+      <thead>
+        <tr><th>Return</th><th>Date</th><th>Invoice</th><th>Customer</th><th>Refund by</th><th class="num">Amount</th><th>By</th></tr>
+      </thead>
+      <tbody>
+        {% for r in page %}
+        <tr>
+          <td><strong>{{ r.return_no }}</strong></td>
+          <td>{{ r.created_at|date:"d-m-Y H:i" }}</td>
+          <td><a href="{% url 'pos:sale_detail' r.sale.pk %}">{{ r.sale.invoice_no }}</a></td>
+          <td>{{ r.sale.customer.name }}</td>
+          <td>{{ r.get_refund_method_display }}</td>
+          <td class="num">{{ r.refund_total|floatformat:"2g" }}</td>
+          <td>{{ r.processed_by.get_full_name|default:r.processed_by.username }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="grid-empty">No returns yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if page.has_other_pages %}
+  <div class="pager">
+    {% if page.has_previous %}<a href="?{{ querystring }}&page={{ page.previous_page_number }}">&laquo; Previous</a>{% endif %}
+    <span>Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
+    {% if page.has_next %}<a href="?{{ querystring }}&page={{ page.next_page_number }}">Next &raquo;</a>{% endif %}
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

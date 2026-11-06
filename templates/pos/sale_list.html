@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Sales · Artyflakes POS{% endblock %}
+{% block extra_css %}<link href="{% static 'css/inventory.css' %}" rel="stylesheet">{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h3>Sales</h3>
+    <p>Sales &bull; {% if can_manage %}All bills{% else %}Your bills{% endif %}</p>
+  </div>
+</div>
+
+<div class="toolbar">
+  <a class="tb" href="{{ request.get_full_path }}"><i class="bi bi-arrow-repeat"></i><span>Refresh</span></a>
+  <a class="tb" href="{% url 'pos:screen' %}"><i class="bi bi-cart3"></i><span>New sale</span></a>
+</div>
+
+<section class="grid-panel">
+  <form class="grid-search" method="get" style="flex-wrap: wrap;">
+    <i class="bi bi-search"></i>
+    <input type="text" name="q" value="{{ q }}" placeholder="Invoice, customer or phone" autocomplete="off">
+    <select name="status" class="grid-field" onchange="this.form.submit()">
+      <option value="">All status</option>
+      {% for value, label in statuses %}<option value="{{ value }}" {% if value == status %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+    <select name="method" class="grid-field" onchange="this.form.submit()">
+      <option value="">Any payment</option>
+      {% for value, label in methods %}<option value="{{ value }}" {% if value == method %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+    {% if can_manage %}
+    <select name="cashier" class="grid-field" onchange="this.form.submit()">
+      <option value="">All cashiers</option>
+      {% for c in cashiers %}<option value="{{ c.pk }}" {% if cashier_id == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.get_full_name|default:c.username }}</option>{% endfor %}
+    </select>
+    {% endif %}
+    <input type="date" name="date_from" value="{{ date_from }}" class="grid-field" title="From">
+    <input type="date" name="date_to" value="{{ date_to }}" class="grid-field" title="To">
+    <button class="btn btn-brand btn-sm">Apply</button>
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'pos:sale_list' %}">Clear</a>
+    <span class="count">Bills: <strong>{{ total }}</strong></span>
+  </form>
+
+  <div class="px-3 py-2 small text-muted border-bottom">
+    Completed bills in this view: <strong>{{ totals.n }}</strong> &bull; Total: <strong>₹{{ totals.s|default:0|floatformat:"2g" }}</strong>
+    <span class="ms-1">(voided bills are not counted)</span>
+  </div>
+
+  <div class="grid-wrap">
+    <table class="grid">
+      <thead>
+        <tr>
+          <th>Invoice</th><th>Date</th><th>Customer</th><th>Cashier</th><th>Paid by</th>
+          <th class="num">Total</th><th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s, methods_text in rows %}
+        <tr class="{% if s.status == 'voided' %}inactive{% endif %}">
+          <td><a href="{% url 'pos:sale_detail' s.pk %}"><strong>{{ s.invoice_no }}</strong></a></td>
+          <td>{{ s.created_at|date:"d-m-Y H:i" }}</td>
+          <td>{{ s.customer.name }}</td>
+          <td>{{ s.cashier.get_full_name|default:s.cashier.username }}</td>
+          <td>{{ methods_text }}</td>
+          <td class="num">{{ s.total|floatformat:"2g" }}</td>
+          <td>
+            {% if s.status == 'voided' %}<span class="st st-out">Voided</span>
+            {% else %}<span class="st st-ok">Completed</span>{% endif %}
+            {% if s.return_count %}<span class="tag">Returns: {{ s.return_count }}</span>{% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="grid-empty">No bills match these filters.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if page.has_other_pages %}
+  <div class="pager">
+    {% if page.has_previous %}<a href="?{{ querystring }}&page={{ page.previous_page_number }}">&laquo; Previous</a>{% endif %}
+    <span>Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
+    {% if page.has_next %}<a href="?{{ querystring }}&page={{ page.next_page_number }}">Next &raquo;</a>{% endif %}
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

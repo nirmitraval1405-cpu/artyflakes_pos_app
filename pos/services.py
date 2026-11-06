@@ -1,13 +1,14 @@
 from decimal import Decimal, InvalidOperation
 from django.utils import timezone
 from django.conf import settings
+from django.db.models import Sum
 from django.db import IntegrityError, transaction
 
 from inventory.models import Product, StockMovement
 from inventory.stock import current_stock, qty_fmt
 from people.models import Contact
 
-from .models import InvoiceCounter, Payment, Sale, SaleItem
+from .models import InvoiceCounter, Payment, ReturnCounter, Sale, SaleItem, SaleReturn, SaleReturnItem
 
 MAX_LINES = 100
 MAX_RUPEES = Decimal("10000000")        # sanity limit: Rs 1 crore per amount
@@ -324,4 +325,169 @@ def create_sale(user, data):
             existing = Sale.objects.filter(client_token=token).first()
             if existing:
                 return _result(existing, [], duplicate=True)
+        raise
+    
+# =====================  Void and return  =====================
+def _require_admin(user):
+    if not user.is_admin_role:
+        raise CheckoutError("Only an admin can do this.", status=403)
+
+
+def void_sale(user, sale_id, reason):
+    """Cancel a bill and put its stock back. The bill stays on record, marked VOIDED."""
+    _require_admin(user)
+    reason = (reason or "").strip()[:255]
+    if not reason:
+        raise CheckoutError("Give a reason for voiding this bill.")
+
+    with transaction.atomic():
+        sale = Sale.objects.select_for_update().filter(pk=sale_id).first()
+        if sale is None:
+            raise CheckoutError("Bill not found.", status=404)
+        if sale.status == Sale.Status.VOIDED:
+            raise CheckoutError("This bill is already voided.")
+        if sale.returns.exists():
+            raise CheckoutError("This bill already has returns, so it cannot be voided.")
+
+        # Reverse exactly the stock rows this sale created
+        sold = StockMovement.objects.filter(reference=sale.invoice_no, movement_type=StockMovement.Type.SALE)
+        StockMovement.objects.bulk_create([
+            StockMovement(
+                product_id=m.product_id, quantity=-m.quantity, movement_type=StockMovement.Type.SALE_RETURN,
+                reference=sale.invoice_no, note="Bill voided", created_by=user,
+            )
+            for m in sold
+        ])
+
+        sale.status = Sale.Status.VOIDED
+        sale.voided_at = timezone.now()
+        sale.voided_by = user
+        sale.void_reason = reason
+        sale.save(update_fields=["status", "voided_at", "voided_by", "void_reason", "updated_at"])
+    return sale
+
+
+def create_return(user, sale_id, data):
+    """
+    data: {"quantities": {sale_item_id: "1"}, "refund_method": "cash", "reason": "...", "client_token": "..."}
+    Returns (SaleReturn, already_done).
+    """
+    _require_admin(user)
+
+    token = str(data.get("client_token") or "")[:40] or None
+    if token:
+        existing = SaleReturn.objects.filter(client_token=token).first()
+        if existing:
+            return existing, True
+
+    method = data.get("refund_method")
+    if method not in Payment.Method.values:
+        raise CheckoutError("Choose how the refund was paid.")
+    reason = str(data.get("reason") or "").strip()[:255]
+
+    wanted = {}
+    for item_id, raw in (data.get("quantities") or {}).items():
+        if str(raw).strip() == "":
+            continue
+        qty = _decimal(raw, "Quantity")
+        milli = qty * 1000
+        if qty < 0 or milli != milli.to_integral_value():
+            raise CheckoutError("Quantities must be positive numbers with at most 3 decimals.")
+        if qty > 0:
+            wanted[int(item_id)] = int(milli)
+    if not wanted:
+        raise CheckoutError("Enter a quantity for at least one item.")
+
+    try:
+        with transaction.atomic():
+            # Locking the bill makes two returns on the same bill take turns
+            sale = Sale.objects.select_for_update().filter(pk=sale_id).first()
+            if sale is None:
+                raise CheckoutError("Bill not found.", status=404)
+            if sale.status == Sale.Status.VOIDED:
+                raise CheckoutError("This bill was voided, so nothing can be returned.")
+
+            items = {i.pk: i for i in sale.items.all()}
+            if set(wanted) - set(items):
+                raise CheckoutError("An item does not belong to this bill.")
+
+            done = {
+                row["sale_item_id"]: row
+                for row in SaleReturnItem.objects.filter(sale_item__sale=sale)
+                .values("sale_item_id")
+                .annotate(q=Sum("quantity"), a=Sum("refund_amount"), t=Sum("tax_amount"))
+            }
+
+            lines, refund_total, tax_total = [], 0, 0
+            for item_id in sorted(wanted):
+                item = items[item_id]
+                r_milli = wanted[item_id]
+                q_milli = int(item.quantity * 1000)
+                prev = done.get(item_id)
+                back_milli = int(prev["q"] * 1000) if prev else 0
+                left_milli = q_milli - back_milli
+
+                if r_milli > left_milli:
+                    raise CheckoutError(
+                        f"{item.product_name}: only {qty_fmt(Decimal(left_milli) / 1000)} can still be returned."
+                    )
+                if item.unit in COUNT_UNITS and r_milli % 1000:
+                    raise CheckoutError(f"{item.product_name} must be returned in whole numbers.")
+
+                line_paise = int(item.line_total * 100)
+                paid_back = int(prev["a"] * 100) if prev else 0
+                tax_paise = int(item.tax_amount * 100)
+                tax_back = int(prev["t"] * 100) if prev else 0
+
+                if r_milli == left_milli:
+                    # The last part of a line gets whatever is left, so rounding never refunds extra
+                    refund = line_paise - paid_back
+                    tax = tax_paise - tax_back
+                else:
+                    refund = min(div_round(line_paise * r_milli, q_milli), line_paise - paid_back)
+                    tax = min(div_round(tax_paise * r_milli, q_milli), tax_paise - tax_back)
+
+                lines.append((item, r_milli, refund, tax))
+                refund_total += refund
+                tax_total += tax
+
+            if refund_total <= 0:
+                raise CheckoutError("There is nothing to refund for these items.")
+
+            ret = SaleReturn.objects.create(
+                return_no=ReturnCounter.next_return_no(), sale=sale, processed_by=user,
+                refund_method=method, refund_total=rupees(refund_total), tax_total=rupees(tax_total),
+                reason=reason, client_token=token,
+            )
+            SaleReturnItem.objects.bulk_create([
+                SaleReturnItem(
+                    sale_return=ret, sale_item=item, product_id=item.product_id, product_name=item.product_name,
+                    quantity=(Decimal(r_milli) / 1000).quantize(Decimal("0.001")),
+                    refund_amount=rupees(refund), tax_amount=rupees(tax),
+                )
+                for item, r_milli, refund, tax in lines
+            ])
+
+            # Put stock back only for products whose stock was reduced by this sale
+            tracked = set(
+                StockMovement.objects.filter(reference=sale.invoice_no, movement_type=StockMovement.Type.SALE)
+                .values_list("product_id", flat=True)
+            )
+            StockMovement.objects.bulk_create([
+                StockMovement(
+                    product_id=item.product_id, quantity=(Decimal(r_milli) / 1000).quantize(Decimal("0.001")),
+                    movement_type=StockMovement.Type.SALE_RETURN, reference=ret.return_no,
+                    note=f"Return from {sale.invoice_no}", created_by=user,
+                )
+                for item, r_milli, refund, tax in lines
+                if item.product_id in tracked
+            ])
+            return ret, False
+
+    except IntegrityError:
+        # Two identical submits raced each other: return the one that won
+        if token:
+            existing = SaleReturn.objects.filter(client_token=token).first()
+            if existing:
+                return existing, True
         raise

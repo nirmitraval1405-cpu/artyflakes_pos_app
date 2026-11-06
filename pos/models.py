@@ -1,5 +1,3 @@
-import uuid
-
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
@@ -9,10 +7,6 @@ from inventory.models import Product
 from people.models import Contact
 
 MONEY = {"max_digits": 12, "decimal_places": 2}
-
-
-def new_order_number():
-    return f"POS-{uuid.uuid4().hex[:12].upper()}"
 
 
 class InvoiceCounter(models.Model):
@@ -30,16 +24,31 @@ class InvoiceCounter(models.Model):
         return f"AF-{year}-{counter.last_number:04d}"
 
 
+class ReturnCounter(models.Model):
+    """Same idea as InvoiceCounter, for return numbers like AF-R-2026-0001."""
+    year = models.PositiveIntegerField(unique=True)
+    last_number = models.PositiveIntegerField(default=0)
+
+    @classmethod
+    def next_return_no(cls):
+        """Must be called inside transaction.atomic()."""
+        year = timezone.localdate().year
+        counter, _ = cls.objects.select_for_update().get_or_create(year=year)
+        counter.last_number += 1
+        counter.save(update_fields=["last_number"])
+        return f"AF-R-{year}-{counter.last_number:04d}"
+
+
 class Sale(TimeStampedModel):
     class Status(models.TextChoices):
         COMPLETED = "completed", "Completed"
         VOIDED = "voided", "Voided"
 
     invoice_no = models.CharField(max_length=30, unique=True)
+    client_token = models.CharField(max_length=40, unique=True, null=True, blank=True)  # blocks double submits
     customer = models.ForeignKey(Contact, on_delete=models.PROTECT, related_name="sales")
     cashier = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.COMPLETED)
-    client_token = models.CharField(max_length=40, unique=True, null=True, blank=True)  # blocks double submits
 
     # Prices include GST. subtotal = sum of price x qty, before any discount.
     subtotal = models.DecimalField(default=0, **MONEY)
@@ -50,6 +59,12 @@ class Sale(TimeStampedModel):
     amount_paid = models.DecimalField(default=0, **MONEY)
     change_due = models.DecimalField(default=0, **MONEY)
     note = models.CharField(max_length=255, blank=True)
+
+    voided_at = models.DateTimeField(null=True, blank=True)
+    voided_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    void_reason = models.CharField(max_length=255, blank=True, default="")
 
     class Meta:
         ordering = ["-created_at", "-id"]
@@ -98,3 +113,37 @@ class Payment(TimeStampedModel):
 
     def __str__(self):
         return f"{self.get_method_display()} {self.amount}"
+
+
+class SaleReturn(TimeStampedModel):
+    """Money handed back for items returned from one bill."""
+    return_no = models.CharField(max_length=30, unique=True)
+    sale = models.ForeignKey(Sale, on_delete=models.PROTECT, related_name="returns")
+    processed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    refund_method = models.CharField(max_length=10, choices=Payment.Method.choices)
+    refund_total = models.DecimalField(default=0, **MONEY)
+    tax_total = models.DecimalField(default=0, **MONEY)       # GST contained in the refund
+    reason = models.CharField(max_length=255, blank=True)
+    client_token = models.CharField(max_length=40, unique=True, null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+
+    def __str__(self):
+        return self.return_no
+
+
+class SaleReturnItem(models.Model):
+    sale_return = models.ForeignKey(SaleReturn, on_delete=models.CASCADE, related_name="items")
+    sale_item = models.ForeignKey(SaleItem, on_delete=models.PROTECT, related_name="returned_items")
+    product = models.ForeignKey(Product, on_delete=models.PROTECT, related_name="+")
+    product_name = models.CharField(max_length=200)
+    quantity = models.DecimalField(max_digits=12, decimal_places=3)
+    refund_amount = models.DecimalField(default=0, **MONEY)
+    tax_amount = models.DecimalField(default=0, **MONEY)
+
+    class Meta:
+        ordering = ["id"]
+
+    def __str__(self):
+        return f"{self.product_name} x {self.quantity}"
