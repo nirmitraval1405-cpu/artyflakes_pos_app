@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Purchase {{ purchase.purchase_no }} · Artyflakes POS{% endblock %}
+{% block extra_css %}<link href="{% static 'css/purchase.css' %}" rel="stylesheet">{% endblock %}
+
+{% block content %}
+<div class="purchase-page">
+  <div class="page-head">
+    <div>
+      <h3>Purchase {{ purchase.purchase_no }}</h3>
+      <p>Supplier purchase details</p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <a class="btn btn-brand" href="{% url 'purchase:list' %}">Back to list</a>
+      {% if purchase.status != 'cancelled' %}
+      <form method="post" action="{% url 'purchase:cancel' purchase.pk %}" onsubmit="return confirm('Cancel this purchase and reverse its stock entry?');">
+        {% csrf_token %}
+        <input type="hidden" name="reason" value="Cancelled by admin">
+        <button class="btn btn-outline-danger" type="submit">Cancel purchase</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-lg-6">
+      <div class="purchase-card">
+        <h6 class="mb-3">Supplier details</h6>
+        <div class="row g-2">
+          <div class="col-6"><strong>Name:</strong><br>{{ purchase.supplier.name }}</div>
+          <div class="col-6"><strong>Phone:</strong><br>{{ purchase.supplier.phone|default:"—" }}</div>
+          <div class="col-12"><strong>Address:</strong><br>{{ purchase.supplier.address|default:"—" }}</div>
+          <div class="col-6"><strong>GSTIN:</strong><br>{{ purchase.supplier.gstin|default:"—" }}</div>
+          <div class="col-6"><strong>Invoice no:</strong><br>{{ purchase.supplier_invoice_no|default:"—" }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-6">
+      <div class="purchase-card">
+        <h6 class="mb-3">Purchase summary</h6>
+        <div class="summary-box">
+          <div class="line"><span>Purchase date</span><strong>{{ purchase.purchase_date|date:"d-m-Y" }}</strong></div>
+          <div class="line"><span>Grand total</span><strong>₹{{ purchase.grand_total|floatformat:"2" }}</strong></div>
+          <div class="line"><span>Paid</span><strong>₹{{ purchase.amount_paid|floatformat:"2" }}</strong></div>
+          <div class="line"><span>Outstanding</span><strong>₹{{ purchase.outstanding_amount|floatformat:"2" }}</strong></div>
+          <div class="line"><span>Status</span><strong>{{ purchase.payment_status }}</strong></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="purchase-card mb-3">
+    <h6 class="mb-3">Purchased products</h6>
+    <div class="table-responsive">
+      <table class="purchase-grid">
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th>SKU</th>
+            <th>Qty</th>
+            <th>Cost</th>
+            <th>Discount</th>
+            <th>GST</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in purchase.items.all %}
+          <tr>
+            <td>{{ item.product_name }}</td>
+            <td>{{ item.product_code }}</td>
+            <td>{{ item.quantity }}</td>
+            <td>₹{{ item.cost_price|floatformat:"2" }}</td>
+            <td>₹{{ item.discount|floatformat:"2" }}</td>
+            <td>₹{{ item.gst_amount|floatformat:"2" }}</td>
+            <td>₹{{ item.total_amount|floatformat:"2" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="purchase-card mb-3">
+    <h6 class="mb-3">Record payment</h6>
+    <form method="post" action="{% url 'purchase:payment' purchase.pk %}" class="row g-2 align-items-end">
+      {% csrf_token %}
+      <div class="col-md-3">
+        <label class="form-label small text-muted">Amount</label>
+        <input type="number" step="0.01" min="0" name="amount" class="form-control" required>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small text-muted">Method</label>
+        <select name="method" class="form-select">
+          <option value="cash">Cash</option>
+          <option value="upi">UPI</option>
+          <option value="card">Card</option>
+          <option value="bank_transfer">Bank transfer</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small text-muted">Reference</label>
+        <input type="text" name="reference" class="form-control">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small text-muted">Payment date</label>
+        <input type="date" name="payment_date" class="form-control" value="{{ purchase.purchase_date|date:'Y-m-d' }}">
+      </div>
+      <div class="col-md-1">
+        <button class="btn btn-brand" type="submit">Save</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="purchase-card">
+    <h6 class="mb-3">Payment history</h6>
+    <div class="table-responsive">
+      <table class="purchase-grid">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Method</th>
+            <th>Amount</th>
+            <th>Reference</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for payment in purchase.payments.all %}
+          <tr>
+            <td>{{ payment.payment_date|date:"d-m-Y" }}</td>
+            <td>{{ payment.get_method_display }}</td>
+            <td>₹{{ payment.amount|floatformat:"2" }}</td>
+            <td>{{ payment.reference|default:"—" }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4" class="text-center text-muted py-3">No payment history recorded yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

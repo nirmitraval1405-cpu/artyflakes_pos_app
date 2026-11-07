@@ -76,16 +76,18 @@
       {% endwith %}
 
       <!-- Purchase -->
-      <button class="side-link nav-toggle collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#grpPurchase" aria-expanded="false">
+      {% with papp=request.resolver_match.namespace %}
+      <button class="side-link nav-toggle {% if papp != 'purchase' %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#grpPurchase" aria-expanded="{% if papp == 'purchase' %}true{% else %}false{% endif %}">
         <i class="bi bi-bag"></i> Purchase
         <span class="chev"><i class="bi bi-chevron-right"></i></span>
       </button>
-      <div class="collapse" id="grpPurchase">
+      <div class="collapse {% if papp == 'purchase' %}show{% endif %}" id="grpPurchase">
         <div class="sub-list">
-          <span class="sub-link disabled">Purchases <em>Soon</em></span>
+          <a class="sub-link {% if papp == 'purchase' %}active{% endif %}" href="{% url 'purchase:list' %}">Purchases</a>
           {% if user.is_admin_role %}<a class="sub-link" href="{% url 'people:contact_list' %}?type=supplier">Suppliers</a>{% endif %}
         </div>
       </div>
+      {% endwith %}
 
       <!-- People -->
       {% if user.is_admin_role %}

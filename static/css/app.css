@@ -68,10 +68,35 @@ body {
     background: var(--bg);
     color: var(--text);
     font-size: 14px;
+    cursor: default;
 }
 
 a {
     text-decoration: none;
+}
+
+input,
+textarea,
+[contenteditable="true"] {
+    cursor: default;
+}
+
+a,
+button,
+select,
+input[type="checkbox"],
+input[type="radio"],
+[role="button"] {
+    cursor: pointer;
+}
+
+button:disabled,
+input:disabled,
+select:disabled,
+textarea:disabled,
+[aria-disabled="true"],
+.disabled {
+    cursor: not-allowed;
 }
 
 button,

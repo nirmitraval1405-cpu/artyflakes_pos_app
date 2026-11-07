@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Purchase list · Artyflakes POS{% endblock %}
+{% block extra_css %}<link href="{% static 'css/purchase.css' %}" rel="stylesheet">{% endblock %}
+
+{% block content %}
+<div class="purchase-page">
+  <div class="page-head">
+    <div>
+      <h3>Purchases</h3>
+      <p>Supplier purchases &bull; receive stock</p>
+    </div>
+  </div>
+
+  <div class="purchase-toolbar">
+    <a class="tb primary" href="{% url 'purchase:create' %}"><i class="bi bi-plus-lg"></i> Create purchase</a>
+    <a class="tb" href="{% url 'purchase:export' %}"><i class="bi bi-download"></i> Export CSV</a>
+    <a class="tb" href="{{ request.path }}"><i class="bi bi-arrow-repeat"></i> Refresh</a>
+  </div>
+
+  <div class="card purchase-card">
+    <form method="get" class="row g-2 align-items-end mb-3">
+      <div class="col-md-3">
+        <label class="form-label small text-muted">Search</label>
+        <input type="text" name="q" class="form-control" value="{{ q }}" placeholder="Purchase no / supplier invoice / supplier">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small text-muted">Supplier</label>
+        <select class="form-select" name="supplier">
+          <option value="">All suppliers</option>
+          {% for s in suppliers %}
+            <option value="{{ s.pk }}" {% if supplier_id == s.pk|stringformat:'s' %}selected{% endif %}>{{ s.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small text-muted">Status</label>
+        <select class="form-select" name="status">
+          <option value="">All</option>
+          <option value="paid" {% if status == 'paid' %}selected{% endif %}>Paid</option>
+          <option value="partial" {% if status == 'partial' %}selected{% endif %}>Partial</option>
+          <option value="unpaid" {% if status == 'unpaid' %}selected{% endif %}>Unpaid</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small text-muted">From</label>
+        <input type="date" class="form-control" name="from_date" value="{{ from_date }}">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small text-muted">To</label>
+        <input type="date" class="form-control" name="to_date" value="{{ to_date }}">
+      </div>
+      <div class="col-md-1 d-grid">
+        <button type="submit" class="btn btn-brand">Filter</button>
+      </div>
+    </form>
+
+    <div class="table-responsive">
+      <table class="purchase-grid">
+        <thead>
+          <tr>
+            <th>Purchase ID</th>
+            <th>Supplier invoice</th>
+            <th>Supplier</th>
+            <th>Purchase date</th>
+            <th>Total</th>
+            <th>Paid</th>
+            <th>Due</th>
+            <th>Status</th>
+            <th>Created by</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for purchase in page %}
+          <tr>
+            <td><a href="{% url 'purchase:detail' purchase.pk %}">{{ purchase.purchase_no }}</a></td>
+            <td>{{ purchase.supplier_invoice_no|default:"—" }}</td>
+            <td>{{ purchase.supplier.name }}</td>
+            <td>{{ purchase.purchase_date|date:"d-m-Y" }}</td>
+            <td>₹{{ purchase.grand_total|floatformat:"2" }}</td>
+            <td>₹{{ purchase.amount_paid|floatformat:"2" }}</td>
+            <td>₹{{ purchase.outstanding_amount|floatformat:"2" }}</td>
+            <td>
+              {% if purchase.payment_status == 'Paid' %}<span class="badge badge-success">Paid</span>
+              {% elif purchase.payment_status == 'Partial' %}<span class="badge badge-warning">Partial</span>
+              {% else %}<span class="badge badge-danger">Unpaid</span>{% endif %}
+            </td>
+            <td>{{ purchase.created_by.get_full_name|default:purchase.created_by.username }}</td>
+            <td>
+              <div class="d-flex gap-2">
+                <a href="{% url 'purchase:detail' purchase.pk %}" class="btn btn-sm btn-outline-secondary">View</a>
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="10" class="text-center text-muted py-4">No purchases found.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if page.has_other_pages %}
+    <div class="pager mt-3">
+      {% if page.has_previous %}<a href="?{{ querystring }}&page={{ page.previous_page_number }}">&laquo; Previous</a>{% endif %}
+      <span>Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
+      {% if page.has_next %}<a href="?{{ querystring }}&page={{ page.next_page_number }}">Next &raquo;</a>{% endif %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

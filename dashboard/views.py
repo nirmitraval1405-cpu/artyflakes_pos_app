@@ -15,6 +15,7 @@ from django.utils import timezone
 from inventory.stock import low_stock, qty_fmt, with_stock
 from people.models import Contact
 from pos.models import Sale, SaleItem, SaleReturn, SaleReturnItem
+from purchase.models import Purchase
 
 ZERO = Decimal("0")
 MONEY_FIELD = DecimalField(max_digits=18, decimal_places=2)
@@ -200,12 +201,24 @@ def home(request):
     cur = _metrics(start, end)
     prev = _metrics(p_start, p_end)
 
+    purchase_total = Purchase.objects.filter(
+        status=Purchase.Status.COMPLETED,
+        purchase_date__gte=start,
+        purchase_date__lte=end,
+    ).aggregate(total=Coalesce(Sum("grand_total"), Value(ZERO), output_field=MONEY_FIELD))["total"]
+    prev_purchase_total = Purchase.objects.filter(
+        status=Purchase.Status.COMPLETED,
+        purchase_date__gte=p_start,
+        purchase_date__lte=p_end,
+    ).aggregate(total=Coalesce(Sum("grand_total"), Value(ZERO), output_field=MONEY_FIELD))["total"]
+
     primary_cards = [
         {"label": "Total Sales", "display": inr(cur["sales"]), "icon": "bi-receipt",
          "change": _change(cur["sales"], prev["sales"], label)},
         {"label": "Sales Return", "display": inr(cur["returns"]), "icon": "bi-arrow-repeat",
          "change": _change(cur["returns"], prev["returns"], label)},
-        {"label": "Total Purchase", "display": "\u2014", "icon": "bi-bag"},
+        {"label": "Total Purchase", "display": inr(purchase_total) if purchase_total else "\u2014", "icon": "bi-bag",
+         "change": _change(purchase_total, prev_purchase_total, label) if purchase_total or prev_purchase_total else None},
         {"label": "Purchase Return", "display": "\u2014", "icon": "bi-shield-check"},
     ]
     secondary_cards = [

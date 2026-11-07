@@ -1,0 +1,320 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}{{ title }} · Artyflakes POS{% endblock %}
+{% block extra_css %}<link href="{% static 'css/purchase.css' %}" rel="stylesheet">{% endblock %}
+
+{% block content %}
+<div class="purchase-page">
+  <div class="page-head">
+    <div>
+      <h3>{{ title }}</h3>
+      <p>Create a supplier purchase and update stock</p>
+    </div>
+    <a class="btn btn-outline-secondary" href="{{ back_url }}">Back</a>
+  </div>
+
+  <form method="post" class="purchase-form" id="purchaseForm">
+    {% csrf_token %}
+    <input type="hidden" name="client_token" value="{{ token }}">
+
+    {% if form.non_field_errors %}
+      <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    <div class="purchase-card mb-3 barcode-scan-card">
+      <div class="barcode-scan-wrap">
+        <input id="barcode-input" type="text" placeholder="Scan or type barcode / product code" autocomplete="off">
+        <button type="button" id="barcode-scan-btn" class="btn btn-outline-secondary">Scan</button>
+      </div>
+      <div class="small text-danger mt-1" id="scanMsg" hidden></div>
+    </div>
+
+    <div class="purchase-card mb-3">
+      <h6 class="mb-3">Purchase information</h6>
+      <div class="form-grid">
+        <div>
+          <label class="form-label small text-muted">{{ form.supplier.label }}</label>
+          {{ form.supplier }}
+          {% if form.supplier.errors %}<div class="text-danger small mt-1">{{ form.supplier.errors }}</div>{% endif %}
+        </div>
+        <div>
+          <label class="form-label small text-muted">{{ form.supplier_invoice_no.label }}</label>
+          {{ form.supplier_invoice_no }}
+        </div>
+        <div>
+          <label class="form-label small text-muted">{{ form.purchase_date.label }}</label>
+          {{ form.purchase_date }}
+          {% if form.purchase_date.errors %}<div class="text-danger small mt-1">{{ form.purchase_date.errors }}</div>{% endif %}
+        </div>
+        <div>
+          <label class="form-label small text-muted">{{ form.amount_paid.label }}</label>
+          {{ form.amount_paid }}
+          {% if form.amount_paid.errors %}<div class="text-danger small mt-1">{{ form.amount_paid.errors }}</div>{% endif %}
+        </div>
+        <div>
+          <label class="form-label small text-muted">{{ form.payment_due.label }}</label>
+          <div class="payment-due-toggle">{{ form.payment_due }}</div>
+        </div>
+        <div>
+          <label class="form-label small text-muted">{{ form.payment_method.label }}</label>
+          {{ form.payment_method }}
+        </div>
+        <div>
+          <label class="form-label small text-muted">{{ form.payment_reference.label }}</label>
+          {{ form.payment_reference }}
+        </div>
+      </div>
+      <div class="mt-3">
+        <label class="form-label small text-muted">{{ form.notes.label }}</label>
+        {{ form.notes }}
+      </div>
+    </div>
+
+    <div class="purchase-card mb-3">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h6 class="mb-0">Products</h6>
+        <button type="button" class="btn btn-sm btn-outline-secondary add-line">Add row</button>
+      </div>
+
+      <div id="purchase-lines">
+        {% for row in rows %}
+        <div class="purchase-row mb-2">
+          <div>
+            <label class="form-label small text-muted">Product</label>
+            <select name="product" class="form-select product-select">
+              <option value="">Select product</option>
+              {% for product in products %}
+                <option value="{{ product.pk }}"
+                        data-barcode="{{ product.barcode|default:'' }}"
+                        data-code="{{ product.code|default:'' }}"
+                        data-unit="{{ product.unit }}"
+                        data-cost="{{ product.cost_price|floatformat:'2u' }}"
+                        data-gst="{{ product.gst_rate|floatformat:'-2u' }}"
+                        {% if product.pk|stringformat:"s" == row.product %}selected{% endif %}>{{ product.name }}{% if product.code %} ({{ product.code }}){% endif %}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label class="form-label small text-muted">Qty</label>
+            <input type="number" min="0.001" step="0.001" data-f="qty" name="quantity_{{ forloop.counter0 }}" value="{{ row.qty }}">
+          </div>
+          <div>
+            <label class="form-label small text-muted">Cost</label>
+            <input type="number" min="0" step="0.01" data-f="cost" name="cost_price_{{ forloop.counter0 }}" value="{{ row.cost }}">
+          </div>
+          <div>
+            <label class="form-label small text-muted">Discount</label>
+            <input type="number" min="0" step="0.01" data-f="disc" name="discount_{{ forloop.counter0 }}" value="{{ row.disc }}">
+          </div>
+          <div>
+            <label class="form-label small text-muted">GST %</label>
+            <input type="number" min="0" max="100" step="0.01" data-f="gst" name="gst_rate_{{ forloop.counter0 }}" value="{{ row.gst }}">
+          </div>
+          <div>
+            <label class="form-label small text-muted">Total</label>
+            <input type="text" class="line-total" value="₹0.00" disabled>
+          </div>
+          <div>
+            <button type="button" class="remove-btn" aria-label="Remove line">Remove</button>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="purchase-card">
+      <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+        <div class="small">
+          <div>Subtotal: <strong id="sumSub">₹0.00</strong></div>
+          <div>Discount: <strong id="sumDisc">₹0.00</strong></div>
+          <div>GST: <strong id="sumGst">₹0.00</strong></div>
+          <div class="fs-5 mt-1">Grand total: <strong id="sumTotal">₹0.00</strong></div>
+          <div id="paidHint" class="mt-1"></div>
+          <div class="text-muted mt-1">The exact amounts are worked out when you save.</div>
+        </div>
+        <button class="btn btn-brand" type="submit" id="saveBtn">Save purchase</button>
+      </div>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  (function () {
+    const form = document.getElementById("purchaseForm");
+    const lines = document.getElementById("purchase-lines");
+    const WHOLE_UNITS = ["pcs", "set", "box", "pack"];       // must match the server
+
+    const rows = () => Array.from(lines.querySelectorAll(".purchase-row"));
+    const f = (row, name) => row.querySelector('[data-f="' + name + '"]');
+    const selectOf = (row) => row.querySelector('select[name="product"]');
+    const paise = (x) => Math.round((Number(x) || 0) * 100);
+    const inr = (p) => "₹" + (p / 100).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    // Field names are rebuilt from each row's position, so removing a row can never make two rows share a name.
+    function renumber() {
+      rows().forEach((row, i) => {
+        f(row, "qty").name = "quantity_" + i;
+        f(row, "cost").name = "cost_price_" + i;
+        f(row, "disc").name = "discount_" + i;
+        f(row, "gst").name = "gst_rate_" + i;
+      });
+    }
+
+    function applyUnit(row, unit) {
+      const qty = f(row, "qty");
+      const whole = WHOLE_UNITS.indexOf(unit) !== -1;
+      qty.step = whole ? "1" : "0.001";
+      qty.min = whole ? "1" : "0.001";
+      if (whole) qty.value = String(Math.max(1, Math.round(Number(qty.value) || 1)));
+    }
+
+    function onProductChange(row) {
+      const opt = selectOf(row).selectedOptions[0];
+      if (!opt || !opt.value) return;
+      f(row, "cost").value = opt.dataset.cost || "0";
+      f(row, "gst").value = opt.dataset.gst || "0";
+      applyUnit(row, opt.dataset.unit);
+    }
+
+    function lineCalc(row) {
+      if (!selectOf(row).value) return { gross: 0, disc: 0, tax: 0, total: 0, over: false };
+      const qty = Number(f(row, "qty").value) || 0;
+      const cost = Number(f(row, "cost").value) || 0;
+      const disc = paise(f(row, "disc").value);
+      const gst = Number(f(row, "gst").value) || 0;
+      const gross = Math.round(qty * cost * 100);
+      const taxable = Math.max(gross - disc, 0);
+      const tax = Math.round(taxable * gst / 100);
+      return { gross, disc: Math.min(disc, gross), tax, total: taxable + tax, over: disc > gross };
+    }
+
+    function updateTotals() {
+      let gross = 0, disc = 0, tax = 0, total = 0;
+      rows().forEach((row) => {
+        const c = lineCalc(row);
+        row.querySelector(".line-total").value = inr(c.total);
+        f(row, "disc").classList.toggle("is-invalid", c.over);
+        gross += c.gross; disc += c.disc; tax += c.tax; total += c.total;
+      });
+      document.getElementById("sumSub").textContent = inr(gross);
+      document.getElementById("sumDisc").textContent = inr(disc);
+      document.getElementById("sumGst").textContent = inr(tax);
+      document.getElementById("sumTotal").textContent = inr(total);
+
+      const paidBox = document.getElementById("id_amount_paid");
+      const paid = paidBox && !paidBox.disabled ? paise(paidBox.value) : 0;
+      const hint = document.getElementById("paidHint");
+      if (paid > total) { hint.textContent = "The payment is more than the total."; hint.className = "mt-1 text-danger"; }
+      else { hint.textContent = "Balance due: " + inr(total - paid); hint.className = "mt-1 text-muted"; }
+    }
+
+    function addLine() {
+      const row = rows()[0].cloneNode(true);      // copies the product list, so nothing is typed into JavaScript
+      selectOf(row).value = "";
+      f(row, "qty").value = "1";
+      f(row, "cost").value = "0";
+      f(row, "disc").value = "0";
+      f(row, "gst").value = "0";
+      f(row, "disc").classList.remove("is-invalid");
+      applyUnit(row, "");
+      lines.appendChild(row);
+      renumber();
+      updateTotals();
+      return row;
+    }
+
+    lines.addEventListener("input", updateTotals);
+    lines.addEventListener("change", (e) => {
+      if (e.target.matches('select[name="product"]')) onProductChange(e.target.closest(".purchase-row"));
+      updateTotals();
+    });
+    lines.addEventListener("click", (e) => {
+      const btn = e.target.closest(".remove-btn");
+      if (!btn) return;
+      const row = btn.closest(".purchase-row");
+      if (rows().length > 1) {
+        row.remove();
+      } else {                                    // keep one row, just clear it
+        selectOf(row).value = "";
+        f(row, "qty").value = "1"; f(row, "cost").value = "0"; f(row, "disc").value = "0"; f(row, "gst").value = "0";
+      }
+      renumber();
+      updateTotals();
+    });
+    document.querySelector(".add-line").addEventListener("click", addLine);
+
+    // ----- Payment due toggle -----
+    const paymentDue = document.getElementById("id_payment_due");
+    const amountPaid = document.getElementById("id_amount_paid");
+    function setDueState() {
+      if (!paymentDue || !amountPaid) return;
+      amountPaid.disabled = paymentDue.checked;
+      if (paymentDue.checked) amountPaid.value = "0.00";
+      updateTotals();
+    }
+    if (paymentDue) { paymentDue.addEventListener("change", setDueState); }
+    if (amountPaid) { amountPaid.addEventListener("input", updateTotals); }
+
+    // ----- Barcode / code box -----
+    const barcodeInput = document.getElementById("barcode-input");
+    const scanMsg = document.getElementById("scanMsg");
+
+    function scanProduct(raw) {
+      const value = String(raw || "").trim().toLowerCase();
+      if (!value) return;
+      scanMsg.hidden = true;
+
+      const options = Array.from(document.querySelectorAll("#purchase-lines .purchase-row:first-child .product-select option[value]"))
+        .filter((o) => o.value);
+      const match = options.find((o) => (o.dataset.barcode || "").toLowerCase() === value || (o.dataset.code || "").toLowerCase() === value);
+      if (!match) {
+        scanMsg.textContent = "No product found for \"" + raw.trim() + "\".";
+        scanMsg.hidden = false;
+        barcodeInput.select();
+        return;
+      }
+
+      // Already on the purchase? Jump to its quantity instead of adding a second row.
+      let row = rows().find((r) => selectOf(r).value === match.value);
+      if (!row) {
+        row = rows().find((r) => !selectOf(r).value) || addLine();
+        selectOf(row).value = match.value;
+        onProductChange(row);
+        updateTotals();
+      }
+      barcodeInput.value = "";
+      f(row, "qty").focus();
+      f(row, "qty").select();
+    }
+
+    document.getElementById("barcode-scan-btn").addEventListener("click", () => scanProduct(barcodeInput.value));
+    barcodeInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); scanProduct(barcodeInput.value); }
+    });
+
+    // ----- Submit -----
+    let submitting = false;
+    form.addEventListener("submit", (e) => {
+      renumber();
+      if (!rows().some((r) => selectOf(r).value)) {
+        e.preventDefault();
+        alert("Add at least one product.");
+        return;
+      }
+      if (submitting) {
+        e.preventDefault();
+        return;
+      }
+      submitting = true;
+      document.getElementById("saveBtn").disabled = true;
+    });
+
+    rows().forEach((row) => { const o = selectOf(row).selectedOptions[0]; if (o && o.value) applyUnit(row, o.dataset.unit); });
+    renumber();
+    setDueState();
+    updateTotals();
+  })();
+</script>
+{% endblock %}
