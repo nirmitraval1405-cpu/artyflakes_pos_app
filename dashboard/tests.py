@@ -4,8 +4,11 @@ from decimal import Decimal
 
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from accounts.models import User
+from expenses.models import ExpenseCategory
+from expenses.services import create_expense, void_expense
 from inventory.models import Product, StockMovement
 
 from .views import _change, inr, period_bounds
@@ -87,8 +90,8 @@ class DashboardTests(TestCase):
         self.assertEqual(cards["Bills Made"]["display"], "0")
         self.assertEqual(cards["Total Purchase"]["display"], "\u2014")
         self.assertEqual(cards["Purchase Return"]["display"], "\u2014")
-        self.assertEqual(cards["Total Sales Due"]["display"], "\u2014")
-        self.assertEqual(cards["Total Expenses"]["display"], "\u2014")
+        self.assertEqual(cards["Net Profit"]["display"], "\u20b90.00")
+        self.assertEqual(cards["Total Expenses"]["display"], "\u20b90.00")
         self.assertNotContains(response, "Phase 7")
         self.assertNotContains(response, "Phase 8")
 
@@ -101,6 +104,77 @@ class DashboardTests(TestCase):
         self.assertEqual(cards["Gross Profit"]["display"], "\u20b9223.73")   # 500 - 76.27 - 200
         self.assertEqual(response.context["top_products"][0]["name"], "Resin")
         self.assertEqual(response.context["heat"]["total"], 1)
+
+    def test_expenses_reduce_net_profit_and_appear_in_hourly_chart(self):
+        self.client.force_login(User.objects.get(username="boss9"))
+        self.sell()
+        category = ExpenseCategory.objects.create(name="Rent")
+        admin_user = User.objects.get(username="boss9")
+        create_expense(admin_user, {
+            "expense_date": timezone.localdate(),
+            "category": category.pk,
+            "amount": "300.00",
+            "payment_method": "cash",
+            "client_token": "dashboard-rent",
+        })
+        cards, response = self.cards()
+        self.assertEqual(cards["Total Expenses"]["display"], "\u20b9300.00")
+        self.assertEqual(cards["Net Profit"]["display"], "-\u20b976.27")
+        chart = response.context["chart_data"]["sales_statistics"]
+        today_index = timezone.localtime(timezone.now()).hour
+        self.assertEqual(len(chart["labels"]), 24)
+        self.assertEqual(chart["revenue"][today_index], "500.00")
+        self.assertEqual(chart["expenses"][today_index], "300.00")
+
+    def test_sales_statistics_api_switches_aggregation_for_each_period(self):
+        self.client.force_login(User.objects.get(username="boss9"))
+        url = reverse("dashboard:sales_statistics")
+        today = timezone.localdate()
+        expected_lengths = {
+            "today": 24,
+            "week": 7,
+            "days30": 30,
+            "month": today.day,
+            "year": today.month,
+        }
+        for key, expected_length in expected_lengths.items():
+            with self.subTest(key=key):
+                response = self.client.get(url, {"range": key})
+                self.assertEqual(response.status_code, 200)
+                data = response.json()
+                self.assertEqual(len(data["labels"]), expected_length)
+                self.assertEqual(len(data["revenue"]), expected_length)
+                self.assertEqual(len(data["expenses"]), expected_length)
+                self.assertEqual(len(data["tooltips"]), expected_length)
+        today_data = self.client.get(url, {"range": "today"}).json()
+        self.assertEqual(today_data["labels"][0], "12 AM")
+        self.assertEqual(today_data["labels"][-1], "11 PM")
+        year_data = self.client.get(url, {"range": "year"}).json()
+        self.assertEqual(year_data["labels"][0], "Jan")
+        self.assertEqual(year_data["labels"][-1], today.strftime("%b"))
+
+    def test_sales_statistics_api_rejects_cashiers_and_invalid_ranges(self):
+        url = reverse("dashboard:sales_statistics")
+        self.client.force_login(User.objects.get(username="cash9"))
+        self.assertEqual(self.client.get(url, {"range": "today"}).status_code, 403)
+        self.client.force_login(User.objects.get(username="boss9"))
+        self.assertEqual(self.client.get(url, {"range": "invalid"}).status_code, 400)
+
+    def test_voided_expense_is_not_counted_on_dashboard(self):
+        self.client.force_login(User.objects.get(username="boss9"))
+        category = ExpenseCategory.objects.create(name="Utilities")
+        admin_user = User.objects.get(username="boss9")
+        expense, _ = create_expense(admin_user, {
+            "expense_date": timezone.localdate(),
+            "category": category.pk,
+            "amount": "100.00",
+            "payment_method": "cash",
+            "client_token": "dashboard-voided",
+        })
+        void_expense(admin_user, expense.pk, "Entered in error")
+        cards, _ = self.cards()
+        self.assertEqual(cards["Total Expenses"]["display"], "\u20b90.00")
+        self.assertEqual(cards["Net Profit"]["display"], "\u20b90.00")
 
     def test_a_return_reduces_profit_and_shows_as_sales_return(self):
         self.client.login(username="boss9", password="pw12345!")

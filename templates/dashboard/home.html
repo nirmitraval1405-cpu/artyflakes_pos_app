@@ -15,9 +15,9 @@
 </div>
 
 <div class="d-flex align-items-center flex-wrap mb-1">
-  <div class="range-tabs">
+  <div class="range-tabs" id="dashboardRangeTabs" data-chart-url="{% url 'dashboard:sales_statistics' %}">
     {% for key, label in ranges %}
-      <a class="{% if key == range_key %}active{% endif %}" {% if key == range_key %}aria-current="page"{% endif %} href="?range={{ key }}">{{ label }}</a>
+      <a class="{% if key == range_key %}active{% endif %}" {% if key == range_key %}aria-current="page"{% endif %} data-range="{{ key }}" href="?range={{ key }}">{{ label }}</a>
     {% endfor %}
   </div>
   {% if range_key != "today" %}<span class="period-note">{{ period_text }}</span>{% endif %}
@@ -63,10 +63,13 @@
     <div class="panel h-100">
       <div class="panel-head">
         <span class="panel-icon"><i class="bi bi-bar-chart"></i></span>
-        <h6>Sales</h6>
-        <span class="ms-auto small text-muted">{{ range_label }}</span>
+        <h6>Sales Statistics</h6>
+        <span class="ms-auto small text-muted" id="salesChartPeriod">{{ chart_data.sales_statistics.period }}</span>
       </div>
-      <div class="panel-body"><div class="chart-box"><canvas id="salesChart"></canvas></div></div>
+      <div class="panel-body">
+        <div class="chart-box"><canvas id="salesChart"></canvas></div>
+        <div id="salesChartMessage" class="small text-danger mt-2" role="status" aria-live="polite"></div>
+      </div>
     </div>
   </div>
 
@@ -249,17 +252,66 @@
 
     const bar = document.getElementById("salesChart");
     if (bar) {
-      new Chart(bar, {
+      const chart = new Chart(bar, {
         type: "bar",
-        data: { labels: data.sales.labels, datasets: [{ label: "Sales", data: data.sales.values, backgroundColor: themeColor("--secondary"), borderRadius: 3, maxBarThickness: 32 }] },
+        data: { labels: data.sales_statistics.labels, datasets: [
+          { label: "Revenue", data: data.sales_statistics.revenue.map(Number), backgroundColor: "#C69C6D", borderRadius: 3, maxBarThickness: 32 },
+          { label: "Expenses", data: data.sales_statistics.expenses.map(Number), backgroundColor: "#504041", borderRadius: 3, maxBarThickness: 32 },
+        ] },
         options: {
           responsive: true, maintainAspectRatio: false,
-          plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => inr(c.parsed.y) } } },
+          animation: { duration: 450 },
+          plugins: {
+            legend: { display: true },
+            tooltip: {
+              callbacks: {
+                title: (items) => items.length ? data.sales_statistics.tooltips[items[0].dataIndex] : "",
+                label: (c) => c.dataset.label + ": " + inr(c.parsed.y),
+              },
+            },
+          },
           scales: {
-            x: { grid: { display: false }, ticks: { color: themeColor("--muted") } },
+            x: { grid: { display: false }, ticks: { color: themeColor("--muted"), autoSkip: true, maxTicksLimit: 16, maxRotation: 0 } },
             y: { beginAtZero: true, grid: { color: themeColor("--border") }, ticks: { color: themeColor("--muted"), callback: (v) => inr(v) } },
           },
         },
+      });
+
+      const tabs = document.getElementById("dashboardRangeTabs");
+      const period = document.getElementById("salesChartPeriod");
+      const message = document.getElementById("salesChartMessage");
+      let requestId = 0;
+      tabs.addEventListener("click", async (event) => {
+        const link = event.target.closest("a[data-range]");
+        if (!link) return;
+        event.preventDefault();
+        const currentRequest = ++requestId;
+        message.textContent = "";
+        tabs.setAttribute("aria-busy", "true");
+        try {
+          const url = new URL(tabs.dataset.chartUrl, window.location.origin);
+          url.searchParams.set("range", link.dataset.range);
+          const response = await fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } });
+          if (!response.ok) throw new Error("Unable to load chart data.");
+          const result = await response.json();
+          if (currentRequest !== requestId) return;
+          data.sales_statistics = result;
+          chart.data.labels = result.labels;
+          chart.data.datasets[0].data = result.revenue.map(Number);
+          chart.data.datasets[1].data = result.expenses.map(Number);
+          chart.update();
+          period.textContent = result.period;
+          tabs.querySelectorAll("a[data-range]").forEach((tab) => {
+            const active = tab === link;
+            tab.classList.toggle("active", active);
+            if (active) tab.setAttribute("aria-current", "page");
+            else tab.removeAttribute("aria-current");
+          });
+        } catch (error) {
+          if (currentRequest === requestId) message.textContent = error.message;
+        } finally {
+          if (currentRequest === requestId) tabs.removeAttribute("aria-busy");
+        }
       });
     }
 
@@ -267,7 +319,7 @@
     if (donut && data.cats.labels.length) {
       new Chart(donut, {
         type: "doughnut",
-        data: { labels: data.cats.labels, datasets: [{ data: data.cats.values, backgroundColor: palette, borderColor: themeColor("--card-bg"), borderWidth: 2 }] },
+        data: { labels: data.cats.labels, datasets: [{ data: data.cats.values.map(Number), backgroundColor: palette, borderColor: themeColor("--card-bg"), borderWidth: 2 }] },
         options: {
           responsive: true, maintainAspectRatio: false, cutout: "68%",
           plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => c.label + ": " + inr(c.parsed) } } },

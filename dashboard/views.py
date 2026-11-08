@@ -9,10 +9,12 @@ from django.db.models import (
 from django.db.models.functions import (
     Coalesce, ExtractHour, ExtractWeekDay, TruncDate, TruncHour, TruncMonth,
 )
+from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
 
 from inventory.stock import low_stock, qty_fmt, with_stock
+from expenses.models import Expense
 from people.models import Contact
 from pos.models import Sale, SaleItem, SaleReturn, SaleReturnItem
 from purchase.models import Purchase
@@ -111,6 +113,10 @@ def _sales_in(start, end):
     )
 
 
+def _chart_money(value):
+    return f"{Decimal(value or 0):.2f}"
+
+
 def _metrics(start, end):
     sales = _sales_in(start, end)
     agg = sales.aggregate(total=_sum("total"), bills=Count("id"))
@@ -132,26 +138,138 @@ def _metrics(start, end):
     }
 
 
-def _sales_chart(key, start, end):
-    qs = _sales_in(start, end).order_by()
+def _sales_statistics(key, start, end):
+    tz = timezone.get_current_timezone()
     if key == "today":
-        rows = qs.annotate(b=TruncHour("created_at")).values("b").annotate(t=Sum("total"))
-        by = {timezone.localtime(r["b"]).hour: r["t"] for r in rows}
-        labels = [f"{h:02d}:00" for h in range(24)]
-        values = [float(by.get(h, 0)) for h in range(24)]
-    elif key == "year":
-        rows = qs.annotate(b=TruncMonth("created_at")).values("b").annotate(t=Sum("total"))
-        by = {timezone.localtime(r["b"]).month: r["t"] for r in rows}
-        months = range(1, end.month + 1)
-        labels = [calendar.month_abbr[m] for m in months]
-        values = [float(by.get(m, 0)) for m in months]
+        hours = range(24)
+        revenue = {hour: ZERO for hour in hours}
+        expenses = {hour: ZERO for hour in hours}
+        for row in (
+            _sales_in(start, end).order_by()
+            .annotate(bucket=TruncHour("created_at", tzinfo=tz))
+            .values("bucket")
+            .annotate(total=Sum("total"))
+        ):
+            revenue[timezone.localtime(row["bucket"], tz).hour] += row["total"] or ZERO
+        for row in (
+            SaleReturn.objects.filter(created_at__date__gte=start, created_at__date__lte=end)
+            .order_by()
+            .annotate(bucket=TruncHour("created_at", tzinfo=tz))
+            .values("bucket")
+            .annotate(total=Sum("refund_total"))
+        ):
+            revenue[timezone.localtime(row["bucket"], tz).hour] -= row["total"] or ZERO
+        for row in (
+            Expense.objects.filter(
+                status=Expense.Status.ACTIVE, created_at__date__gte=start, created_at__date__lte=end
+            )
+            .order_by()
+            .annotate(bucket=TruncHour("created_at", tzinfo=tz))
+            .values("bucket")
+            .annotate(total=Sum("amount"))
+        ):
+            expenses[timezone.localtime(row["bucket"], tz).hour] += row["total"] or ZERO
+
+        labels = [f"{hour % 12 or 12} {'AM' if hour < 12 else 'PM'}" for hour in hours]
+        tooltips = [f"{start:%A, %d %B %Y} · {label}" for label in labels]
+        return {
+            "labels": labels,
+            "tooltips": tooltips,
+            "revenue": [_chart_money(revenue[hour]) for hour in hours],
+            "expenses": [_chart_money(expenses[hour]) for hour in hours],
+            "period": f"Today · {start:%d-%m-%Y}",
+        }
+
+    if key == "year":
+        buckets = range(1, end.month + 1)
+        revenue = {month: ZERO for month in buckets}
+        expenses = {month: ZERO for month in buckets}
+        for row in (
+            _sales_in(start, end).order_by()
+            .annotate(bucket=TruncMonth("created_at", tzinfo=tz))
+            .values("bucket")
+            .annotate(total=Sum("total"))
+        ):
+            revenue[timezone.localtime(row["bucket"], tz).month] += row["total"] or ZERO
+        for row in (
+            SaleReturn.objects.filter(created_at__date__gte=start, created_at__date__lte=end)
+            .order_by()
+            .annotate(bucket=TruncMonth("created_at", tzinfo=tz))
+            .values("bucket")
+            .annotate(total=Sum("refund_total"))
+        ):
+            revenue[timezone.localtime(row["bucket"], tz).month] -= row["total"] or ZERO
+        for row in (
+            Expense.objects.filter(
+                status=Expense.Status.ACTIVE, expense_date__gte=start, expense_date__lte=end
+            )
+            .order_by()
+            .values("expense_date__month")
+            .annotate(total=Sum("amount"))
+        ):
+            expenses[row["expense_date__month"]] += row["total"] or ZERO
+        labels = [calendar.month_abbr[month] for month in buckets]
+        tooltips = [f"{calendar.month_name[month]} {end.year}" for month in buckets]
     else:
-        rows = qs.annotate(b=TruncDate("created_at")).values("b").annotate(t=Sum("total"))
-        by = {r["b"]: r["t"] for r in rows}
-        dates = [start + timedelta(days=i) for i in range((end - start).days + 1)]
-        labels = [d.strftime("%d %b") for d in dates]
-        values = [float(by.get(d, 0)) for d in dates]
-    return {"labels": labels, "values": values}
+        days = [start + timedelta(days=offset) for offset in range((end - start).days + 1)]
+        revenue = {day: ZERO for day in days}
+        expenses = {day: ZERO for day in days}
+        for row in (
+            _sales_in(start, end).order_by()
+            .annotate(bucket=TruncDate("created_at", tzinfo=tz))
+            .values("bucket")
+            .annotate(total=Sum("total"))
+        ):
+            revenue[row["bucket"]] += row["total"] or ZERO
+        for row in (
+            SaleReturn.objects.filter(created_at__date__gte=start, created_at__date__lte=end)
+            .order_by()
+            .annotate(bucket=TruncDate("created_at", tzinfo=tz))
+            .values("bucket")
+            .annotate(total=Sum("refund_total"))
+        ):
+            revenue[row["bucket"]] -= row["total"] or ZERO
+        for row in (
+            Expense.objects.filter(
+                status=Expense.Status.ACTIVE, expense_date__gte=start, expense_date__lte=end
+            )
+            .order_by()
+            .values("expense_date")
+            .annotate(total=Sum("amount"))
+        ):
+            expenses[row["expense_date"]] += row["total"] or ZERO
+        labels = [
+            day.strftime("%a %d %b") if key == "week" else day.strftime("%d %b")
+            for day in days
+        ]
+        tooltips = [day.strftime("%A, %d %B %Y") for day in days]
+
+    chart = {
+        "labels": labels,
+        "tooltips": tooltips,
+        "period": f"{dict(RANGES)[key]} · {start:%d-%m-%Y}" + (
+            "" if start == end else f" to {end:%d-%m-%Y}"
+        ),
+    }
+    if key == "year":
+        chart["revenue"] = [_chart_money(revenue[month]) for month in buckets]
+        chart["expenses"] = [_chart_money(expenses[month]) for month in buckets]
+    else:
+        chart["revenue"] = [_chart_money(revenue[day]) for day in days]
+        chart["expenses"] = [_chart_money(expenses[day]) for day in days]
+    return chart
+
+
+@login_required
+def sales_statistics(request):
+    if not request.user.is_admin_role:
+        return JsonResponse({"error": "Admin access is required."}, status=403)
+    key = request.GET.get("range", "today")
+    if key not in dict(RANGES):
+        return JsonResponse({"error": "Choose a valid date range."}, status=400)
+    today = timezone.localdate()
+    (start, end), _ = period_bounds(key, today)
+    return JsonResponse(_sales_statistics(key, start, end))
 
 
 HEAT_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
@@ -200,6 +318,12 @@ def home(request):
 
     cur = _metrics(start, end)
     prev = _metrics(p_start, p_end)
+    current_expenses = Expense.objects.filter(
+        status=Expense.Status.ACTIVE, expense_date__gte=start, expense_date__lte=end
+    ).aggregate(total=_sum("amount"))["total"]
+    previous_expenses = Expense.objects.filter(
+        status=Expense.Status.ACTIVE, expense_date__gte=p_start, expense_date__lte=p_end
+    ).aggregate(total=_sum("amount"))["total"]
 
     purchase_total = Purchase.objects.filter(
         status=Purchase.Status.COMPLETED,
@@ -224,8 +348,11 @@ def home(request):
     secondary_cards = [
         {"label": "Gross Profit", "display": inr(cur["profit"]), "icon": "bi-layers",
          "change": _change(cur["profit"], prev["profit"], label), "foot": "Before expenses"},
-        {"label": "Total Sales Due", "display": "\u2014", "icon": "bi-clock-history"},
-        {"label": "Total Expenses", "display": "\u2014", "icon": "bi-wallet2"},
+        # Purchases are not expenses: product costs are already included in Gross Profit.
+        {"label": "Net Profit", "display": inr(cur["profit"] - current_expenses), "icon": "bi-graph-down-arrow",
+         "change": _change(cur["profit"] - current_expenses, prev["profit"] - previous_expenses, label)},
+        {"label": "Total Expenses", "display": inr(current_expenses), "icon": "bi-wallet2",
+         "change": _change(current_expenses, previous_expenses, label)},
         {"label": "Bills Made", "display": str(cur["bills"]), "icon": "bi-receipt-cutoff",
          "change": _change(cur["bills"], prev["bills"], label)},
     ]
@@ -295,8 +422,8 @@ def home(request):
         "recent_sales": recent,
         "heat": _heatmap(today),
         "chart_data": {
-            "sales": _sales_chart(key, start, end),
-            "cats": {"labels": [c["name"] for c in categories], "values": [float(r["amount"]) for r in cat_rows]},
+            "cats": {"labels": [c["name"] for c in categories], "values": [_chart_money(r["amount"]) for r in cat_rows]},
+            "sales_statistics": _sales_statistics(key, start, end),
         },
     }
     return render(request, "dashboard/home.html", context)

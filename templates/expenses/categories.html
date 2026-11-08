@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Expense categories · Artyflakes POS{% endblock %}
+{% block extra_css %}<link href="{% static 'css/inventory.css' %}" rel="stylesheet">{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div><h3>Expense categories</h3><p>Manage categories used for new expenses</p></div>
+</div>
+<div class="toolbar">
+  <a class="tb" href="{% url 'expenses:list' %}"><i class="bi bi-arrow-left"></i><span>Expenses</span></a>
+  <a class="tb" href="{% url 'expenses:category_create' %}"><i class="bi bi-plus-lg"></i><span>New category</span></a>
+</div>
+<section class="grid-panel">
+  <div class="grid-wrap">
+    <table class="grid">
+      <thead><tr><th>Name</th><th>Status</th><th>Expenses</th><th>Actions</th></tr></thead>
+      <tbody>
+        {% for category in categories %}
+        <tr>
+          <td>{{ category.name }}</td>
+          <td><span class="st st-{% if category.is_active %}ok{% else %}out{% endif %}">{% if category.is_active %}Active{% else %}Inactive{% endif %}</span></td>
+          <td>{{ category.expense_count }}</td>
+          <td>
+            <div class="d-flex flex-wrap gap-2">
+              <a class="btn btn-sm btn-outline-secondary" href="{% url 'expenses:category_update' category.pk %}">Rename</a>
+              <form method="post" action="{% url 'expenses:category_toggle' category.pk %}">
+                {% csrf_token %}
+                <button class="btn btn-sm btn-outline-secondary" type="submit">{% if category.is_active %}Deactivate{% else %}Activate{% endif %}</button>
+              </form>
+              {% if not category.expense_count %}<a class="btn btn-sm btn-outline-danger" href="{% url 'expenses:category_delete' category.pk %}">Delete</a>{% endif %}
+            </div>
+          </td>
+        </tr>
+        {% empty %}<tr><td colspan="4" class="grid-empty">No expense categories found.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

@@ -106,6 +106,21 @@
       {% endif %}
 
       {% if user.is_admin_role %}
+      {% with eapp=request.resolver_match.app_name %}
+      <button class="side-link nav-toggle {% if eapp != 'expenses' %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#grpExpenses" aria-expanded="{% if eapp == 'expenses' %}true{% else %}false{% endif %}">
+        <i class="bi bi-wallet2"></i> Expenses
+        <span class="chev"><i class="bi bi-chevron-right"></i></span>
+      </button>
+      <div class="collapse {% if eapp == 'expenses' %}show{% endif %}" id="grpExpenses">
+        <div class="sub-list">
+          <a class="sub-link {% if eapp == 'expenses' and request.resolver_match.url_name != 'categories' and request.resolver_match.url_name|slice:':9' != 'category_' %}active{% endif %}" href="{% url 'expenses:list' %}">Expenses</a>
+          <a class="sub-link {% if eapp == 'expenses' and request.resolver_match.url_name == 'categories' or request.resolver_match.url_name|slice:':9' == 'category_' %}active{% endif %}" href="{% url 'expenses:categories' %}">Categories</a>
+        </div>
+      </div>
+      {% endwith %}
+      {% endif %}
+
+      {% if user.is_admin_role %}
       <div class="nav-label">Insights</div>
       <a class="side-link {% if request.resolver_match.app_name == 'reports' %}active{% endif %}" href="{% url 'reports:index' %}">
         <i class="bi bi-bar-chart"></i> Reports

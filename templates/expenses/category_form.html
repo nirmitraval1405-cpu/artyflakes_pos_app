@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}{{ title }} · Artyflakes POS{% endblock %}
+{% block extra_css %}<link href="{% static 'css/inventory.css' %}" rel="stylesheet">{% endblock %}
+
+{% block content %}
+<div class="page-head"><div><h3>{{ title }}</h3></div></div>
+<div class="panel" style="max-width: 620px;">
+  <div class="panel-body">
+    <form method="post" novalidate>
+      {% csrf_token %}
+      {% for field in form %}
+      <div class="mb-3">
+        <label class="form-label fw-semibold" for="{{ field.id_for_label }}">{{ field.label }}</label>
+        {{ field }}
+        {% for error in field.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+      </div>
+      {% endfor %}
+      <button class="btn btn-brand" type="submit">Save</button>
+      <a class="btn btn-outline-secondary" href="{{ back_url }}">Cancel</a>
+    </form>
+  </div>
+</div>
+{% endblock %}

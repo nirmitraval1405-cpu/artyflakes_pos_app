@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Delete category · Artyflakes POS{% endblock %}
+{% block content %}
+<div class="page-head"><div><h3>Delete expense category</h3></div></div>
+<div class="panel" style="max-width: 560px;">
+  <div class="panel-body">
+    <p>Delete <strong>{{ category.name }}</strong>?</p>
+    <p class="text-muted small">Categories with expenses cannot be deleted. Deactivate them instead.</p>
+    <form method="post" class="d-flex gap-2">
+      {% csrf_token %}
+      <button class="btn btn-danger" type="submit">Delete category</button>
+      <a class="btn btn-outline-secondary" href="{% url 'expenses:categories' %}">Cancel</a>
+    </form>
+  </div>
+</div>
+{% endblock %}

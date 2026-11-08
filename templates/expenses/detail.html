@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}{{ expense.expense_no }} · Expenses{% endblock %}
+{% block extra_css %}<link href="{% static 'css/inventory.css' %}" rel="stylesheet">{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div><h3>{{ expense.expense_no }}</h3><p>Expense details</p></div>
+  <a class="btn btn-outline-secondary" href="{% url 'expenses:list' %}">Back to expenses</a>
+</div>
+
+{% if expense.status == "voided" %}
+<div class="alert alert-danger">
+  This expense was voided by {{ expense.voided_by.get_full_name|default:expense.voided_by.username }}
+  on {{ expense.voided_at|date:"d-m-Y H:i" }}. Reason: {{ expense.void_reason }}
+</div>
+{% endif %}
+
+<div class="panel" style="max-width: 900px;">
+  <div class="panel-body">
+    <dl class="row mb-0">
+      <dt class="col-sm-4">Date</dt><dd class="col-sm-8">{{ expense.expense_date|date:"d-m-Y" }}</dd>
+      <dt class="col-sm-4">Category</dt><dd class="col-sm-8">{{ expense.category.name }}{% if not expense.category.is_active %} <span class="tag">Inactive</span>{% endif %}</dd>
+      <dt class="col-sm-4">Amount</dt><dd class="col-sm-8">₹{{ expense.amount|floatformat:"2g" }}</dd>
+      <dt class="col-sm-4">Payment method</dt><dd class="col-sm-8">{{ expense.get_payment_method_display }}</dd>
+      <dt class="col-sm-4">Payee</dt><dd class="col-sm-8">{{ expense.payee|default:"—" }}</dd>
+      <dt class="col-sm-4">Reference</dt><dd class="col-sm-8">{{ expense.reference|default:"—" }}</dd>
+      <dt class="col-sm-4">Note</dt><dd class="col-sm-8">{{ expense.note|default:"—" }}</dd>
+      <dt class="col-sm-4">Status</dt><dd class="col-sm-8">{{ expense.get_status_display }}</dd>
+      <dt class="col-sm-4">Created by</dt><dd class="col-sm-8">{{ expense.created_by.get_full_name|default:expense.created_by.username }}</dd>
+    </dl>
+  </div>
+</div>
+
+{% if expense.status == "active" %}
+<div class="panel mt-3" style="max-width: 900px;">
+  <div class="panel-body">
+    <h5>Void expense</h5>
+    <p class="text-muted">Voiding preserves the record and removes it from expense totals.</p>
+    <form method="post" action="{% url 'expenses:void' expense.pk %}" onsubmit="return confirm('Void this expense? This cannot be undone.');">
+      {% csrf_token %}
+      <div class="mb-3">
+        <label class="form-label fw-semibold" for="{{ void_form.reason.id_for_label }}">{{ void_form.reason.label }}</label>
+        {{ void_form.reason }}
+        {% for error in void_form.reason.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+      </div>
+      <button class="btn btn-danger" type="submit">Void expense</button>
+    </form>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

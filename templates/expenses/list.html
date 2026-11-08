@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Expenses · Artyflakes POS{% endblock %}
+{% block extra_css %}<link href="{% static 'css/inventory.css' %}" rel="stylesheet">{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div><h3>Expenses</h3><p>Management &bull; Finance</p></div>
+</div>
+
+<div class="toolbar">
+  <a class="tb" href="{{ request.get_full_path }}"><i class="bi bi-arrow-repeat"></i><span>Refresh</span></a>
+  <a class="tb" href="{% url 'expenses:create' %}"><i class="bi bi-plus-lg"></i><span>New expense</span></a>
+  <a class="tb" href="{% url 'expenses:export' %}?{{ request.GET.urlencode }}"><i class="bi bi-arrow-up"></i><span>Export CSV</span></a>
+  <a class="tb" href="{% url 'expenses:categories' %}"><i class="bi bi-tags"></i><span>Categories</span></a>
+</div>
+
+<section class="grid-panel">
+  <form class="grid-search" method="get">
+    <i class="bi bi-search"></i>
+    <input type="search" name="q" value="{{ q }}" placeholder="Search number, payee, note or reference" autocomplete="off">
+    <select name="category" class="grid-field">
+      <option value="">All categories</option>
+      {% for category in categories %}
+      <option value="{{ category.pk }}" {% if category_id == category.pk|stringformat:"s" %}selected{% endif %}>{{ category.name }}{% if not category.is_active %} (Inactive){% endif %}</option>
+      {% endfor %}
+    </select>
+    <select name="method" class="grid-field">
+      <option value="">All payment methods</option>
+      {% for value, label in methods %}<option value="{{ value }}" {% if method == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+    <select name="status" class="grid-field">
+      <option value="">All statuses</option>
+      {% for value, label in statuses %}<option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+    <label class="small">From <input type="date" name="from_date" value="{{ from_date }}"></label>
+    <label class="small">To <input type="date" name="to_date" value="{{ to_date }}"></label>
+    <button class="tb" type="submit"><i class="bi bi-funnel"></i><span>Filter</span></button>
+  </form>
+
+  <div class="p-3 d-flex flex-wrap gap-4 border-bottom">
+    <span>Expenses matching filters: <strong>{{ total }}</strong></span>
+    <span>Active expenses: <strong>{{ active_count }}</strong></span>
+    <span>Active total: <strong>₹{{ active_total|floatformat:"2g" }}</strong></span>
+  </div>
+
+  <div class="grid-wrap">
+    <table class="grid">
+      <thead><tr><th>Expense no.</th><th>Date</th><th>Category</th><th>Payee</th><th>Payment</th><th class="num">Amount</th><th>Status</th></tr></thead>
+      <tbody>
+        {% for expense in page %}
+        <tr>
+          <td><a href="{% url 'expenses:detail' expense.pk %}">{{ expense.expense_no }}</a></td>
+          <td>{{ expense.expense_date|date:"d-m-Y" }}</td>
+          <td>{{ expense.category.name }}{% if not expense.category.is_active %} <span class="tag">Inactive</span>{% endif %}</td>
+          <td>{{ expense.payee|default:"—" }}</td>
+          <td>{{ expense.get_payment_method_display }}</td>
+          <td class="num">₹{{ expense.amount|floatformat:"2g" }}</td>
+          <td><span class="st st-{% if expense.status == 'active' %}ok{% else %}out{% endif %}">{{ expense.get_status_display }}</span></td>
+        </tr>
+        {% empty %}<tr><td colspan="7" class="grid-empty">No expenses match these filters.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if page.has_other_pages %}
+  <div class="pager">
+    {% if page.has_previous %}<a href="?{{ querystring }}&page={{ page.previous_page_number }}">&laquo; Previous</a>{% endif %}
+    <span>Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
+    {% if page.has_next %}<a href="?{{ querystring }}&page={{ page.next_page_number }}">Next &raquo;</a>{% endif %}
+  </div>
+  {% endif %}
+</section>
+{% endblock %}
