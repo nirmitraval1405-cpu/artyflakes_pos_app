@@ -127,8 +127,10 @@
       </a>
       {% endif %}
 
+      {% if user.is_admin_role %}
       <div class="nav-label">System</div>
-      <a class="side-link disabled"><i class="bi bi-shop"></i> Store Settings <em>Soon</em></a>
+      <a class="side-link {% if request.resolver_match.app_name == 'storeconfig' %}active{% endif %}" href="{% url 'storeconfig:store' %}"><i class="bi bi-shop"></i> Store Settings</a>
+      {% endif %}
     </nav>
   </aside>
 
@@ -142,7 +144,7 @@
       </div>
 
       <div class="topbar-right">
-                <a class="store-chip d-none d-md-inline-flex" href="{% url 'pos:screen' %}" title="Open POS"><i class="bi bi-shop"></i> Artyflakes</a>
+                <a class="store-chip d-none d-md-inline-flex" href="{% url 'pos:screen' %}" title="Open POS"><i class="bi bi-shop"></i> {{ store_name|default:"Artyflakes" }}</a>
         <button class="icon-btn" id="fullscreenBtn" title="Full screen"><i class="bi bi-arrows-fullscreen"></i></button>
         {% if user.is_admin_role %}
         <a class="icon-btn" href="{% url 'admin:index' %}" title="Admin panel"><i class="bi bi-gear"></i></a>

@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}Store settings · {{ store_name }}{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h3>Store settings</h3>
+    <p>Manage the business details printed on receipts and invoices.</p>
+  </div>
+</div>
+
+<div class="panel" style="max-width: 980px;">
+  <div class="panel-body">
+    <form method="post" enctype="multipart/form-data" novalidate>
+      {% csrf_token %}
+      {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+
+      <fieldset class="mb-4">
+        <legend class="h6 border-bottom pb-2 mb-3">My company data</legend>
+        <div class="row g-3">
+          {% for field in form %}
+            {% if field.name == "name" or field.name == "gstin" or field.name == "street_name" or field.name == "building_number" or field.name == "additional_street_name" or field.name == "plot_identification" or field.name == "district" or field.name == "postal_code" or field.name == "city" or field.name == "state_province" or field.name == "country" or field.name == "phone" or field.name == "email" %}
+            <div class="{% if field.name == 'name' or field.name == 'street_name' or field.name == 'additional_street_name' %}col-12{% else %}col-md-6{% endif %}">
+              <label class="form-label fw-semibold" for="{{ field.id_for_label }}">{{ field.label }}</label>
+              {{ field }}
+              {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+              {% for error in field.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+            </div>
+            {% endif %}
+          {% endfor %}
+        </div>
+        <datalist id="store-country-options">
+          <option value="India"></option>
+          <option value="United States"></option>
+          <option value="United Kingdom"></option>
+          <option value="Canada"></option>
+          <option value="Australia"></option>
+          <option value="United Arab Emirates"></option>
+        </datalist>
+      </fieldset>
+
+      <fieldset class="mb-4">
+        <legend class="h6 border-bottom pb-2 mb-3">Bank account</legend>
+        <div class="row g-3">
+          {% for field in form %}
+            {% if field.name == "bank_account_number" or field.name == "bank_details" %}
+            <div class="{% if field.name == 'bank_details' %}col-12{% else %}col-md-6{% endif %}">
+              <label class="form-label fw-semibold" for="{{ field.id_for_label }}">{{ field.label }}</label>
+              {{ field }}
+              {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+              {% for error in field.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+            </div>
+            {% endif %}
+          {% endfor %}
+        </div>
+      </fieldset>
+
+      <fieldset class="mb-4">
+        <legend class="h6 border-bottom pb-2 mb-3">Logo</legend>
+        <div class="row g-3 align-items-center">
+          <div class="col-md-7">
+            {% with field=form.logo %}
+              <label class="form-label fw-semibold" for="{{ field.id_for_label }}">{{ field.label }}</label>
+              {{ field }}
+              {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+              {% for error in field.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+            {% endwith %}
+          </div>
+          {% if object.logo %}
+          <div class="col-md-5">
+            <img src="{{ object.logo.url }}" alt="Current store logo" style="max-width: 220px; max-height: 100px; object-fit: contain;">
+          </div>
+          {% endif %}
+        </div>
+      </fieldset>
+
+      <fieldset class="mb-4">
+        <legend class="h6 border-bottom pb-2 mb-3">POS and receipts</legend>
+        <div class="row g-3">
+          {% for field in form %}
+            {% if field.name == "tagline" or field.name == "receipt_footer" or field.name == "cashier_max_discount_percent" %}
+            <div class="{% if field.name == 'tagline' or field.name == 'receipt_footer' %}col-12{% else %}col-md-6{% endif %}">
+              <label class="form-label fw-semibold" for="{{ field.id_for_label }}">{{ field.label }}</label>
+              {{ field }}
+              {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+              {% for error in field.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+            </div>
+            {% endif %}
+          {% endfor %}
+        </div>
+      </fieldset>
+
+      <div class="mt-4 d-flex align-items-center flex-wrap gap-3">
+        <button class="btn btn-brand" type="submit">Save settings</button>
+        {% if object.updated_by %}
+          <span class="small text-muted">Last changed by {{ object.updated_by.get_full_name|default:object.updated_by.username }} on {{ object.updated_at|date:"d-m-Y H:i" }}</span>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

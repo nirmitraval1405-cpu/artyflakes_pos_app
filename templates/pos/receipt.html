@@ -18,10 +18,12 @@
   {% if sale.status == 'voided' %}<div class="void-banner">VOIDED</div>{% endif %}
 
   <div class="r-center">
+    {% if store.logo %}<img class="r-logo" src="{{ store.logo }}" alt="{{ store.name }} logo">{% endif %}
     <h1>{{ store.name }}</h1>
     {% if store.tagline %}<div>{{ store.tagline }}</div>{% endif %}
     {% if store.address %}<div>{{ store.address|linebreaksbr }}</div>{% endif %}
     {% if store.phone %}<div>Ph: {{ store.phone }}</div>{% endif %}
+    {% if store.email %}<div>{{ store.email }}</div>{% endif %}
     {% if store.gstin %}<div>GSTIN: {{ store.gstin }}</div>{% endif %}
   </div>
   <hr>

@@ -6,6 +6,10 @@
 {% block content %}
 <div class="dashboard-page">
 
+{% if user.is_admin_role and backup_warning %}
+<div class="alert alert-warning" role="alert">{{ backup_warning }}</div>
+{% endif %}
+
 <div class="page-head">
   <div>
     <h3>Welcome, {{ user.get_full_name|default:user.username }}</h3>
@@ -63,8 +67,8 @@
     <div class="panel h-100">
       <div class="panel-head">
         <span class="panel-icon"><i class="bi bi-bar-chart"></i></span>
-        <h6>Sales Statistics</h6>
-        <span class="ms-auto small text-muted" id="salesChartPeriod">{{ chart_data.sales_statistics.period }}</span>
+        <h6>Sales &amp; Purchase</h6>
+        <span class="ms-auto small text-muted">{{ range_label }}{% if range_key == 'today' %} &bull; Purchases today: {{ today_purchases }}{% endif %}</span>
       </div>
       <div class="panel-body">
         <div class="chart-box"><canvas id="salesChart"></canvas></div>
@@ -252,66 +256,19 @@
 
     const bar = document.getElementById("salesChart");
     if (bar) {
-      const chart = new Chart(bar, {
+      const datasets = [{ label: "Sales", data: data.sales.values, backgroundColor: "#C69C6D", borderRadius: 4 }];
+      if (data.purchases) datasets.push({ label: "Purchases", data: data.purchases, backgroundColor: "#504041", borderRadius: 4 });
+      new Chart(bar, {
         type: "bar",
-        data: { labels: data.sales_statistics.labels, datasets: [
-          { label: "Revenue", data: data.sales_statistics.revenue.map(Number), backgroundColor: "#C69C6D", borderRadius: 3, maxBarThickness: 32 },
-          { label: "Expenses", data: data.sales_statistics.expenses.map(Number), backgroundColor: "#504041", borderRadius: 3, maxBarThickness: 32 },
-        ] },
+        data: { labels: data.sales.labels, datasets: datasets },
         options: {
           responsive: true, maintainAspectRatio: false,
-          animation: { duration: 450 },
           plugins: {
-            legend: { display: true },
-            tooltip: {
-              callbacks: {
-                title: (items) => items.length ? data.sales_statistics.tooltips[items[0].dataIndex] : "",
-                label: (c) => c.dataset.label + ": " + inr(c.parsed.y),
-              },
-            },
+            legend: { display: !!data.purchases },
+            tooltip: { callbacks: { label: (c) => c.dataset.label + ": " + inr(c.parsed.y) } },
           },
-          scales: {
-            x: { grid: { display: false }, ticks: { color: themeColor("--muted"), autoSkip: true, maxTicksLimit: 16, maxRotation: 0 } },
-            y: { beginAtZero: true, grid: { color: themeColor("--border") }, ticks: { color: themeColor("--muted"), callback: (v) => inr(v) } },
-          },
+          scales: { y: { beginAtZero: true, ticks: { callback: (v) => inr(v) } } },
         },
-      });
-
-      const tabs = document.getElementById("dashboardRangeTabs");
-      const period = document.getElementById("salesChartPeriod");
-      const message = document.getElementById("salesChartMessage");
-      let requestId = 0;
-      tabs.addEventListener("click", async (event) => {
-        const link = event.target.closest("a[data-range]");
-        if (!link) return;
-        event.preventDefault();
-        const currentRequest = ++requestId;
-        message.textContent = "";
-        tabs.setAttribute("aria-busy", "true");
-        try {
-          const url = new URL(tabs.dataset.chartUrl, window.location.origin);
-          url.searchParams.set("range", link.dataset.range);
-          const response = await fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } });
-          if (!response.ok) throw new Error("Unable to load chart data.");
-          const result = await response.json();
-          if (currentRequest !== requestId) return;
-          data.sales_statistics = result;
-          chart.data.labels = result.labels;
-          chart.data.datasets[0].data = result.revenue.map(Number);
-          chart.data.datasets[1].data = result.expenses.map(Number);
-          chart.update();
-          period.textContent = result.period;
-          tabs.querySelectorAll("a[data-range]").forEach((tab) => {
-            const active = tab === link;
-            tab.classList.toggle("active", active);
-            if (active) tab.setAttribute("aria-current", "page");
-            else tab.removeAttribute("aria-current");
-          });
-        } catch (error) {
-          if (currentRequest === requestId) message.textContent = error.message;
-        } finally {
-          if (currentRequest === requestId) tabs.removeAttribute("aria-busy");
-        }
       });
     }
 

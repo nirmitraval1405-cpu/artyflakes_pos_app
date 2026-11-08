@@ -2,6 +2,7 @@ import calendar
 from datetime import timedelta
 from decimal import Decimal
 
+from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.db.models import (
     CharField, Count, DecimalField, ExpressionWrapper, F, Max, Sum, Value,
@@ -15,6 +16,7 @@ from django.utils import timezone
 
 from inventory.stock import low_stock, qty_fmt, with_stock
 from expenses.models import Expense
+from backups.status import backup_warning, read_backup_status
 from people.models import Contact
 from pos.models import Sale, SaleItem, SaleReturn, SaleReturnItem
 from purchase.models import Purchase
@@ -111,6 +113,35 @@ def _sales_in(start, end):
     return Sale.objects.filter(
         status=Sale.Status.COMPLETED, created_at__date__gte=start, created_at__date__lte=end
     )
+
+
+def _purchases_in(start, end):
+    return Purchase.objects.filter(
+        status=Purchase.Status.COMPLETED, purchase_date__gte=start, purchase_date__lte=end
+    )
+
+
+def _purchase_total(start, end):
+    return _purchases_in(start, end).aggregate(t=_sum("grand_total"))["t"]
+
+
+def _purchases_series(key, start, end):
+    """Purchases have dates, not times, so they have no hourly series for today."""
+    if key == "today":
+        return None
+    qs = _purchases_in(start, end).order_by()
+    if key == "year":
+        rows = qs.annotate(b=TruncMonth("purchase_date")).values("b").annotate(t=Sum("grand_total"))
+        by = {row["b"].month: row["t"] for row in rows}
+        return [float(by.get(month, 0)) for month in range(1, end.month + 1)]
+    by = {
+        row["purchase_date"]: row["t"]
+        for row in qs.values("purchase_date").annotate(t=Sum("grand_total"))
+    }
+    return [
+        float(by.get(start + timedelta(days=offset), 0))
+        for offset in range((end - start).days + 1)
+    ]
 
 
 def _chart_money(value):
@@ -318,6 +349,8 @@ def home(request):
 
     cur = _metrics(start, end)
     prev = _metrics(p_start, p_end)
+    purchase_cur = _purchase_total(start, end)
+    purchase_prev = _purchase_total(p_start, p_end)
     current_expenses = Expense.objects.filter(
         status=Expense.Status.ACTIVE, expense_date__gte=start, expense_date__lte=end
     ).aggregate(total=_sum("amount"))["total"]
@@ -325,25 +358,15 @@ def home(request):
         status=Expense.Status.ACTIVE, expense_date__gte=p_start, expense_date__lte=p_end
     ).aggregate(total=_sum("amount"))["total"]
 
-    purchase_total = Purchase.objects.filter(
-        status=Purchase.Status.COMPLETED,
-        purchase_date__gte=start,
-        purchase_date__lte=end,
-    ).aggregate(total=Coalesce(Sum("grand_total"), Value(ZERO), output_field=MONEY_FIELD))["total"]
-    prev_purchase_total = Purchase.objects.filter(
-        status=Purchase.Status.COMPLETED,
-        purchase_date__gte=p_start,
-        purchase_date__lte=p_end,
-    ).aggregate(total=Coalesce(Sum("grand_total"), Value(ZERO), output_field=MONEY_FIELD))["total"]
-
     primary_cards = [
         {"label": "Total Sales", "display": inr(cur["sales"]), "icon": "bi-receipt",
          "change": _change(cur["sales"], prev["sales"], label)},
         {"label": "Sales Return", "display": inr(cur["returns"]), "icon": "bi-arrow-repeat",
          "change": _change(cur["returns"], prev["returns"], label)},
-        {"label": "Total Purchase", "display": inr(purchase_total) if purchase_total else "\u2014", "icon": "bi-bag",
-         "change": _change(purchase_total, prev_purchase_total, label) if purchase_total or prev_purchase_total else None},
-        {"label": "Purchase Return", "display": "\u2014", "icon": "bi-shield-check"},
+        {"label": "Total Purchase", "display": inr(purchase_cur), "icon": "bi-bag", "color": "teal",
+         "change": _change(purchase_cur, purchase_prev, label)},
+        {"label": "Purchase Return", "display": "\u2014", "icon": "bi-shield-check", "color": "blue",
+         "note": "Cancelled purchases are left out"},
     ]
     secondary_cards = [
         {"label": "Gross Profit", "display": inr(cur["profit"]), "icon": "bi-layers",
@@ -399,13 +422,18 @@ def home(request):
     ]
 
     recent = Sale.objects.select_related("customer").order_by("-created_at")[:5]
+    sales_statistics = _sales_statistics(key, start, end)
 
     context = {
         "today": today,
+        "backup_warning": backup_warning(
+            read_backup_status(), settings.BACKUP_STALE_HOURS
+        ),
         "ranges": RANGES,
         "range_key": key,
         "range_label": dict(RANGES)[key],
         "period_text": f"{start:%d-%m-%Y}" + ("" if start == end else f" to {end:%d-%m-%Y}"),
+        "today_purchases": inr(purchase_cur),
         "primary_cards": primary_cards,
         "secondary_cards": secondary_cards,
         "overall": {
@@ -423,7 +451,9 @@ def home(request):
         "heat": _heatmap(today),
         "chart_data": {
             "cats": {"labels": [c["name"] for c in categories], "values": [_chart_money(r["amount"]) for r in cat_rows]},
-            "sales_statistics": _sales_statistics(key, start, end),
+            "sales": {"labels": sales_statistics["labels"], "values": sales_statistics["revenue"]},
+            "sales_statistics": sales_statistics,
+            "purchases": _purchases_series(key, start, end),
         },
     }
     return render(request, "dashboard/home.html", context)

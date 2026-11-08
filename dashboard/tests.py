@@ -1,3 +1,11 @@
+from datetime import timedelta
+
+from django.utils import timezone
+
+from people.models import Contact
+from purchase.models import Purchase
+
+
 import json
 from datetime import date
 from decimal import Decimal
@@ -88,7 +96,7 @@ class DashboardTests(TestCase):
         cards, response = self.cards()
         self.assertEqual(cards["Total Sales"]["display"], "\u20b90.00")
         self.assertEqual(cards["Bills Made"]["display"], "0")
-        self.assertEqual(cards["Total Purchase"]["display"], "\u2014")
+        self.assertEqual(cards["Total Purchase"]["display"], "\u20b90.00")
         self.assertEqual(cards["Purchase Return"]["display"], "\u2014")
         self.assertEqual(cards["Net Profit"]["display"], "\u20b90.00")
         self.assertEqual(cards["Total Expenses"]["display"], "\u20b90.00")
@@ -216,3 +224,57 @@ class DashboardTests(TestCase):
         response = self.client.get(reverse("dashboard:home"))
         self.assertEqual(response.context["overall"]["first_time"], 1)
         self.assertEqual(response.context["top_customers"][0]["name"], "Asha")
+        
+class DashboardPurchaseTests(TestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user("dp_boss", password="pw12345!", role="admin")
+        self.supplier = Contact.objects.create(name="Resin Co", is_customer=False, is_supplier=True)
+        self.client.login(username="dp_boss", password="pw12345!")
+        self.today = timezone.localdate()
+        self.count = 0
+
+    def buy(self, amount, day=None, status="completed"):
+        self.count += 1
+        return Purchase.objects.create(
+            purchase_no=f"AF-P-T-{self.count}", supplier=self.supplier, purchase_date=day or self.today,
+            grand_total=Decimal(amount), status=status, created_by=self.admin,
+        )
+
+    def get(self, key="today"):
+        response = self.client.get(reverse("dashboard:home"), {"range": key})
+        cards = {c["label"]: c for c in response.context["primary_cards"]}
+        return cards["Total Purchase"], response
+
+    def test_only_completed_purchases_are_counted(self):
+        self.buy("1000.00")
+        self.buy("400.00", status="cancelled")
+        card, _ = self.get()
+        self.assertEqual(card["display"], "\u20b91,000.00")
+
+    def test_period_and_percent_change(self):
+        self.buy("150.00")
+        self.buy("100.00", day=self.today - timedelta(days=1))
+        self.buy("999.00", day=self.today - timedelta(days=40))        # outside the week
+        card, _ = self.get("today")
+        self.assertEqual(card["change"]["text"], "+50.0% vs yesterday")
+        card, _ = self.get("week")
+        self.assertEqual(card["display"], "\u20b9250.00")
+
+    def test_chart_has_a_purchase_series_except_for_today(self):
+        self.buy("150.00")
+        _, response = self.get("today")
+        self.assertIsNone(response.context["chart_data"]["purchases"])
+        self.assertEqual(response.context["today_purchases"], "\u20b9150.00")
+
+        _, response = self.get("week")
+        series = response.context["chart_data"]["purchases"]
+        self.assertEqual(len(series), 7)
+        self.assertEqual(series[-1], 150.0)
+
+        _, response = self.get("year")
+        self.assertEqual(response.context["chart_data"]["purchases"][self.today.month - 1], 150.0)
+
+    def test_an_empty_database_shows_zero_not_an_error(self):
+        card, response = self.get("month")
+        self.assertEqual(card["display"], "\u20b90.00")
+        self.assertEqual(response.status_code, 200)

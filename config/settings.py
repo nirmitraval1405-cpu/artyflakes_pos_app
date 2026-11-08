@@ -18,6 +18,7 @@ from django.contrib.messages import constants as message_constants
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
+DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
@@ -49,6 +50,8 @@ INSTALLED_APPS = [
     'reports',
     'people',
     'expenses',
+    'backups.apps.BackupsConfig',
+    'storeconfig'
 ]
 
 MIDDLEWARE = [
@@ -73,6 +76,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                 "storeconfig.context_processors.store",
             ],
         },
     },
@@ -154,9 +158,23 @@ LOGOUT_REDIRECT_URL = "accounts:login"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 TIME_ZONE = "Asia/Kolkata"  
 
+# Database backups are kept outside the project because they contain customer data.
+BACKUP_DIR = Path(
+    os.getenv("BACKUP_DIR", str(Path.home() / "Documents" / "artyflakes-backups"))
+).expanduser()
+BACKUP_COPY_DIR = os.getenv("BACKUP_COPY_DIR", "").strip()
+BACKUP_PG_BIN = os.getenv("BACKUP_PG_BIN", "").strip()
+BACKUP_KEEP_DAILY = int(os.getenv("BACKUP_KEEP_DAILY", "14"))
+BACKUP_KEEP_WEEKLY = int(os.getenv("BACKUP_KEEP_WEEKLY", "8"))
+BACKUP_KEEP_MONTHLY = int(os.getenv("BACKUP_KEEP_MONTHLY", "12"))
+BACKUP_MIN_BYTES = int(os.getenv("BACKUP_MIN_BYTES", "20000"))
+BACKUP_STALE_HOURS = int(os.getenv("BACKUP_STALE_HOURS", "36"))
+
 # Highest total discount (percent of the bill) a Cashier may give. Admins have no limit.
 POS_CASHIER_MAX_DISCOUNT_PERCENT = 10
 
+# First-run defaults only. After the first start, the shop details and the cashier discount limit are
+# edited on the Store Settings page and stored in the database. Changing these values later does nothing.
 
 STORE = {
     "name": "Artyflakes",

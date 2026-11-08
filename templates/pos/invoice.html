@@ -19,10 +19,12 @@
 
   <div class="i-head">
     <div class="i-store">
+      {% if store.logo %}<img class="i-logo" src="{{ store.logo }}" alt="{{ store.name }} logo">{% endif %}
       <h1>{{ store.name }}</h1>
       {% if store.tagline %}<div>{{ store.tagline }}</div>{% endif %}
       {% if store.address %}<div>{{ store.address|linebreaksbr }}</div>{% endif %}
       {% if store.phone %}<div>Phone: {{ store.phone }}</div>{% endif %}
+      {% if store.email %}<div>Email: {{ store.email }}</div>{% endif %}
       {% if store.gstin %}<div>GSTIN: {{ store.gstin }}</div>{% endif %}
     </div>
     <div class="i-doc">
@@ -116,6 +118,14 @@
       </table>
     </div>
   </div>
+
+  {% if store.bank_account_number or store.bank_details %}
+  <div class="i-bank">
+    <b>Bank account</b>
+    {% if store.bank_account_number %}<div>Account number: {{ store.bank_account_number }}</div>{% endif %}
+    {% if store.bank_details %}<div>{{ store.bank_details|linebreaksbr }}</div>{% endif %}
+  </div>
+  {% endif %}
 
   <div class="i-foot">{{ store.footer }} &nbsp;&bull;&nbsp; This is a computer-generated invoice.</div>
 </div>

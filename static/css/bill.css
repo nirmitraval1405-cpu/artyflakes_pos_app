@@ -8,6 +8,7 @@ body.receipt { background: #e8e8e8; font-family: "Courier New", Courier, monospa
 .r-sheet { width: 72mm; margin: 10px auto; background: #fff; padding: 3mm; box-sizing: content-box; }
 .r-center { text-align: center; }
 .r-center h1 { font-size: 17px; margin: 0 0 2px; }
+.r-logo { display: block; max-width: 35mm; max-height: 20mm; margin: 0 auto 4px; object-fit: contain; }
 .r-sheet hr { border: 0; border-top: 1px dashed #000; margin: 6px 0; }
 .r-row, .r-line { display: flex; justify-content: space-between; gap: 6px; }
 .r-name { font-weight: 700; margin-top: 3px; word-break: break-word; }
@@ -20,6 +21,7 @@ body.invoice { font-family: Arial, Helvetica, sans-serif; font-size: 12px; backg
 .i-sheet { width: 186mm; margin: 12px auto; background: #fff; padding: 10mm; box-sizing: content-box; }
 .i-head { display: flex; justify-content: space-between; gap: 20px; border-bottom: 2px solid #000; padding-bottom: 8px; }
 .i-store h1 { font-size: 22px; margin: 0 0 3px; }
+.i-logo { display: block; max-width: 55mm; max-height: 25mm; margin-bottom: 5px; object-fit: contain; }
 .i-doc { text-align: right; }
 .i-doc h2 { margin: 0 0 4px; font-size: 18px; letter-spacing: .08em; }
 .i-doc table { margin-left: auto; text-align: left; }
@@ -37,6 +39,7 @@ table.i-sum { width: 100%; border-collapse: collapse; }
 .i-sum td:last-child { text-align: right; }
 .i-sum tr.grand td { border-top: 2px solid #000; border-bottom: 2px solid #000; font-size: 15px; font-weight: 700; }
 .i-foot { margin-top: 18px; padding-top: 6px; border-top: 1px solid #999; text-align: center; font-size: 11px; color: #444; }
+.i-bank { margin-top: 12px; padding-top: 6px; border-top: 1px solid #999; font-size: 11px; }
 
 @media screen and (max-width: 800px) {
   .i-sheet {

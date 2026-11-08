@@ -59,6 +59,7 @@ class Sale(TimeStampedModel):
     amount_paid = models.DecimalField(default=0, **MONEY)
     change_due = models.DecimalField(default=0, **MONEY)
     note = models.CharField(max_length=255, blank=True)
+    store_info = models.JSONField(null=True, blank=True)
 
     voided_at = models.DateTimeField(null=True, blank=True)
     voided_by = models.ForeignKey(

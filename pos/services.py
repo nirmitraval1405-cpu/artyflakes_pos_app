@@ -1,12 +1,13 @@
 from decimal import Decimal, InvalidOperation
-from django.utils import timezone
-from django.conf import settings
-from django.db.models import Sum
+
 from django.db import IntegrityError, transaction
+from django.db.models import Sum
+from django.utils import timezone
 
 from inventory.models import Product, StockMovement
 from inventory.stock import current_stock, qty_fmt
 from people.models import Contact
+from storeconfig.models import StoreSettings
 
 from .models import InvoiceCounter, Payment, ReturnCounter, Sale, SaleItem, SaleReturn, SaleReturnItem
 
@@ -140,7 +141,7 @@ def compute_bill(lines, bill_kind=None, bill_value=0):
 
 # ---------- Checkout ----------
 def _result(sale, warnings, duplicate=False):
-     return {
+    return {
         "ok": True,
         "duplicate": duplicate,
         "sale_id": sale.pk,
@@ -221,6 +222,9 @@ def create_sale(user, data):
     # ---- 2. Save everything or nothing ----
     try:
         with transaction.atomic():
+            # The shop's current details and discount limit, read from the Store Settings page
+            cfg = StoreSettings.load()
+
             # Lock the products being sold (in a fixed order, so two checkouts cannot deadlock)
             products = {
                 p.pk: p for p in Product.objects.select_for_update().filter(pk__in=seen).order_by("pk")
@@ -256,10 +260,12 @@ def create_sale(user, data):
                 )
 
             if not user.is_admin_role:
-                max_pct = Decimal(str(getattr(settings, "POS_CASHIER_MAX_DISCOUNT_PERCENT", 10)))
+                max_pct = cfg.cashier_max_discount_percent
                 max_bp = int(max_pct * 100)
                 if calc["discount_total"] * 10000 > max_bp * calc["subtotal"]:
-                    raise CheckoutError(f"Discount is above your limit of {max_pct}%. Ask an admin to bill this.")
+                    raise CheckoutError(
+                        f"Discount is above your limit of {max_pct.normalize():f}%. Ask an admin to bill this."
+                    )
 
             tendered = sum(p["amount"] for p in payments)
             if tendered < total:
@@ -283,6 +289,7 @@ def create_sale(user, data):
                 discount_total=rupees(calc["discount_total"]), tax_total=rupees(calc["tax_total"]),
                 total=rupees(total), amount_paid=rupees(tendered), change_due=rupees(change),
                 note=str(data.get("note") or "")[:255],
+                store_info=cfg.as_store_info(),     # the shop details this bill was made with
             )
 
             items, movements, warnings = [], [], []
@@ -326,7 +333,8 @@ def create_sale(user, data):
             if existing:
                 return _result(existing, [], duplicate=True)
         raise
-    
+
+
 # =====================  Void and return  =====================
 def _require_admin(user):
     if not user.is_admin_role:

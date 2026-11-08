@@ -3,7 +3,7 @@ import logging
 import uuid
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
-
+from storeconfig.models import StoreSettings
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import get_user_model
@@ -26,9 +26,15 @@ logger = logging.getLogger(__name__)
 
 
 def _store():
-    info = {"name": "Artyflakes", "tagline": "", "address": "", "phone": "", "gstin": "", "footer": ""}
-    info.update(getattr(settings, "STORE", {}))
-    return info
+    return StoreSettings.load().as_store_info()
+
+
+@login_required
+def screen(request):
+    cfg = StoreSettings.load()
+    # Admins have no discount limit, so the page shows the limit to Cashiers only
+    limit = "" if request.user.is_admin_role else f"{cfg.cashier_max_discount_percent.normalize():f}"
+    return render(request, "pos/screen.html", {"max_discount": limit, "store": cfg.as_store_info()})
 
 
 @login_required
@@ -164,7 +170,7 @@ def _bill_context(request, sale):
         "sgst_total": sum((g["sgst"] for g in tax_summary), Decimal("0")),
         "walk_in": sale.customer.is_system,
         "cashier_name": sale.cashier.get_full_name() or sale.cashier.username,
-        "store": _store(),
+                "store": sale.store_info or _store(),     # old bills use the current details
         "autoprint": request.GET.get("print") == "1",
     }
 
