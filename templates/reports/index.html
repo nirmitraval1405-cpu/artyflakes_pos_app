@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% load static %}
-{% block title %}Reports · Artyflakes POS{% endblock %}
+{% block title %}Reports · {{ store_name }}{% endblock %}
 {% block extra_css %}<link href="{% static 'css/reports.css' %}" rel="stylesheet">{% endblock %}
 
 {% block content %}
@@ -36,13 +36,20 @@
     <h4>Filter</h4>
     <form id="rpForm" onsubmit="return false">
       <label>Customers &amp; suppliers</label>
-      <select disabled title="Available with sales and purchase reports"><option>All</option></select>
+      <select name="party">
+        <option value="">All</option>
+        <optgroup label="Customers">{% for c in customers %}<option value="{{ c.pk }}">{{ c.name }}</option>{% endfor %}</optgroup>
+        <optgroup label="Suppliers">{% for c in suppliers %}<option value="{{ c.pk }}">{{ c.name }}</option>{% endfor %}</optgroup>
+      </select>
 
       <label>User</label>
-      <select disabled title="Available with sales reports"><option>All</option></select>
+      <select name="user">
+        <option value="">All</option>
+        {% for u in users %}<option value="{{ u.pk }}">{{ u.get_full_name|default:u.username }}</option>{% endfor %}
+      </select>
 
       <label>Cash register</label>
-      <select disabled title="Available with sales reports"><option>All</option></select>
+      <select disabled title="Not used yet"><option>All</option></select>
 
       <label>Product</label>
       <select name="product">
@@ -61,12 +68,13 @@
         <label class="form-check-label" for="rpSub">Include subgroups</label>
       </div>
 
-      <div class="rp-dates" title="Used by sales and purchase reports">
+      <div class="rp-dates">
         <i class="bi bi-calendar3"></i>
         <input type="date" name="date_from" value="{{ date_from|date:'Y-m-d' }}">
         <span>-</span>
         <input type="date" name="date_to" value="{{ date_to|date:'Y-m-d' }}">
       </div>
+      <div class="small text-muted mt-1">Each report uses the filters that apply to it and tells you about the rest.</div>
     </form>
 
     <div class="rp-actions">
@@ -97,7 +105,7 @@
         if (item.dataset.ready !== "1") {
           selected = null;
           setButtons(false);
-          note.textContent = "\u201C" + item.textContent.trim() + "\u201D needs sales, purchase or stock data. It will be available in a later phase.";
+          note.textContent = "\u201C" + item.textContent.trim() + "\u201D is not available yet.";
           return;
         }
         item.classList.add("active");
@@ -119,7 +127,6 @@
     document.getElementById("btnPdf").addEventListener("click", () => go("print=1"));
     document.getElementById("btnExcel").addEventListener("click", () => go("format=csv"));
 
-    // Search box
     document.getElementById("rpSearch").addEventListener("input", (e) => {
       const q = e.target.value.trim().toLowerCase();
       document.querySelectorAll(".rp-section").forEach((section) => {

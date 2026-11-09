@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% load static %}
-{% block title %}{{ report.title }} · Reports{% endblock %}
+{% block title %}{{ info.title }} · Reports{% endblock %}
 {% block extra_css %}<link href="{% static 'css/reports.css' %}" rel="stylesheet">{% endblock %}
 
 {% block content %}
@@ -15,8 +15,8 @@
 <div class="rv-sheet">
   <div class="rv-head">
     <div>
-      <h3>{{ report.title }}</h3>
-      <div class="text-muted">{{ report.section }} report &bull; Artyflakes</div>
+      <h3>{{ info.title }}</h3>
+      <div class="text-muted">{{ info.section }} report &bull; {{ store_name }}</div>
     </div>
     <div class="text-end text-muted small">
       Generated {{ generated|date:"d-m-Y H:i" }}<br>
@@ -24,23 +24,37 @@
     </div>
   </div>
 
+  {% for n in notes %}<div class="rv-note">{{ n }}</div>{% endfor %}
+
   <div class="rv-filters">
-    {% if filters %}{% for f in filters %}<span class="rv-chip">{{ f }}</span>{% endfor %}{% else %}<span class="rv-chip">All records</span>{% endif %}
-    <span class="rv-chip">Rows: {{ rows|length }}</span>
+    {% for c in report.chips %}<span class="rv-chip">{{ c }}</span>{% endfor %}
+    <span class="rv-chip">Rows: {{ total_rows }}</span>
   </div>
+
+  {% if truncated %}
+  <div class="rv-note">
+    Showing the first {{ page_cap }} of {{ total_rows }} rows. Totals cover all {{ total_rows }} rows.
+    Narrow the dates, or use Excel (CSV), which holds up to {{ csv_cap }} rows.
+  </div>
+  {% endif %}
 
   <div class="rv-wrap">
     <table class="rv-table">
       <thead>
-        <tr>{% for label, cls in headers %}<th class="{{ cls }}">{{ label }}</th>{% endfor %}</tr>
+        <tr>{% for label, cls in report.headers %}<th class="{{ cls }}">{{ label }}</th>{% endfor %}</tr>
       </thead>
       <tbody>
         {% for row in rows %}
         <tr>{% for value, cls in row %}<td class="{{ cls }}">{{ value }}</td>{% endfor %}</tr>
         {% empty %}
-        <tr><td colspan="{{ headers|length }}" class="rv-empty">No records match these filters.</td></tr>
+        <tr><td colspan="{{ report.headers|length }}" class="rv-empty">No records match these filters.</td></tr>
         {% endfor %}
       </tbody>
+      {% if total_row %}
+      <tfoot>
+        <tr class="rv-total">{% for value, cls in total_row %}<td class="{{ cls }}">{{ value }}</td>{% endfor %}</tr>
+      </tfoot>
+      {% endif %}
     </table>
   </div>
 </div>

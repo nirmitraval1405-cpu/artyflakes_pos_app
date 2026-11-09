@@ -382,7 +382,7 @@
         flex-wrap: wrap;
     }
 
-    .rv-head > .text-end {
+    .rv-head>.text-end {
         text-align: left !important;
     }
 }
@@ -415,6 +415,41 @@
     }
 
     .rv-table th {
+        background: #eee !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+}
+
+.rv-note {
+    margin: .6rem 0 0;
+    padding: .45rem .8rem;
+    background: var(--tint-gold);
+    color: #8d6a3f;
+    border-radius: 6px;
+    font-size: 13px;
+}
+
+.rv-table tfoot td {
+    background: var(--cream);
+    font-weight: 700;
+    border-top: 2px solid var(--primary);
+    border-bottom: 0;
+}
+
+.rv-table td.num,
+.rv-table th.num {
+    text-align: right;
+}
+
+@media print {
+    .rv-note {
+        background: none;
+        border: 1px solid #999;
+        color: #000;
+    }
+
+    .rv-table tfoot td {
         background: #eee !important;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;

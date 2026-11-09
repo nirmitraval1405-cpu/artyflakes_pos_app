@@ -1,4 +1,5 @@
 import json
+from .gst import split_tax
 import logging
 import uuid
 from datetime import date
@@ -146,8 +147,8 @@ def _bill_context(request, sale):
         g = groups[rate]
         if g["rate"] <= 0:
             continue
-        cgst = (g["tax"] / 2).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-        tax_summary.append({**g, "half_rate": rate / 2, "cgst": cgst, "sgst": g["tax"] - cgst})
+        cgst, sgst = split_tax(g["tax"])
+        tax_summary.append({**g, "half_rate": rate / 2, "cgst": cgst, "sgst": sgst})
 
     # Cash is stored after change was handed back; show what the customer actually handed over
     pay_lines, has_cash = [], False
