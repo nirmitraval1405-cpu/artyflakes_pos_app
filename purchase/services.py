@@ -4,7 +4,7 @@ from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
-from inventory.models import Product, StockMovement
+from inventory.models import Product, StockMovement, Unit
 from inventory.stock import qty_fmt, with_stock
 
 from .models import Purchase, PurchaseCounter, PurchaseItem, PurchasePayment
@@ -14,8 +14,6 @@ THREE = Decimal("0.001")
 MAX_LINES = 200
 MAX_MONEY = Decimal("100000000")
 MAX_QTY = Decimal("1000000")
-COUNT_UNITS = {"pcs", "set", "box", "pack"}          # must be bought in whole numbers
-
 # After a purchase, a product's cost price becomes the latest cost (after discount, before GST).
 # The dashboard's Gross Profit uses this. Set to False to manage cost prices by hand.
 UPDATE_COST_ON_PURCHASE = True
@@ -51,13 +49,15 @@ def money(value, label, upper=MAX_MONEY, blank_zero=False):
     return d.quantize(TWO)
 
 
-def quantity(value, unit, name):
+def quantity(value, unit, name, whole_units=None):
     d = _decimal(value, f"Quantity for {name}")
     if d <= 0 or d > MAX_QTY:
         raise PurchaseError(f"Quantity for {name} must be above zero.")
     if d != d.quantize(THREE):
         raise PurchaseError(f"Quantity for {name} can have at most 3 decimal places.")
-    if unit in COUNT_UNITS and d != d.to_integral_value():
+    if whole_units is None:
+        whole_units = Unit.whole_quantity_codes()
+    if unit in whole_units and d != d.to_integral_value():
         raise PurchaseError(f"{name} must be bought in whole numbers.")
     return d.quantize(THREE)
 
@@ -101,12 +101,13 @@ def parse_lines(post):
         raise PurchaseError("The same product is on the purchase twice. Combine it into one line.")
 
     products = {p.pk: p for p in Product.objects.filter(pk__in=ids, is_active=True)}
+    whole_units = Unit.whole_quantity_codes()
     lines = []
     for index, pid in picked:
         p = products.get(pid)
         if p is None:
             raise PurchaseError(f"Product #{pid} is no longer available.")
-        qty = quantity(post.get(f"quantity_{index}"), p.unit, p.name)
+        qty = quantity(post.get(f"quantity_{index}"), p.unit, p.name, whole_units)
         cost = money(post.get(f"cost_price_{index}"), f"Cost price for {p.name}")
         disc = money(post.get(f"discount_{index}"), f"Discount for {p.name}", blank_zero=True)
         gst = money(post.get(f"gst_rate_{index}"), f"GST % for {p.name}", upper=Decimal("100"), blank_zero=True)

@@ -16,7 +16,8 @@
 
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-brand">
-      <i class="bi bi-palette2"></i> Artyflakes <span>POS</span>
+      {% if store_logo_url %}<img class="sidebar-brand-logo" src="{{ store_logo_url }}" alt="{{ store_name }} logo">{% endif %}
+      {% comment %} <span class="sidebar-brand-name">{{ store_name|default:"Artyflakes" }} <small>POS</small></span> {% endcomment %}
     </div>
 
     <nav class="sidebar-nav">
@@ -40,9 +41,11 @@
           <a class="sub-link {% if inv == 'inventory' and pu|slice:':7' == 'product' or pu|slice:':5' == 'group' %}active{% endif %}" href="{% url 'inventory:product_list' %}">Products</a>
           <a class="sub-link {% if pu|slice:':5' == 'stock' or pu == 'movement_list' %}{% if request.GET.filter != 'low' %}active{% endif %}{% endif %}" href="{% url 'inventory:stock_list' %}">Stock</a>
           <a class="sub-link {% if pu == 'stock_list' and request.GET.filter == 'low' %}active{% endif %}" href="{% url 'inventory:stock_list' %}?filter=low">Low Stock</a>
-          <span class="sub-link disabled">Categories <em>Soon</em></span>
-          <span class="sub-link disabled">Brands <em>Soon</em></span>
-          <span class="sub-link disabled">Units <em>Soon</em></span>
+          {% if user.is_admin_role %}
+          <a class="sub-link {% if pu|slice:':8' == 'category' %}active{% endif %}" href="{% url 'inventory:category_list' %}">Categories</a>
+          <a class="sub-link {% if pu|slice:':5' == 'brand' %}active{% endif %}" href="{% url 'inventory:brand_list' %}">Brands</a>
+          <a class="sub-link {% if pu|slice:':4' == 'unit' %}active{% endif %}" href="{% url 'inventory:unit_list' %}">Units</a>
+          {% endif %}
         </div>
       </div>
       {% endwith %}

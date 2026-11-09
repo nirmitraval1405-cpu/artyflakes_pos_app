@@ -8,15 +8,17 @@ from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Count, ProtectedError, Q
 from django.http import HttpResponse, JsonResponse
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
 from django.views.decorators.http import require_POST
-from django.views.generic import CreateView, DeleteView, FormView, UpdateView
+from django.views.generic import CreateView, DeleteView, FormView, ListView, UpdateView, View
 
 from core.permissions import AdminRequiredMixin
 
-from .forms import AddStockForm, CategoryForm, CountForm, DamageForm, ProductForm
-from .models import Category, Product, StockMovement
+from .forms import (
+    AddStockForm, BrandForm, CategoryForm, CountForm, DamageForm, ProductForm, UnitForm,
+)
+from .models import Brand, Category, Product, StockMovement, Unit
 from .stock import current_stock, low_stock, qty_fmt, stock_status, with_stock
 from .utils.barcode_generator import create_barcode_image, generate_barcode
 
@@ -36,7 +38,7 @@ def product_list(request):
     q = request.GET.get("q", "").strip()
     group = request.GET.get("group", "")
 
-    products = with_stock(Product.objects.select_related("category"))
+    products = with_stock(Product.objects.select_related("category", "brand"))
     selected_category = None
 
     if group.isdigit():
@@ -77,11 +79,12 @@ def product_export(request):
     response = HttpResponse(content_type="text/csv")
     response["Content-Disposition"] = 'attachment; filename="products.csv"'
     writer = csv.writer(response)
-    writer.writerow(["Code", "Name", "Group", "Barcode", "Unit", "Cost", "Sale price", "MRP", "GST %", "HSN", "Stock", "Low stock level", "Active"])
-    for p in with_stock(Product.objects.select_related("category")).order_by("name"):
+    writer.writerow(["Code", "Name", "Group", "Brand", "Barcode", "Unit", "Cost", "Sale price", "MRP", "GST %", "HSN", "Stock", "Low stock level", "Active"])
+    for p in with_stock(Product.objects.select_related("category", "brand")).order_by("name"):
         writer.writerow([
             _safe(p.code), _safe(p.name), _safe(p.category.name if p.category else ""),
-            _safe(p.barcode), p.unit, p.cost_price, p.sale_price, p.mrp, p.gst_rate,
+            _safe(p.brand.name if p.brand else ""), _safe(p.barcode), p.unit,
+            p.cost_price, p.sale_price, p.mrp, p.gst_rate,
             _safe(p.hsn_code), qty_fmt(p.stock) if p.track_stock else "", p.min_stock,
             "Yes" if p.is_active else "No",
         ])
@@ -148,15 +151,168 @@ class ProductUpdate(FormPage, UpdateView):
 class CategoryCreate(FormPage, CreateView):
     model = Category
     form_class = CategoryForm
-    saved_message = "Group added."
-    extra_context = {"title": "New group", "back_url": LIST_URL}
+    success_url = reverse_lazy("inventory:category_list")
+    saved_message = "Category added."
+    extra_context = {"title": "New category", "back_url": reverse_lazy("inventory:category_list")}
 
 
 class CategoryUpdate(FormPage, UpdateView):
     model = Category
     form_class = CategoryForm
-    saved_message = "Group updated."
-    extra_context = {"title": "Edit group", "back_url": LIST_URL}
+    success_url = reverse_lazy("inventory:category_list")
+    saved_message = "Category updated."
+    extra_context = {"title": "Edit category", "back_url": reverse_lazy("inventory:category_list")}
+
+
+class CatalogList(AdminRequiredMixin, ListView):
+    template_name = "inventory/catalog_list.html"
+    context_object_name = "items"
+    kind = ""
+
+    def get_queryset(self):
+        if self.kind == "category":
+            return Category.objects.annotate(product_count=Count("products"))
+        if self.kind == "brand":
+            return Brand.objects.annotate(product_count=Count("products"))
+        counts = dict(
+            Product.objects.values("unit").annotate(n=Count("pk")).values_list("unit", "n")
+        )
+        units = list(Unit.objects.all())
+        for unit in units:
+            unit.product_count = counts.get(unit.code, 0)
+        return units
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        labels = {"category": "Categories", "brand": "Brands", "unit": "Units"}
+        context.update({"kind": self.kind, "title": labels[self.kind]})
+        return context
+
+
+class CategoryList(CatalogList):
+    kind = "category"
+
+
+class BrandList(CatalogList):
+    kind = "brand"
+
+
+class UnitList(CatalogList):
+    kind = "unit"
+
+
+class BrandCreate(FormPage, CreateView):
+    model = Brand
+    form_class = BrandForm
+    success_url = reverse_lazy("inventory:brand_list")
+    saved_message = "Brand added."
+    extra_context = {"title": "New brand", "back_url": reverse_lazy("inventory:brand_list")}
+
+
+class BrandUpdate(FormPage, UpdateView):
+    model = Brand
+    form_class = BrandForm
+    success_url = reverse_lazy("inventory:brand_list")
+    saved_message = "Brand updated."
+    extra_context = {"title": "Edit brand", "back_url": reverse_lazy("inventory:brand_list")}
+
+
+class UnitCreate(FormPage, CreateView):
+    model = Unit
+    form_class = UnitForm
+    success_url = reverse_lazy("inventory:unit_list")
+    saved_message = "Unit added."
+    extra_context = {"title": "New unit", "back_url": reverse_lazy("inventory:unit_list")}
+
+
+class UnitUpdate(FormPage, UpdateView):
+    model = Unit
+    form_class = UnitForm
+    success_url = reverse_lazy("inventory:unit_list")
+    saved_message = "Unit updated."
+    extra_context = {"title": "Edit unit", "back_url": reverse_lazy("inventory:unit_list")}
+
+
+class CatalogToggle(AdminRequiredMixin, View):
+    model = None
+    list_url = None
+
+    def post(self, request, pk):
+        item = get_object_or_404(self.model, pk=pk)
+        item.is_active = not item.is_active
+        item.save(update_fields=["is_active", "updated_at"])
+        state = "activated" if item.is_active else "deactivated"
+        messages.success(request, f"{item} {state}.")
+        return redirect(self.list_url)
+
+
+class CategoryToggle(CatalogToggle):
+    model = Category
+    list_url = reverse_lazy("inventory:category_list")
+
+
+class BrandToggle(CatalogToggle):
+    model = Brand
+    list_url = reverse_lazy("inventory:brand_list")
+
+
+class UnitToggle(CatalogToggle):
+    model = Unit
+    list_url = reverse_lazy("inventory:unit_list")
+
+
+class CatalogDelete(AdminRequiredMixin, DeleteView):
+    template_name = "inventory/confirm_delete.html"
+    model = None
+    kind = ""
+    list_url = None
+    product_filter = None
+
+    def get_success_url(self):
+        return self.list_url
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        labels = {"category": "category", "brand": "brand", "unit": "unit"}
+        context.update({
+            "title": f"Delete {labels[self.kind]}",
+            "back_url": self.list_url,
+            "warning": "This can only be deleted if no products use it. Otherwise deactivate it instead.",
+        })
+        return context
+
+    def form_valid(self, form):
+        if self.product_filter(self.object).exists():
+            messages.warning(
+                self.request,
+                f'"{self.object}" is used by products and cannot be deleted. Deactivate it instead.',
+            )
+            return redirect(self.list_url)
+        name = str(self.object)
+        self.object.delete()
+        messages.success(self.request, f'"{name}" deleted.')
+        return redirect(self.list_url)
+
+
+class CategoryDelete(CatalogDelete):
+    model = Category
+    kind = "category"
+    list_url = reverse_lazy("inventory:category_list")
+    product_filter = staticmethod(lambda category: Product.objects.filter(category=category))
+
+
+class BrandDelete(CatalogDelete):
+    model = Brand
+    kind = "brand"
+    list_url = reverse_lazy("inventory:brand_list")
+    product_filter = staticmethod(lambda brand: Product.objects.filter(brand=brand))
+
+
+class UnitDelete(CatalogDelete):
+    model = Unit
+    kind = "unit"
+    list_url = reverse_lazy("inventory:unit_list")
+    product_filter = staticmethod(lambda unit: Product.objects.filter(unit=unit.code))
 
 
 # ---------- Delete pages (admin only) ----------
@@ -215,15 +371,6 @@ class ProductDelete(DeletePage, DeleteView):
             return super().form_valid(form)
 
 
-class CategoryDelete(DeletePage, DeleteView):
-    model = Category
-    extra_context = {
-        "title": "Delete group",
-        "back_url": LIST_URL,
-        "warning": "Products in this group are kept and move to \"No group\".",
-    }
-
-
 # =====================  STOCK  =====================
 @login_required
 def stock_list(request):
@@ -251,7 +398,7 @@ def stock_list(request):
             "code": p.code or "",
             "name": p.name,
             "group": p.category.name if p.category else "",
-            "unit": p.get_unit_display(),
+            "unit": p.unit,
             "stock": qty_fmt(p.stock) if p.track_stock else "\u2014",
             "min_stock": p.min_stock if p.track_stock else "\u2014",
             "kind": kind,

@@ -9,6 +9,7 @@ from core.models import TimeStampedModel
 class Category(TimeStampedModel):
     """A product group, shown in the left tree of the Products page."""
     name = models.CharField(max_length=100, unique=True)
+    is_active = models.BooleanField(default=True)
 
     class Meta:
         ordering = ["name"]
@@ -16,6 +17,37 @@ class Category(TimeStampedModel):
 
     def __str__(self):
         return self.name
+
+
+class Brand(TimeStampedModel):
+    name = models.CharField(max_length=100, unique=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+
+class Unit(TimeStampedModel):
+    code = models.CharField(max_length=10, unique=True)
+    name = models.CharField(max_length=100, unique=True)
+    allow_fraction = models.BooleanField(
+        "Allow decimal quantities", default=True,
+        help_text="Untick for units that must always be sold or purchased in whole numbers.",
+    )
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return f"{self.name} ({self.code})"
+
+    @classmethod
+    def whole_quantity_codes(cls):
+        return set(cls.objects.filter(allow_fraction=False).values_list("code", flat=True))
 
 
 class Product(TimeStampedModel):
@@ -35,9 +67,12 @@ class Product(TimeStampedModel):
     category = models.ForeignKey(
         Category, null=True, blank=True, on_delete=models.SET_NULL, related_name="products"
     )
+    brand = models.ForeignKey(
+        Brand, null=True, blank=True, on_delete=models.SET_NULL, related_name="products"
+    )
     barcode = models.CharField(max_length=64, unique=True, null=True, blank=True)
     hsn_code = models.CharField("HSN code", max_length=10, blank=True)
-    unit = models.CharField(max_length=10, choices=Unit.choices, default=Unit.PCS)
+    unit = models.CharField(max_length=10, default=Unit.PCS)
     track_stock = models.BooleanField(
         "Track stock", default=True,
         help_text="Untick for services or custom work that has no stock.",

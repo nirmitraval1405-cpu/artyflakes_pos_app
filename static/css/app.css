@@ -160,18 +160,33 @@ textarea:focus-visible {
 }
 
 .sidebar-brand {
-    padding: 1rem 1.25rem;
+    padding: 1.25rem 1rem;
     font-size: 1.25rem;
     font-weight: 700;
     color: var(--primary);
     border-bottom: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;   /* stacks logo over brand text */
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: .75rem;
 }
 
-.sidebar-brand i {
-    color: var(--secondary);
+.sidebar-brand-logo {
+    width: 100%;
+    max-width: 140px;         /* allows a wide, sharp display */
+    height: auto;
+    max-height: 70px;
+    flex: none;
+    object-fit: contain;
 }
 
-.sidebar-brand span {
+.sidebar-brand-name {
+    min-width: 0;
+}
+
+.sidebar-brand-name small {
     color: var(--secondary);
     font-size: .7rem;
     vertical-align: super;

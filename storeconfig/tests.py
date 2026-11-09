@@ -164,9 +164,13 @@ class StoreSettingsPageTests(TestCase):
     def test_store_name_reaches_every_page_and_login_still_works(self):
         s = StoreSettings.load()
         s.name = "Craft Hut"
+        s.logo = "store/cropped-2.webp"
         s.save()
         self.client.login(username="sc_boss", password="pw12345!")
-        self.assertEqual(self.client.get(reverse("pos:sale_list")).context["store_name"], "Craft Hut")
+        response = self.client.get(reverse("pos:sale_list"))
+        self.assertEqual(response.context["store_name"], "Craft Hut")
+        self.assertContains(response, "Craft Hut logo")
+        self.assertContains(response, "/media/store/cropped-2.webp")
         self.client.logout()
         self.assertEqual(self.client.get(reverse("accounts:login")).status_code, 200)
 

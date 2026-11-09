@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}{{ title }} · Artyflakes POS{% endblock %}
+{% block extra_css %}<link href="{% static 'css/inventory.css' %}" rel="stylesheet">{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div><h3>{{ title }}</h3><p>Management &bull; Inventory</p></div>
+</div>
+<div class="toolbar">
+  <a class="tb" href="{% url 'inventory:product_list' %}"><i class="bi bi-arrow-left"></i><span>Products</span></a>
+  {% if kind == "category" %}
+    <a class="tb" href="{% url 'inventory:category_create' %}"><i class="bi bi-plus-lg"></i><span>New category</span></a>
+  {% elif kind == "brand" %}
+    <a class="tb" href="{% url 'inventory:brand_create' %}"><i class="bi bi-plus-lg"></i><span>New brand</span></a>
+  {% else %}
+    <a class="tb" href="{% url 'inventory:unit_create' %}"><i class="bi bi-plus-lg"></i><span>New unit</span></a>
+  {% endif %}
+</div>
+<section class="grid-panel">
+  <div class="grid-wrap">
+    <table class="grid">
+      <thead>
+        <tr>
+          {% if kind == "unit" %}<th>Code</th>{% endif %}
+          <th>Name</th>
+          {% if kind == "unit" %}<th>Quantity type</th>{% endif %}
+          <th>Status</th><th>Products</th><th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+        <tr>
+          {% if kind == "unit" %}<td>{{ item.code }}</td>{% endif %}
+          <td>{{ item.name }}</td>
+          {% if kind == "unit" %}<td>{% if item.allow_fraction %}Decimal quantities{% else %}Whole numbers{% endif %}</td>{% endif %}
+          <td><span class="st st-{% if item.is_active %}ok{% else %}out{% endif %}">{% if item.is_active %}Active{% else %}Inactive{% endif %}</span></td>
+          <td>{{ item.product_count }}</td>
+          <td>
+            <div class="d-flex flex-wrap gap-2">
+              {% if kind == "category" %}
+                <a class="btn btn-sm btn-outline-secondary" href="{% url 'inventory:category_update' item.pk %}">Edit</a>
+                <form method="post" action="{% url 'inventory:category_toggle' item.pk %}">
+                {% csrf_token %}<button class="btn btn-sm btn-outline-secondary" type="submit">{% if item.is_active %}Deactivate{% else %}Activate{% endif %}</button></form>
+                {% if not item.product_count %}<a class="btn btn-sm btn-outline-danger" href="{% url 'inventory:category_delete' item.pk %}">Delete</a>{% endif %}
+              {% elif kind == "brand" %}
+                <a class="btn btn-sm btn-outline-secondary" href="{% url 'inventory:brand_update' item.pk %}">Edit</a>
+                <form method="post" action="{% url 'inventory:brand_toggle' item.pk %}">
+                {% csrf_token %}<button class="btn btn-sm btn-outline-secondary" type="submit">{% if item.is_active %}Deactivate{% else %}Activate{% endif %}</button></form>
+                {% if not item.product_count %}<a class="btn btn-sm btn-outline-danger" href="{% url 'inventory:brand_delete' item.pk %}">Delete</a>{% endif %}
+              {% else %}
+                <a class="btn btn-sm btn-outline-secondary" href="{% url 'inventory:unit_update' item.pk %}">Edit</a>
+                <form method="post" action="{% url 'inventory:unit_toggle' item.pk %}">
+                {% csrf_token %}<button class="btn btn-sm btn-outline-secondary" type="submit">{% if item.is_active %}Deactivate{% else %}Activate{% endif %}</button></form>
+                {% if not item.product_count %}<a class="btn btn-sm btn-outline-danger" href="{% url 'inventory:unit_delete' item.pk %}">Delete</a>{% endif %}
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="{% if kind == 'unit' %}6{% else %}4{% endif %}" class="grid-empty">No {{ title|lower }} found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

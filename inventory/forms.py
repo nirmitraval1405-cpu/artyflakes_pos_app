@@ -1,8 +1,10 @@
+import re
 from decimal import Decimal
 
 from django import forms
+from django.db.models import Q
 
-from .models import Category, Product
+from .models import Brand, Category, Product, Unit
 
 
 def _style(form):
@@ -26,6 +28,34 @@ class CategoryForm(forms.ModelForm):
         _style(self)
 
 
+class BrandForm(forms.ModelForm):
+    class Meta:
+        model = Brand
+        fields = ["name"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        _style(self)
+
+
+class UnitForm(forms.ModelForm):
+    class Meta:
+        model = Unit
+        fields = ["code", "name", "allow_fraction"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance.pk:
+            self.fields["code"].disabled = True
+        _style(self)
+
+    def clean_code(self):
+        code = self.cleaned_data["code"].strip().lower()
+        if not re.fullmatch(r"[a-z0-9_-]+", code):
+            raise forms.ValidationError("Use lowercase letters, numbers, hyphens, or underscores.")
+        return code
+
+
 class ProductForm(forms.ModelForm):
     opening_stock = forms.DecimalField(
         required=False,
@@ -40,7 +70,7 @@ class ProductForm(forms.ModelForm):
     class Meta:
         model = Product
         fields = [
-            "name", "category", "barcode", "code", "unit", "track_stock",
+            "name", "category", "brand", "barcode", "code", "unit", "track_stock",
             "cost_price", "sale_price", "mrp", "gst_rate", "hsn_code",
             "min_stock", "is_active",
         ]
@@ -53,11 +83,27 @@ class ProductForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["category"].queryset = Category.objects.filter(
+            Q(is_active=True) | Q(pk=self.instance.category_id)
+        ).order_by("name")
+        self.fields["brand"].queryset = Brand.objects.filter(
+            Q(is_active=True) | Q(pk=self.instance.brand_id)
+        ).order_by("name")
+        active_units = Unit.objects.filter(is_active=True)
+        if self.instance.pk:
+            active_units = Unit.objects.filter(
+                Q(is_active=True) | Q(code=self.instance.unit)
+            )
+        self.fields["unit"] = forms.ChoiceField(
+            choices=[(unit.code, f"{unit.name} ({unit.code})") for unit in active_units],
+            initial=self.instance.unit or Product.Unit.PCS,
+            label="Unit",
+        )
         if self.instance.pk:
             self.fields.pop("opening_stock")
         else:
             self.order_fields([
-                "name", "category", "barcode", "code", "unit", "track_stock",
+                "name", "category", "brand", "barcode", "code", "unit", "track_stock",
                 "opening_stock", "cost_price", "sale_price", "mrp", "gst_rate",
                 "hsn_code", "min_stock", "is_active",
             ])

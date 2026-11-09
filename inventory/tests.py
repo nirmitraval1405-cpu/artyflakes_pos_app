@@ -1,3 +1,4 @@
+from decimal import Decimal
 import tempfile
 from pathlib import Path
 
@@ -8,7 +9,7 @@ from django.urls import reverse
 from accounts.models import User
 
 from .forms import ProductForm
-from .models import Product, StockMovement
+from .models import Brand, Category, Product, StockMovement, Unit
 from .utils.barcode_generator import (
     create_barcode_image,
     generate_barcode,
@@ -91,7 +92,7 @@ class BarcodeEndpointTests(TestCase):
         self.assertContains(response, "Opening stock")
         self.assertContains(response, 'name="opening_stock"')
 
-    def test_product_creation_generates_and_saves_barcode_and_image(self):
+    def test_product_creation_keeps_optional_barcode_blank(self):
         with tempfile.TemporaryDirectory() as media_root, override_settings(MEDIA_ROOT=media_root):
             self.client.get(reverse("inventory:product_create"))
             response = self.client.post(
@@ -111,11 +112,9 @@ class BarcodeEndpointTests(TestCase):
                 },
                 HTTP_X_CSRFTOKEN=self.client.cookies["csrftoken"].value,
             )
-
             product = Product.objects.get(name="Created product")
             self.assertEqual(response.status_code, 302)
-            self.assertRegex(product.barcode, r"^\d{12}$")
-            self.assertTrue(default_storage.exists(product.barcode_image.name))
+            self.assertIsNone(product.barcode)
 
     def test_product_creation_records_optional_opening_stock(self):
         self.client.get(reverse("inventory:product_create"))
@@ -167,38 +166,34 @@ class BarcodeEndpointTests(TestCase):
         self.assertFalse(form.is_valid())
         self.assertIn("opening_stock", form.errors)
 
-    def test_product_edit_preserves_existing_barcode_image(self):
-        with tempfile.TemporaryDirectory() as media_root, override_settings(MEDIA_ROOT=media_root):
-            product = Product.objects.create(name="Before edit", barcode="EDIT-123")
-            product.barcode_image.name = create_barcode_image(product.barcode)
-            product.save(update_fields=["barcode_image"])
-            image_name = product.barcode_image.name
+    def test_product_edit_preserves_existing_barcode(self):
+        product = Product.objects.create(name="Before edit", barcode="EDIT-123")
 
-            self.client.get(reverse("inventory:product_update", args=[product.pk]))
-            response = self.client.post(
-                reverse("inventory:product_update", args=[product.pk]),
-                {
-                    "name": "After edit",
-                    "category": "",
-                    "barcode": product.barcode,
-                    "code": product.code,
-                    "unit": Product.Unit.PCS,
-                    "cost_price": "0",
-                    "sale_price": "0",
-                    "mrp": "0",
-                    "gst_rate": "0",
-                    "hsn_code": "",
-                    "min_stock": "0",
-                    "is_active": "on",
-                },
-                HTTP_X_CSRFTOKEN=self.client.cookies["csrftoken"].value,
-            )
+        self.client.get(reverse("inventory:product_update", args=[product.pk]))
+        response = self.client.post(
+            reverse("inventory:product_update", args=[product.pk]),
+            {
+                "name": "After edit",
+                "category": "",
+                "brand": "",
+                "barcode": product.barcode,
+                "code": product.code,
+                "unit": Product.Unit.PCS,
+                "cost_price": "0",
+                "sale_price": "0",
+                "mrp": "0",
+                "gst_rate": "0",
+                "hsn_code": "",
+                "min_stock": "0",
+                "is_active": "on",
+            },
+            HTTP_X_CSRFTOKEN=self.client.cookies["csrftoken"].value,
+        )
 
-            product.refresh_from_db()
-            self.assertEqual(response.status_code, 302)
-            self.assertEqual(product.name, "After edit")
-            self.assertEqual(product.barcode_image.name, image_name)
-            self.assertTrue(default_storage.exists(image_name))
+        product.refresh_from_db()
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(product.name, "After edit")
+        self.assertEqual(product.barcode, "EDIT-123")
 
 
 class ProductDeleteTests(TestCase):
@@ -245,3 +240,75 @@ class ProductDeleteTests(TestCase):
 
         self.assertRedirects(response, reverse("inventory:product_list"))
         self.assertFalse(Product.objects.filter(pk=self.product.pk).exists())
+
+
+class InventoryCatalogTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_superuser(
+            username="catalog-admin", password="catalog-password",
+        )
+        self.client.force_login(self.user)
+
+    def test_category_brand_and_unit_pages_are_available(self):
+        for name in ("category_list", "brand_list", "unit_list"):
+            response = self.client.get(reverse(f"inventory:{name}"))
+            self.assertEqual(response.status_code, 200)
+
+    def test_can_create_brand_and_unit_catalog_entries(self):
+        response = self.client.post(reverse("inventory:category_create"), {"name": "Paper"})
+        self.assertRedirects(response, reverse("inventory:category_list"))
+        self.assertTrue(Category.objects.filter(name="Paper", is_active=True).exists())
+
+        response = self.client.post(reverse("inventory:brand_create"), {"name": "Acme"})
+        self.assertRedirects(response, reverse("inventory:brand_list"))
+        brand = Brand.objects.get(name="Acme")
+        self.assertTrue(brand.is_active)
+
+        response = self.client.post(reverse("inventory:unit_create"), {
+            "code": "tray",
+            "name": "Tray",
+            "allow_fraction": "",
+        })
+        self.assertRedirects(response, reverse("inventory:unit_list"))
+        unit = Unit.objects.get(code="tray")
+        self.assertFalse(unit.allow_fraction)
+
+    def test_unit_fraction_setting_controls_purchase_quantities(self):
+        from purchase.services import PurchaseError, quantity
+
+        with self.assertRaises(PurchaseError):
+            quantity("1.5", "pcs", "Pieces")
+
+        Unit.objects.create(code="roll", name="Roll", allow_fraction=True)
+        self.assertEqual(quantity("1.5", "roll", "Roll"), Decimal("1.500"))
+
+    def test_products_can_use_managed_brand_and_unit(self):
+        brand = Brand.objects.create(name="Acme")
+        unit = Unit.objects.create(code="roll", name="Roll", allow_fraction=True)
+        form = ProductForm(data={
+            "name": "Wrapping paper",
+            "brand": brand.pk,
+            "unit": unit.code,
+            "cost_price": "1",
+            "sale_price": "2",
+            "mrp": "2",
+            "gst_rate": "0",
+            "hsn_code": "",
+            "min_stock": "0",
+            "is_active": "on",
+        })
+
+        self.assertTrue(form.is_valid(), form.errors)
+        product = form.save()
+        self.assertEqual(product.brand, brand)
+        self.assertEqual(product.unit, "roll")
+
+    def test_in_use_catalog_items_cannot_be_deleted(self):
+        category = Category.objects.create(name="Paper")
+        Product.objects.create(name="Wrapping paper", category=category)
+
+        response = self.client.post(reverse("inventory:category_delete", args=[category.pk]))
+
+        self.assertRedirects(response, reverse("inventory:category_list"))
+        self.assertTrue(Category.objects.filter(pk=category.pk).exists())
+        self.assertTrue(Category.objects.get(pk=category.pk).is_active)

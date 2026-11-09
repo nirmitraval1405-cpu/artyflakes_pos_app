@@ -15,12 +15,12 @@ from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
-from inventory.models import Product
+from inventory.models import Product, Unit
 from inventory.stock import with_stock
 from people.models import Contact
 
 from .models import Payment, Sale, SaleItem, SaleReturn, SaleReturnItem
-from .services import COUNT_UNITS, CheckoutError, create_return, create_sale, void_sale
+from .services import CheckoutError, create_return, create_sale, void_sale
 
 logger = logging.getLogger(__name__)
 
@@ -342,6 +342,7 @@ def sale_return(request, pk):
             return redirect("pos:sale_detail", pk=sale.pk)
 
     done = _returned_totals(sale)
+    whole_units = Unit.whole_quantity_codes()
     rows = []
     for it in sale.items.all():
         back_q = done[it.pk]["q"] if it.pk in done else Decimal("0")
@@ -349,7 +350,7 @@ def sale_return(request, pk):
         rows.append({
             "it": it, "returned": back_q,
             "left_q": it.quantity - back_q, "left_a": it.line_total - back_a,
-            "whole": it.unit in COUNT_UNITS, "value": posted.get(f"qty_{it.pk}", ""),
+            "whole": it.unit in whole_units, "value": posted.get(f"qty_{it.pk}", ""),
         })
 
     return render(request, "pos/sale_return.html", {

@@ -4,7 +4,7 @@ from django.db import IntegrityError, transaction
 from django.db.models import Sum
 from django.utils import timezone
 
-from inventory.models import Product, StockMovement
+from inventory.models import Product, StockMovement, Unit
 from inventory.stock import current_stock, qty_fmt
 from people.models import Contact
 from storeconfig.models import StoreSettings
@@ -13,9 +13,6 @@ from .models import InvoiceCounter, Payment, ReturnCounter, Sale, SaleItem, Sale
 
 MAX_LINES = 100
 MAX_RUPEES = Decimal("10000000")        # sanity limit: Rs 1 crore per amount
-COUNT_UNITS = {"pcs", "set", "box", "pack"}   # these must be sold in whole numbers
-
-
 class CheckoutError(Exception):
     def __init__(self, message, status=400):
         super().__init__(message)
@@ -229,6 +226,7 @@ def create_sale(user, data):
             products = {
                 p.pk: p for p in Product.objects.select_for_update().filter(pk__in=seen).order_by("pk")
             }
+            whole_units = Unit.whole_quantity_codes()
 
             lines = []
             for s in specs:
@@ -237,7 +235,7 @@ def create_sale(user, data):
                     raise CheckoutError("A product on the bill no longer exists.")
                 if not p.is_active:
                     raise CheckoutError(f"{p.name} is inactive and cannot be sold.")
-                if p.unit in COUNT_UNITS and s["qty_milli"] % 1000:
+                if p.unit in whole_units and s["qty_milli"] % 1000:
                     raise CheckoutError(f"{p.name} must be sold in whole numbers.")
                 lines.append({
                     "price": int((p.sale_price * 100).to_integral_value()),   # the server's price, never the browser's
@@ -416,6 +414,7 @@ def create_return(user, sale_id, data):
                 raise CheckoutError("This bill was voided, so nothing can be returned.")
 
             items = {i.pk: i for i in sale.items.all()}
+            whole_units = Unit.whole_quantity_codes()
             if set(wanted) - set(items):
                 raise CheckoutError("An item does not belong to this bill.")
 
@@ -439,7 +438,7 @@ def create_return(user, sale_id, data):
                     raise CheckoutError(
                         f"{item.product_name}: only {qty_fmt(Decimal(left_milli) / 1000)} can still be returned."
                     )
-                if item.unit in COUNT_UNITS and r_milli % 1000:
+                if item.unit in whole_units and r_milli % 1000:
                     raise CheckoutError(f"{item.product_name} must be returned in whole numbers.")
 
                 line_paise = int(item.line_total * 100)

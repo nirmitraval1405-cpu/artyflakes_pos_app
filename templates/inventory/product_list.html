@@ -79,7 +79,7 @@
       <table class="grid" id="productRows">
         <thead>
           <tr>
-            <th>Code</th><th>Name</th><th>Group</th><th>Barcode</th>
+            <th>Code</th><th>Name</th><th>Group</th><th>Brand</th><th>Barcode</th>
             <th class="num">Cost</th><th class="num">Sale price</th><th class="num">MRP</th><th class="num">GST %</th><th class="num">Stock</th>
           </tr>
         </thead>
@@ -89,6 +89,7 @@
             <td>{{ p.code|default:"" }}</td>
             <td>{{ p.name }}{% if not p.is_active %} <span class="tag">Inactive</span>{% endif %}</td>
             <td>{{ p.category.name|default:"" }}</td>
+            <td>{{ p.brand.name|default:"" }}</td>
             <td>{{ p.barcode|default:"" }}</td>
             <td class="num">{{ p.cost_price|floatformat:"2g" }}</td>
             <td class="num">{{ p.sale_price|floatformat:"2g" }}</td>
@@ -97,7 +98,7 @@
             <td class="num">{% if p.track_stock %}{{ p.stock|floatformat:"-3" }}{% else %}&mdash;{% endif %}</td>
           </tr>
           {% empty %}
-          <tr><td colspan="9" class="grid-empty">
+          <tr><td colspan="10" class="grid-empty">
             {% if q or group %}No products match this search or group.{% else %}No products yet. Click <strong>New product</strong> to add the first one.{% endif %}
           </td></tr>
           {% endfor %}

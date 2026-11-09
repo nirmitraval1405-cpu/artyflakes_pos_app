@@ -1,8 +1,8 @@
 from django.contrib import admin
 
-from .models import Category, Product, StockMovement
+from .models import Brand, Category, Product, StockMovement, Unit
 
-admin.site.register(Category)
+admin.site.register((Category, Brand, Unit))
 
 
 @admin.register(Product)
