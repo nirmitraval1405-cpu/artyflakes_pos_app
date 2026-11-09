@@ -1,5 +1,5 @@
 from decimal import Decimal, InvalidOperation
-
+from promotions.engine import best_discount, rules_for
 from django.db import IntegrityError, transaction
 from django.db.models import Sum
 from django.utils import timezone
@@ -92,15 +92,18 @@ def _apply_discount(base, kind, value):
 # ---------- The money maths (pure, no database) ----------
 def compute_bill(lines, bill_kind=None, bill_value=0):
     """
-    lines: list of {price, qty_milli, gst_bp, disc_kind, disc_value}   (price in paise, GST in basis points)
+    lines: list of {price, qty_milli, gst_bp, disc_kind, disc_value, promo}   (price in paise, GST in basis points)
+    promo is the promotion discount on the line, in paise (optional, 0 when there is none).
     Prices include GST. Returns paise totals and per-line results.
     The browser (pos.js) runs the same steps; keep the two in sync.
     """
     rows = []
     for ln in lines:
         gross = div_round(ln["price"] * ln["qty_milli"], 1000)
-        line_disc = _apply_discount(gross, ln["disc_kind"], ln["disc_value"])
-        rows.append({"gross": gross, "line_disc": line_disc, "net": gross - line_disc, "share": 0})
+        promo = min(ln.get("promo", 0), gross)                                  # the promotion comes off first
+        line_disc = _apply_discount(gross - promo, ln["disc_kind"], ln["disc_value"])   # the cashier's discount comes after
+        rows.append({"gross": gross, "promo": promo, "line_disc": line_disc,
+                     "net": gross - promo - line_disc, "share": 0})
 
     base = sum(r["net"] for r in rows)
     bill_disc = _apply_discount(base, bill_kind, bill_value)
@@ -120,21 +123,21 @@ def compute_bill(lines, bill_kind=None, bill_value=0):
 
     result_lines = []
     for r, ln in zip(rows, lines):
-        discount = r["line_disc"] + r["share"]
+        discount = r["promo"] + r["line_disc"] + r["share"]
         total = r["gross"] - discount
         gst_bp = ln["gst_bp"]
         tax = div_round(total * gst_bp, 10000 + gst_bp)    # GST already inside the price
-        result_lines.append({"gross": r["gross"], "discount": discount, "tax": tax, "total": total})
+        result_lines.append({"gross": r["gross"], "promo": r["promo"], "discount": discount, "tax": tax, "total": total})
 
     return {
         "lines": result_lines,
         "subtotal": sum(l["gross"] for l in result_lines),
+        "promo_total": sum(l["promo"] for l in result_lines),
         "bill_discount": bill_disc,
         "discount_total": sum(l["discount"] for l in result_lines),
         "tax_total": sum(l["tax"] for l in result_lines),
         "total": sum(l["total"] for l in result_lines),
     }
-
 
 # ---------- Checkout ----------
 def _result(sale, warnings, duplicate=False):
@@ -147,7 +150,7 @@ def _result(sale, warnings, duplicate=False):
         "subtotal": f"{sale.subtotal:,.2f}",
         "discount": f"{sale.discount_total:,.2f}",
         "tax": f"{sale.tax_total:,.2f}",
-        "total": f"{sale.total:,.2f}",
+        "total": f"{sale.total:.2f}",
         "paid": f"{sale.amount_paid:,.2f}",
         "change": f"{sale.change_due:,.2f}",
         "customer_phone": "" if sale.customer.is_system else sale.customer.phone,
@@ -194,13 +197,13 @@ def create_sale(user, data):
         if qty <= 0 or qty > 100000 or milli != milli.to_integral_value():
             raise CheckoutError("Quantity must be above zero with at most 3 decimals.")
         kind, value = parse_discount(raw.get("discount"), "Item discount")
-        price_override = None
-        if raw.get("price") not in (None, ""):
-            price_override = to_paise(raw.get("price"), "Item price")
-            if price_override <= 0:
-                raise CheckoutError("An item price must be above zero.")
-        specs.append({"pid": pid, "qty_milli": int(milli), "disc_kind": kind,
-                      "disc_value": value, "price": price_override})
+        raw_price = raw.get("price")
+        price = to_paise(raw_price, "Item price") if raw_price not in (None, "") else None
+        if price == 0:
+            raise CheckoutError("Item price must be above zero.")
+        specs.append({
+            "pid": pid, "qty_milli": int(milli), "disc_kind": kind, "disc_value": value, "price": price,
+        })
 
     bill_kind, bill_value = parse_discount(data.get("bill_discount"), "Bill discount")
 
@@ -232,9 +235,12 @@ def create_sale(user, data):
             products = {
                 p.pk: p for p in Product.objects.select_for_update().filter(pk__in=seen).order_by("pk")
             }
+
+            # The promotions running right now. The server decides this, never the browser.
+            rules = rules_for(seen, timezone.now())
             whole_units = Unit.whole_quantity_codes()
 
-            lines = []
+            lines, promo_names = [], []
             for s in specs:
                 p = products.get(s["pid"])
                 if p is None:
@@ -243,16 +249,16 @@ def create_sale(user, data):
                     raise CheckoutError(f"{p.name} is inactive and cannot be sold.")
                 if p.unit in whole_units and s["qty_milli"] % 1000:
                     raise CheckoutError(f"{p.name} must be sold in whole numbers.")
-                list_price = int((p.sale_price * 100).to_integral_value())   # the server's list price
-                price = list_price
-                if s["price"] is not None and s["price"] != list_price:
-                    price = s["price"]
+                price = s["price"] if s["price"] is not None else int((p.sale_price * 100).to_integral_value())
+                promo, promo_name = best_discount(rules.get(p.pk, []), price, s["qty_milli"])
+                promo_names.append(promo_name if promo else "")
                 lines.append({
                     "price": price,
                     "qty_milli": s["qty_milli"],
                     "gst_bp": int((p.gst_rate * 100).to_integral_value()),
                     "disc_kind": s["disc_kind"],
                     "disc_value": s["disc_value"],
+                    "promo": promo,
                 })
 
             calc = compute_bill(lines, bill_kind, bill_value)
@@ -263,14 +269,17 @@ def create_sale(user, data):
 
             if expected_total is not None and expected_total != total:
                 raise CheckoutError(
-                    "The bill total changed (a price may have been updated). "
-                    "Reload the POS page and rebuild the bill.", status=409,
+                    "The bill total changed (a price or a promotion may have changed). "
+                    "The totals on your screen were refreshed. Please check them and try again.", status=409,
                 )
 
             if not user.is_admin_role:
+                # The cashier limit covers only the discount the cashier gives. Promotions are set by the owner.
+                manual = calc["discount_total"] - calc["promo_total"]
+                base = calc["subtotal"] - calc["promo_total"]
                 max_pct = cfg.cashier_max_discount_percent
                 max_bp = int(max_pct * 100)
-                if calc["discount_total"] * 10000 > max_bp * calc["subtotal"]:
+                if manual * 10000 > max_bp * base:
                     raise CheckoutError(
                         f"Discount is above your limit of {max_pct.normalize():f}%. Ask an admin to bill this."
                     )
@@ -286,9 +295,7 @@ def create_sale(user, data):
             if customer_id in (None, ""):
                 customer = Contact.walk_in()
             else:
-                customer = Contact.objects.filter(
-                    pk=customer_id, is_customer=True, is_supplier=False, is_active=True
-                ).first()
+                customer = Contact.objects.filter(pk=customer_id, is_customer=True, is_active=True).first()
                 if customer is None:
                     raise CheckoutError("That customer was not found.")
 
@@ -303,7 +310,7 @@ def create_sale(user, data):
             )
 
             items, movements, warnings = [], [], []
-            for s, line, result in zip(specs, lines, calc["lines"]):
+            for s, line, result, promo_name in zip(specs, lines, calc["lines"], promo_names):
                 p = products[s["pid"]]
                 qty = (Decimal(s["qty_milli"]) / 1000).quantize(Decimal("0.001"))
                 items.append(SaleItem(
@@ -311,6 +318,7 @@ def create_sale(user, data):
                     hsn_code=p.hsn_code, unit=p.unit, quantity=qty,
                     unit_price=rupees(line["price"]), mrp=p.mrp or p.sale_price, cost_price=p.cost_price,
                     gst_rate=p.gst_rate, discount=rupees(result["discount"]),
+                    promo_discount=rupees(result["promo"]), promo_name=promo_name[:120],
                     tax_amount=rupees(result["tax"]), line_total=rupees(result["total"]),
                 ))
                 if p.track_stock:
@@ -343,7 +351,6 @@ def create_sale(user, data):
             if existing:
                 return _result(existing, [], duplicate=True)
         raise
-
 
 # =====================  Void and return  =====================
 def _require_admin(user):

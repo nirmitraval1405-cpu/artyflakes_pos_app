@@ -91,6 +91,9 @@
         </div>
       </div>
       {% endwith %}
+        {% if user.is_admin_role %}
+      <a class="side-link {% if request.resolver_match.app_name == 'promotions' %}active{% endif %}" href="{% url 'promotions:list' %}"><i class="bi bi-heart"></i> Promotions</a>
+      {% endif %}
 
       <!-- People -->
       {% if user.is_admin_role %}

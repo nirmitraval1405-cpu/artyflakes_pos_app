@@ -25,8 +25,8 @@
       <div class="rp-section">
         <h5><span>{{ section.title }}</span></h5>
         {% for r in section.reports %}
-          <button type="button" class="rp-item{% if not r.ready %} soon{% endif %}" data-slug="{{ r.slug }}" data-ready="{% if r.ready %}1{% else %}0{% endif %}">
-            <i class="bi bi-clipboard"></i> {{ r.title }}
+          <button type="button" class="rp-item{% if selected_report == r.slug %} active{% endif %}{% if not r.ready %} soon{% endif %}" data-slug="{{ r.slug }}" data-ready="{% if r.ready %}1{% else %}0{% endif %}">
+            <i class="bi bi-clipboard"></i> {{ r.nav_title }}
           </button>
         {% endfor %}
       </div>
@@ -39,43 +39,42 @@
     <h4>Filter</h4>
     <form id="rpForm" onsubmit="return false">
       <label>Customers &amp; suppliers</label>
-      <select name="party">
+      <select name="customer_id">
         <option value="">All</option>
-        <optgroup label="Customers">{% for c in customers %}<option value="{{ c.pk }}">{{ c.name }}</option>{% endfor %}</optgroup>
-        <optgroup label="Suppliers">{% for c in suppliers %}<option value="{{ c.pk }}">{{ c.name }}</option>{% endfor %}</optgroup>
+        <optgroup label="Customers">{% for c in customers %}<option value="{{ c.pk }}"{% if selected_customer == c.pk %} selected{% endif %}>{{ c.name }}</option>{% endfor %}</optgroup>
+        {% if walk_in_customer %}<option value="{{ walk_in_customer.pk }}"{% if selected_customer == walk_in_customer.pk %} selected{% endif %}>Walk-in customer</option>{% endif %}
+        <optgroup label="Suppliers">{% for c in suppliers %}<option value="{{ c.pk }}"{% if selected_customer == c.pk %} selected{% endif %}>{{ c.name }}</option>{% endfor %}</optgroup>
       </select>
 
       <label>User</label>
-      <select name="user">
+      <select name="user_id">
         <option value="">All</option>
-        {% for u in users %}<option value="{{ u.pk }}">{{ u.get_full_name|default:u.username }}</option>{% endfor %}
+        {% for u in users %}<option value="{{ u.pk }}"{% if selected_user == u.pk %} selected{% endif %}>{{ u.get_full_name|default:u.username }}</option>{% endfor %}
       </select>
 
-      <label>Cash register</label>
-      <select disabled title="Not used yet"><option>All</option></select>
-
       <label>Product</label>
-      <select name="product">
+      <select name="product_id">
         <option value="">All</option>
-        {% for p in products %}<option value="{{ p.pk }}">{{ p.name }}</option>{% endfor %}
+        {% for p in products %}<option value="{{ p.pk }}"{% if selected_product == p.pk %} selected{% endif %}>{{ p.name }}</option>{% endfor %}
       </select>
 
       <label>Product group</label>
       <select name="group">
         <option value="">All</option>
-        {% for c in categories %}<option value="{{ c.pk }}">{{ c.name }}</option>{% endfor %}
+        {% for c in categories %}<option value="{{ c.pk }}"{% if selected_group == c.pk %} selected{% endif %}>{{ c.name }}</option>{% endfor %}
       </select>
 
-      <div class="form-check rp-check">
-        <input class="form-check-input" type="checkbox" id="rpSub" checked disabled>
-        <label class="form-check-label" for="rpSub">Include subgroups</label>
-      </div>
+      <label>Payment method</label>
+      <select name="payment_method">
+        <option value="">All</option>
+        {% for value, label in payment_methods %}<option value="{{ value }}"{% if selected_payment_method == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
 
       <div class="rp-dates">
         <i class="bi bi-calendar3"></i>
-        <input type="date" name="date_from" value="{{ date_from|date:'Y-m-d' }}">
+        <input type="date" name="start_date" value="{{ date_from|date:'Y-m-d' }}">
         <span>-</span>
-        <input type="date" name="date_to" value="{{ date_to|date:'Y-m-d' }}">
+        <input type="date" name="end_date" value="{{ date_to|date:'Y-m-d' }}">
       </div>
       <div class="small text-muted mt-1">Each report uses the filters that apply to it and tells you about the rest.</div>
     </form>
@@ -98,9 +97,18 @@
     const note = document.getElementById("rpNote");
     const form = document.getElementById("rpForm");
     const buttons = ["btnShow", "btnPrint", "btnExcel", "btnPdf"].map((id) => document.getElementById(id));
-    let selected = null;
+    let selected = "{{ selected_report|escapejs }}";
 
     function setButtons(on) { buttons.forEach((b) => (b.disabled = !on)); }
+    if (selected) {
+      const current = document.querySelector('.rp-item[data-slug="' + selected + '"]');
+      if (current) {
+        current.classList.add("active");
+        setButtons(true);
+      } else {
+        selected = null;
+      }
+    }
 
     items.forEach((item) => {
       item.addEventListener("click", () => {

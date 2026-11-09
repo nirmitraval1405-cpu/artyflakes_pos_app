@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Promotions · {{ store_name }}{% endblock %}
+{% block extra_css %}<link href="{% static 'css/inventory.css' %}" rel="stylesheet">{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h3>Promotions</h3>
+    <p>Management &bull; Discounts that apply automatically at the POS</p>
+  </div>
+</div>
+
+<div class="toolbar">
+  <a class="tb" href="{{ request.get_full_path }}"><i class="bi bi-arrow-repeat"></i><span>Refresh</span></a>
+  <a class="tb" href="{% url 'promotions:create' %}"><i class="bi bi-plus-lg"></i><span>New promotion</span></a>
+</div>
+
+<section class="grid-panel">
+  <div class="px-3 py-2 border-bottom small text-muted">Promotions: <strong>{{ total }}</strong></div>
+  <div class="grid-wrap" style="min-height: 0;">
+    <table class="grid">
+      <thead>
+        <tr><th>Name</th><th>Status</th><th>Period</th><th>Days</th><th>Targets</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr class="{% if r.state_label == 'Off' or r.state_label == 'Expired' %}inactive{% endif %}">
+          <td><strong>{{ r.p.name }}</strong></td>
+          <td><span class="st {{ r.badge }}">{{ r.state_label }}</span></td>
+          <td>{{ r.period }}</td>
+          <td>{{ r.p.days_label }}</td>
+          <td style="white-space: normal;">{{ r.products }}</td>
+          <td style="white-space: nowrap;">
+            <a class="btn btn-outline-secondary btn-sm" href="{% url 'promotions:edit' r.p.pk %}">Edit</a>
+            <form method="post" action="{% url 'promotions:toggle' r.p.pk %}" class="d-inline">
+              {% csrf_token %}
+              <button class="btn btn-outline-secondary btn-sm">{% if r.p.is_active %}Turn off{% else %}Turn on{% endif %}</button>
+            </form>
+            <a class="btn btn-outline-danger btn-sm" href="{% url 'promotions:delete' r.p.pk %}">Delete</a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="grid-empty">No promotions yet. Click <strong>New promotion</strong> to add one.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if page.has_other_pages %}
+  <div class="pager">
+    {% if page.has_previous %}<a href="?page={{ page.previous_page_number }}">&laquo; Previous</a>{% endif %}
+    <span>Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
+    {% if page.has_next %}<a href="?page={{ page.next_page_number }}">Next &raquo;</a>{% endif %}
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

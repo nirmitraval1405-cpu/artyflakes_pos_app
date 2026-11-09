@@ -9,6 +9,7 @@ from django.utils import timezone
 
 from accounts.models import User
 from dashboard.views import _metrics
+from expenses.models import Expense, ExpenseCategory
 from inventory.models import Category, Product, StockMovement
 from people.models import Contact
 from pos.models import Payment, Sale
@@ -144,6 +145,14 @@ class SalesReportTests(ReportBase):
         self.assertEqual(received, sum(s.total for s in Sale.objects.all()))
         self.assertEqual(received, Decimal("1000.00"))
 
+    def test_collected_credit_payments_lists_existing_sale_payments(self):
+        sale = self.sell(customer=self.customer)
+        rows = self.records("sales-collected-credit-payments")
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["invoice"], sale.invoice_no)
+        self.assertEqual(rows[0]["customer"], self.customer.name)
+        self.assertEqual(rows[0]["amount"], sale.total)
+
     def test_refunds_show_by_refund_method(self):
         sale = self.sell()
         self.refund(sale)
@@ -261,8 +270,143 @@ class StockReportTests(ReportBase):
         self.assertEqual(rows[0]["qty"], Decimal("3"))
         self.assertEqual(rows[0]["value"], Decimal("300.00"))
 
+    def test_stock_return_report_uses_purchase_return_movements(self):
+        StockMovement.objects.create(
+            product=self.product,
+            quantity=-2,
+            movement_type=StockMovement.Type.PURCHASE_RETURN,
+            reference="AF-P-T-1",
+            note="Purchase cancelled",
+        )
+        rows = self.records("stock-return-products")
+        self.assertEqual(rows[0]["qty"], Decimal("2"))
+        self.assertEqual(rows[0]["value"], Decimal("200.00"))
+
     def test_stock_movement_shows_a_running_balance_for_one_product(self):
         self.sell(qty="2")
         rows = self.records("sales-stock-movement", product=str(self.product.pk))
         self.assertEqual(rows[0]["type"], "Balance before this period")
         self.assertEqual(rows[-1]["balance"], Decimal("98"))
+
+
+class FinanceReportTests(ReportBase):
+    def test_transaction_history_includes_sale_supplier_payment_and_expense(self):
+        self.sell(customer=self.customer)
+        purchase = self.purchase("1000.00", no="AF-P-T-3")
+        PurchasePayment.objects.create(
+            purchase=purchase,
+            method="bank_transfer",
+            amount=Decimal("300.00"),
+            payment_date=self.today,
+            recorded_by=self.admin,
+        )
+        category = ExpenseCategory.objects.create(name="Rent")
+        Expense.objects.create(
+            expense_no="AF-E-T-1",
+            expense_date=self.today,
+            category=category,
+            amount=Decimal("50.00"),
+            payment_method=Expense.PaymentMethod.CASH,
+            created_by=self.admin,
+        )
+
+        report = self.report("finance-transaction-history")
+        rows = report.context["report"].records
+        self.assertEqual({row["type"] for row in rows}, {"Sale payment", "Supplier payment", "Expense - Rent"})
+        self.assertEqual(report.context["report"]._totals()["inflow"], Decimal("500.00"))
+        self.assertEqual(report.context["report"]._totals()["outflow"], Decimal("350.00"))
+
+    def test_profit_and_loss_matches_dashboard_profit_less_expenses(self):
+        self.sell(qty="2")
+        self.sell(qty="1")
+        self.refund(Sale.objects.order_by("created_at", "id").first(), token="pnl-return")
+        category = ExpenseCategory.objects.create(name="Rent")
+        Expense.objects.create(
+            expense_no="AF-E-T-2",
+            expense_date=self.today,
+            category=category,
+            amount=Decimal("50.00"),
+            payment_method=Expense.PaymentMethod.CASH,
+            created_by=self.admin,
+        )
+
+        rows = {
+            row["item"]: row["amount"]
+            for row in self.records("finance-profit-and-loss")
+        }
+        self.assertEqual(
+            rows["Net sales (excluding GST and returns)"]
+            - rows["Cost of goods sold (net of returned-item cost)"],
+            rows["Gross profit after returns"],
+        )
+        self.assertEqual(rows["Gross profit after returns"], _metrics(self.today, self.today)["profit"])
+        self.assertEqual(rows["Operating expenses"], Decimal("50.00"))
+        self.assertEqual(
+            rows["Net profit"],
+            _metrics(self.today, self.today)["profit"] - Decimal("50.00"),
+        )
+
+
+class CustomerReportTests(ReportBase):
+    def test_customer_report_routes_and_navigation_selection(self):
+        for route_name, slug in (
+            ("reports:sales_by_customer", "customers-sales-by-customer"),
+            ("reports:invoice_list", "customers-invoice-list"),
+            ("reports:item_list", "customers-item-list"),
+        ):
+            self.assertEqual(self.client.get(reverse(route_name)).status_code, 200)
+            self.assertEqual(
+                self.client.get(reverse("reports:index"), {"selected": slug}).status_code,
+                200,
+            )
+        index = self.client.get(
+            reverse("reports:index"),
+            {"selected": "customers-invoice-list"},
+        )
+        self.assertContains(index, 'class="rp-item active"')
+        self.assertContains(index, "Invoice list")
+
+    def test_sales_by_customer_aggregates_taxable_and_total_with_filter_aliases(self):
+        sale = self.sell(customer=self.customer)
+        rows = self.records(
+            "customers-sales-by-customer",
+            start_date=self.today.isoformat(),
+            end_date=self.today.isoformat(),
+            customer_id=str(self.customer.pk),
+            user_id=str(self.admin.pk),
+            product_id=str(self.product.pk),
+        )
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["customer"], self.customer.name)
+        self.assertEqual(rows[0]["before_tax"], sale.total - sale.tax_total)
+        self.assertEqual(rows[0]["total"], sale.total)
+
+    def test_invoice_list_filters_payment_method_and_has_sequential_numbers(self):
+        sale = self.sell(customer=self.customer)
+        rows = self.records(
+            "customers-invoice-list",
+            payment_method=Payment.Method.CASH,
+            customer_id=str(self.customer.pk),
+        )
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["number"], 1)
+        self.assertEqual(rows[0]["document"], sale.invoice_no)
+        self.assertEqual(rows[0]["method"], "Cash")
+        self.assertEqual(rows[0]["tax"], sale.tax_total)
+        self.assertEqual(rows[0]["total"], sale.total)
+        self.assertEqual(self.records("customers-invoice-list", payment_method=Payment.Method.UPI), [])
+
+    def test_item_list_totals_quantity_and_amount_and_labels_walk_in(self):
+        self.sell(qty="2")
+        rows = self.records("customers-item-list", product_id=str(self.product.pk))
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["customer"], "Walk-in customer")
+        self.assertEqual(rows[0]["quantity"], Decimal("2"))
+        self.assertEqual(rows[0]["unit_price"], self.product.sale_price)
+        self.assertEqual(rows[0]["total"], Decimal("500.00"))
+        report = self.report("customers-item-list")
+        self.assertEqual(report.context["report"]._totals()["quantity"], Decimal("2"))
+        self.assertEqual(report.context["report"]._totals()["total"], Decimal("500.00"))
+        self.assertContains(report, "CUSTOMER ITEM LIST")
+        self.assertContains(report, "Company:")
+        self.assertContains(report, "Address:")

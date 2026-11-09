@@ -93,6 +93,8 @@ class SaleItem(models.Model):
     discount = models.DecimalField(default=0, **MONEY)     # total discount on this line, incl. share of bill discount
     tax_amount = models.DecimalField(default=0, **MONEY)   # GST contained in line_total
     line_total = models.DecimalField(default=0, **MONEY)   # unit_price x quantity - discount
+    promo_discount = models.DecimalField(default=0, **MONEY)       # the promotion part of `discount`
+    promo_name = models.CharField(max_length=120, blank=True, default="")
 
     class Meta:
         ordering = ["id"]

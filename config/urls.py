@@ -20,6 +20,7 @@ urlpatterns = [
     path("reports/", include("reports.urls")),
     path("people/", include("people.urls")),
     path("settings/", include("storeconfig.urls")),
+    path("promotions/", include("promotions.urls")),
 ]
 
 if settings.DEBUG:

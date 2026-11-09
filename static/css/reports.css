@@ -236,6 +236,61 @@
     flex-wrap: wrap;
 }
 
+.rv-filterbar {
+    display: flex;
+    align-items: end;
+    flex-wrap: wrap;
+    gap: .55rem;
+    padding: .8rem;
+    margin-bottom: .9rem;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+.rv-filterbar>div {
+    display: grid;
+    gap: .2rem;
+}
+
+.rv-filterbar label {
+    color: var(--muted);
+    font-size: 11px;
+}
+
+.rv-filterbar input,
+.rv-filterbar select {
+    min-width: 130px;
+    padding: .35rem .45rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: #fff;
+    color: var(--text);
+    font-size: 12px;
+}
+
+.rv-print-heading {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    gap: 1rem;
+    font-size: 13px;
+}
+
+.rv-print-heading h3 {
+    margin-bottom: .55rem;
+    letter-spacing: .03em;
+}
+
+.rv-print-heading>div>div {
+    margin: .15rem 0;
+}
+
+.rv-company {
+    max-width: 42%;
+    text-align: right;
+}
+
 .rv-sheet {
     background: var(--card-bg);
     border: 1px solid var(--border);
@@ -385,6 +440,15 @@
     .rv-head>.text-end {
         text-align: left !important;
     }
+
+    .rv-print-heading {
+        flex-wrap: wrap;
+    }
+
+    .rv-company {
+        max-width: 100%;
+        text-align: left;
+    }
 }
 
 @media print {
@@ -392,6 +456,7 @@
     .sidebar,
     .topbar,
     .rv-bar,
+    .rv-filterbar,
     .app-footer,
     .sidebar-backdrop {
         display: none !important;

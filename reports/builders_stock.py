@@ -108,6 +108,49 @@ def loss_and_damage(p):
     return Report(cols, records, p.chips(("product", "group")), totals=("qty", "value"), notes=notes)
 
 
+# ---------- Stock return ----------
+@register("Stock return", "Products", uses=("product", "group"))
+def stock_return_products(p):
+    qs = StockMovement.objects.filter(
+        movement_type=StockMovement.Type.PURCHASE_RETURN,
+        created_at__date__gte=p.date_from,
+        created_at__date__lte=p.date_to,
+    )
+    if p.product:
+        qs = qs.filter(product_id=p.product)
+    if p.group:
+        qs = qs.filter(product__category_id=p.group)
+    rows = (
+        qs.order_by().values("product_id")
+        .annotate(
+            t_name=Max("product__name"),
+            t_code=Max("product__code"),
+            t_qty=Sum("quantity"),
+            t_cost=Max("product__cost_price"),
+        )
+        .order_by("t_name")
+    )
+    records = [
+        {
+            "code": row["t_code"] or "",
+            "name": row["t_name"],
+            "qty": -row["t_qty"],
+            "cost": row["t_cost"],
+            "value": -row["t_qty"] * row["t_cost"],
+        }
+        for row in rows
+    ]
+    cols = [
+        Col("Code", "code"), Col("Product", "name"), Col("Qty returned", "qty", "qty"),
+        Col("Cost price", "cost", "money"), Col("Value returned", "value", "money"),
+    ]
+    notes = [
+        "Uses existing purchase-return stock movements, which currently record purchase cancellation reversals. These do not confirm a physical return to the supplier.",
+        "Valued at each product's current cost price.",
+    ]
+    return Report(cols, records, p.chips(("product", "group")), totals=("qty", "value"), notes=notes)
+
+
 # ---------- Stock movement ----------
 @register("Sales", "Stock movement", uses=("product", "group"))
 def stock_movement(p):

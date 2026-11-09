@@ -4,7 +4,7 @@
   // All money is whole paise (integers). Percentages are "basis points": 10% = 1000.
   // compute() must follow the same steps as compute_bill() in pos/services.py.
   const state = {
-    items: [],        // { id, name, sku, price, mrp, gstBp, qty, stock, track, dKind, dValue }
+    items: [],        // { id, name, sku, price, mrp, gstBp, qty, stock, track, dKind, dValue, promos }
     selected: null,
     customer: null,   // null = Walk-in customer
     bill: { kind: null, value: 0 },
@@ -22,6 +22,7 @@
   const SEARCH_URL = searchInput.dataset.url;
   const CHECKOUT_URL = app.dataset.checkoutUrl;
   const CUSTOMER_URL = app.dataset.customerUrl;
+  const PROMO_URL = app.dataset.promoUrl;
   const CSRF = app.dataset.csrf;
   const MAX_DISCOUNT = app.dataset.maxDiscount;   // empty for admins
 
@@ -70,11 +71,30 @@
     return Math.min(d, base);
   }
 
+  // The best running promotion for a line (they never stack). Same steps as best_discount() on the server.
+  // A rule: { name, kind: "percent"|"amount", value (basis points or paise per unit), min (milli-units, 0 = none) }
+  function promoFor(it, gross) {
+    let best = { amount: 0, name: "" };
+    (it.promos || []).forEach((r) => {
+      if (r.min && it.qty * 1000 < r.min) return;
+      let d = r.kind === "percent" ? divRound(gross * r.value, 10000) : divRound(r.value * it.qty * 1000, 1000);
+      d = Math.min(d, gross);
+      if (d > best.amount) best = { amount: d, name: r.name };
+    });
+    return best;
+  }
+
+  function promoLabel(r) {
+    const v = r.kind === "percent" ? (r.value / 100) + "% off" : "₹" + (r.value / 100).toFixed(2) + " off each";
+    return r.min ? v + " (buy " + fmtQty(r.min / 1000) + "+)" : v;
+  }
+
   function compute() {
     const rows = state.items.map((it) => {
       const gross = it.price * it.qty;
-      const lineDisc = applyDisc(gross, it.dKind, it.dValue);
-      return { it, gross, lineDisc, net: gross - lineDisc, share: 0 };
+      const promo = promoFor(it, gross);                                      // the promotion comes off first
+      const lineDisc = applyDisc(gross - promo.amount, it.dKind, it.dValue);  // then the cashier's discount
+      return { it, gross, promo: promo.amount, promoName: promo.name, lineDisc, net: gross - promo.amount - lineDisc, share: 0 };
     });
     const base = rows.reduce((s, r) => s + r.net, 0);
     const billDisc = applyDisc(base, state.bill.kind, state.bill.value);
@@ -93,9 +113,9 @@
 
     let subtotal = 0, discount = 0, tax = 0, total = 0;
     rows.forEach((r) => {
-      r.total = r.gross - r.lineDisc - r.share;
+      r.total = r.gross - r.promo - r.lineDisc - r.share;
       r.tax = divRound(r.total * r.it.gstBp, 10000 + r.it.gstBp);
-      subtotal += r.gross; discount += r.lineDisc + r.share; tax += r.tax; total += r.total;
+      subtotal += r.gross; discount += r.promo + r.lineDisc + r.share; tax += r.tax; total += r.total;
     });
     return { rows, subtotal, discount, tax, total };
   }
@@ -103,18 +123,19 @@
   // ---------- Cart ----------
   function touch() { state.token = null; }   // any change to the bill needs a fresh duplicate-guard token
 
-  // p: { id, name, sku, price, mrp, gst, stock, track }  (price and mrp in paise, gst in percent)
+  // p: { id, name, sku, price, mrp, gst, stock, track, promos }  (price and mrp in paise, gst in percent)
   function addItem(p) {
     const found = state.items.find((i) => i.id === p.id);
     if (found) {
       found.qty += 1;
       if (p.stock !== undefined) found.stock = p.stock;
+      if (p.promos) found.promos = p.promos;
     } else {
       state.items.push({
         id: p.id, name: p.name, sku: p.sku || "",
         price: p.price, listPrice: p.price, mrp: p.mrp || p.price, gstBp: Math.round((p.gst || 0) * 100),
         qty: 1, stock: p.stock === undefined ? null : p.stock, track: !!p.track,
-        dKind: null, dValue: 0,
+        dKind: null, dValue: 0, promos: p.promos || [],
       });
     }
     state.selected = p.id;
@@ -147,6 +168,23 @@
     render();
   }
 
+  // Asks the server which promotions are running right now for the items in the cart.
+  async function refreshPromos() {
+    if (!state.items.length) return true;
+    try {
+      const res = await fetch(PROMO_URL + "?ids=" + state.items.map((i) => i.id).join(","), { credentials: "same-origin" });
+      if (!res.ok) throw new Error("bad status");
+      const data = await res.json();
+      state.items.forEach((it) => { it.promos = data.rules[String(it.id)] || []; });
+      touch();
+      render();
+      return true;
+    } catch (err) {
+      showNote("Could not check the running promotions. Please try again.");
+      return false;
+    }
+  }
+
   // ---------- Rendering ----------
   function render() {
     body.querySelectorAll(".cart-row").forEach((r) => r.remove());
@@ -156,7 +194,6 @@
 
     calc.rows.forEach((r) => {
       const item = r.it;
-      const saving = Math.max(item.mrp - item.price, 0);
 
       const row = el("div", "cart-row" + (item.id === state.selected ? " selected" : ""));
       row.addEventListener("click", () => { state.selected = item.id; render(); });
@@ -169,11 +206,7 @@
       const txt = el("div");
       txt.appendChild(el("div", "item-name", item.name));
       txt.appendChild(el("div", "item-sku", item.sku));
-      if (item.price !== item.listPrice) txt.appendChild(el("div", "item-sku", "Price changed from " + inr(item.listPrice)));
-      if (r.lineDisc > 0) {
-        const label = item.dKind === "percent" ? "-" + (item.dValue / 100) + "%" : "-" + inr(r.lineDisc);
-        txt.appendChild(el("div", "item-sku", "Discount " + label));
-      }
+      if (r.promo > 0) txt.appendChild(el("div", "item-promo", "Promo: " + r.promoName));
       if (item.track && item.stock !== null && item.qty > item.stock) {
         txt.appendChild(el("div", "stock-warn", item.stock <= 0 ? "No stock in system" : "Only " + fmtQty(item.stock) + " in stock"));
       }
@@ -191,10 +224,12 @@
       qtyCell.appendChild(qb);
       row.appendChild(qtyCell);
 
-      row.appendChild(el("div", "c-num", inr(item.price)));
       row.appendChild(el("div", "c-num", inr(item.mrp)));
-      row.appendChild(el("div", "c-num", inr(saving)));
-      row.appendChild(el("div", "c-num", inr(r.gross - r.lineDisc)));
+      row.appendChild(el("div", "c-num", inr(item.price)));
+      const mrpTotal = item.mrp * item.qty;
+      const discountPercent = mrpTotal > 0 ? Math.max(0, (mrpTotal - r.total) / mrpTotal * 100) : 0;
+      row.appendChild(el("div", "c-num", discountPercent.toFixed(2) + "%"));
+      row.appendChild(el("div", "c-num", inr(r.total)));
 
       const del = el("button", "row-del");
       del.type = "button";
@@ -217,7 +252,7 @@
 
   // ---------- Dialogs ----------
   const backdrop = $("dlgBackdrop");
-    const dialogs = ["dlgPay", "dlgDisc", "dlgCust", "dlgDone", "dlgPrice", "dlgHeld", "dlgDrawer", "dlgRefund"].map($);
+  const dialogs = ["dlgPay", "dlgDisc", "dlgCust", "dlgDone"].map($);
 
   function openDialog(id) {
     dialogs.forEach((d) => (d.hidden = d.id !== id));
@@ -245,16 +280,16 @@
   }
 
   // ---------- Payment ----------
-  const payInputs = { cash: $("payCash"), upi: $("payUpi"), card: $("payCard"), cheque: $("payCheque") };
+  const payInputs = { cash: $("payCash"), upi: $("payUpi"), card: $("payCard") };
   let payCalc = { total: 0, valid: false };
 
-  function openPayment(preset) {
+  async function openPayment(preset) {
     if (!requireItems()) return;
+    if (!(await refreshPromos())) return;      // make sure the promotions are the ones running right now
     const total = compute().total;
     Object.values(payInputs).forEach((i) => (i.value = ""));
     $("payUpiRef").value = "";
     $("payCardRef").value = "";
-    $("payChequeRef").value = "";
     payInputs[preset].value = hStr(total);
     $("payError").hidden = true;
     $("payTotal").textContent = inr(total);
@@ -285,7 +320,7 @@
       message = "Enter amounts like 250 or 250.50.";
       $("payPaid").textContent = "—";
     } else {
-      const paid = vals.cash + vals.upi + vals.card + vals.cheque;
+      const paid = vals.cash + vals.upi + vals.card;
       const change = paid - total;
       $("payPaid").textContent = inr(paid);
       if (paid < total) {
@@ -295,7 +330,7 @@
         $("payLeftLabel").textContent = "Change to return";
         $("payLeft").textContent = inr(change);
       }
-      if (change > vals.cash) message = "Only cash can be overpaid. UPI, card and cheque cannot be more than the bill.";
+      if (change > vals.cash) message = "Only cash can be overpaid. UPI and card cannot be more than the bill.";
       else valid = paid >= total && total > 0;
     }
 
@@ -311,9 +346,9 @@
 
   document.querySelectorAll("[data-fill]").forEach((btn) => {
     btn.addEventListener("click", () => {
-      const vals = readPay() || { cash: 0, upi: 0, card: 0, cheque: 0 };
+      const vals = readPay() || { cash: 0, upi: 0, card: 0 };
       const target = btn.dataset.fill;
-      const key = { payCash: "cash", payUpi: "upi", payCard: "card", payCheque: "cheque" }[target];
+      const key = target === "payCash" ? "cash" : target === "payUpi" ? "upi" : "card";
       const others = Object.keys(vals).filter((k) => k !== key).reduce((s, k) => s + vals[k], 0);
       $(target).value = hStr(Math.max(compute().total - others, 0));
       updatePay();
@@ -326,7 +361,6 @@
     if (vals.cash > 0) payments.push({ method: "cash", amount: hStr(vals.cash), reference: "" });
     if (vals.upi > 0) payments.push({ method: "upi", amount: hStr(vals.upi), reference: $("payUpiRef").value.trim() });
     if (vals.card > 0) payments.push({ method: "card", amount: hStr(vals.card), reference: $("payCardRef").value.trim() });
-    if (vals.cheque > 0) payments.push({ method: "cheque", amount: hStr(vals.cheque), reference: $("payChequeRef").value.trim() });
 
     if (!state.token) state.token = makeToken();   // reused if the same bill is retried
     return {
@@ -369,6 +403,10 @@
       } else {
         $("payError").textContent = data.error || "The bill could not be saved. Please try again.";
         $("payError").hidden = false;
+        if (res.status === 409) {                     // a price or promotion changed: refresh and show the new total
+          await refreshPromos();
+          $("payTotal").textContent = inr(compute().total);
+        }
       }
     } catch (err) {
       $("payError").textContent =
@@ -428,7 +466,7 @@
     scope.value = sel ? "item" : "bill";
     $("discValue").value = "";
     $("discError").hidden = true;
-    $("discHint").textContent = MAX_DISCOUNT ? "Your limit is " + MAX_DISCOUNT + "% of the bill." : "";
+    $("discHint").textContent = MAX_DISCOUNT ? "Your limit is " + MAX_DISCOUNT + "% of the bill (promotions do not count)." : "";
     openDialog("dlgDisc");
     $("discValue").focus();
   }
@@ -521,31 +559,11 @@
   let lastQuery = null;
   let timer = null;
   let reqId = 0;
-  let searchEdited = false;
 
   function closeResults() {
     resultsBox.hidden = true;
     resultsBox.innerHTML = "";
   }
-
-  function resetProductSearch() {
-    clearTimeout(timer);
-    timer = null;
-    reqId++;
-    searchInput.value = "";
-    hits = [];
-    active = 0;
-    lastQuery = null;
-    closeResults();
-  }
-
-  window.addEventListener("pageshow", () => {
-    searchEdited = false;
-    resetProductSearch();
-    setTimeout(() => {
-      if (!searchEdited) resetProductSearch();
-    }, 100);
-  });
 
   function renderResults() {
     resultsBox.innerHTML = "";
@@ -560,6 +578,9 @@
       const left = el("div");
       left.appendChild(el("div", "pr-name", h.name));
       left.appendChild(el("div", "pr-meta", [h.code, h.barcode].filter(Boolean).join("  ·  ")));
+      if (h.promos && h.promos.length) {
+        left.appendChild(el("div", "pr-promo", "Promo: " + h.promos.slice(0, 2).map(promoLabel).join(" · ")));
+      }
 
       const right = el("div", "pr-right");
       right.appendChild(el("div", "pr-price", inr(h.price)));
@@ -594,7 +615,7 @@
   }
 
   function pick(h) {
-    addItem({ id: h.id, name: h.name, sku: h.code, price: h.price, mrp: h.mrp, gst: h.gst, stock: h.stock, track: h.track });
+    addItem({ id: h.id, name: h.name, sku: h.code, price: h.price, mrp: h.mrp, gst: h.gst, stock: h.stock, track: h.track, promos: h.promos });
     if (h.track && h.stock <= 0) {
       showNote("Warning: " + h.name + " shows no stock in the system. The sale is still allowed.");
     } else {
@@ -608,7 +629,6 @@
   }
 
   searchInput.addEventListener("input", () => {
-    searchEdited = true;
     clearTimeout(timer);
     const q = searchInput.value.trim();
     if (q.length < 2) { lastQuery = null; closeResults(); return; }
@@ -696,7 +716,7 @@
   const actions = {
     search: focusSearch, quantity: focusQuantity, new: newSale, void: voidOrder, menu: openMenu,
     cash: () => openPayment("cash"), card: () => openPayment("card"), pay: () => openPayment("cash"),
-    discount: openDiscount, customer: openCustomer, cheque: () => openPayment("cheque"),
+    discount: openDiscount, customer: openCustomer,
   };
 
   document.querySelectorAll("[data-action]").forEach((btn) => {
@@ -728,11 +748,7 @@
   tick();
   setInterval(tick, 30000);
 
-  window.POS = {
-    addItem, resetSale, state, render, touch, showNote, openDialog, closeDialogs, hideDialogs,
-    requireItems, compute, inr, hStr, toHundredths, el, app, CSRF,
-  };
+  window.POS = { addItem, resetSale };
   render();
-  resetProductSearch();
   searchInput.focus();
 })();

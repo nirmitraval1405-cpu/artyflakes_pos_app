@@ -5,15 +5,61 @@
 
 {% block content %}
 <div class="rv-bar">
-  <a class="btn btn-outline-secondary btn-sm" href="{% url 'reports:index' %}"><i class="bi bi-arrow-left"></i> Back to reports</a>
+  <a class="btn btn-outline-secondary btn-sm" href="{% url 'reports:index' %}?{{ back_query }}"><i class="bi bi-arrow-left"></i> Back to reports</a>
   <div class="d-flex gap-2">
     <button class="btn btn-brand btn-sm" onclick="window.print()"><i class="bi bi-printer"></i> Print / Save as PDF</button>
     <a class="btn btn-gold btn-sm" href="?{{ request.GET.urlencode }}&format=csv"><i class="bi bi-file-earmark-excel"></i> Excel (CSV)</a>
   </div>
 </div>
 
+{% if report_header %}
+<form class="rv-filterbar" method="get" action="{% url 'reports:view' info.slug %}">
+  <div><label for="reportStart">From</label><input id="reportStart" type="date" name="start_date" value="{{ date_from|date:'Y-m-d' }}"></div>
+  <div><label for="reportEnd">To</label><input id="reportEnd" type="date" name="end_date" value="{{ date_to|date:'Y-m-d' }}"></div>
+  <div><label for="reportCustomer">Customer</label><select id="reportCustomer" name="customer_id">
+    <option value="">All</option>
+    {% for c in customers %}<option value="{{ c.pk }}"{% if customer.pk == c.pk %} selected{% endif %}>{{ c.name }}</option>{% endfor %}
+    {% if walk_in_customer %}<option value="{{ walk_in_customer.pk }}"{% if customer.pk == walk_in_customer.pk %} selected{% endif %}>Walk-in customer</option>{% endif %}
+  </select></div>
+  <div><label for="reportUser">User</label><select id="reportUser" name="user_id">
+    <option value="">All</option>
+    {% for u in users %}<option value="{{ u.pk }}"{% if cashier.pk == u.pk %} selected{% endif %}>{{ u.get_full_name|default:u.username }}</option>{% endfor %}
+  </select></div>
+  <div><label for="reportProduct">Product</label><select id="reportProduct" name="product_id">
+    <option value="">All</option>
+    {% for p in products %}<option value="{{ p.pk }}"{% if product.pk == p.pk %} selected{% endif %}>{{ p.name }}</option>{% endfor %}
+  </select></div>
+  <div><label for="reportGroup">Category</label><select id="reportGroup" name="group">
+    <option value="">All</option>
+    {% for c in categories %}<option value="{{ c.pk }}"{% if selected_group == c.pk %} selected{% endif %}>{{ c.name }}</option>{% endfor %}
+  </select></div>
+  {% if info.slug == "customers-invoice-list" %}
+  <div><label for="reportPayment">Payment method</label><select id="reportPayment" name="payment_method">
+    <option value="">All</option>
+    {% for value, label in payment_methods %}<option value="{{ value }}"{% if selected_payment_method == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
+  </select></div>
+  {% endif %}
+  <button class="btn btn-sm btn-brand" type="submit"><i class="bi bi-funnel"></i> Filter</button>
+</form>
+{% endif %}
+
 <div class="rv-sheet">
   <div class="rv-head">
+    {% if report_header %}
+    <div class="rv-print-heading">
+      <div>
+        <h3>{{ print_title }}</h3>
+        <div><strong>Period:</strong> {{ date_from|date:"d-m-Y" }} - {{ date_to|date:"d-m-Y" }}</div>
+        <div><strong>Customer:</strong> {% if customer %}{% if customer.is_system %}Walk-in customer{% else %}{{ customer.name }}{% endif %}{% else %}All{% endif %}</div>
+        <div><strong>User:</strong> {{ cashier_name }}</div>
+        <div><strong>Product:</strong> {{ product.name|default:"All" }}</div>
+      </div>
+      <div class="rv-company">
+        <div><strong>Company:</strong> {{ store_name }}</div>
+        <div><strong>Address:</strong> {{ store_address|default:"—"|linebreaksbr }}</div>
+      </div>
+    </div>
+    {% else %}
     <div>
       <h3>{{ info.title }}</h3>
       <div class="text-muted">{{ info.section }} report &bull; {{ store_name }}</div>
@@ -22,6 +68,7 @@
       Generated {{ generated|date:"d-m-Y H:i" }}<br>
       By {{ user.get_full_name|default:user.username }}
     </div>
+    {% endif %}
   </div>
 
   {% for n in notes %}<div class="rv-note">{{ n }}</div>{% endfor %}

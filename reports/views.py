@@ -17,10 +17,12 @@ from core.permissions import AdminRequiredMixin
 from inventory.models import Category, Product
 from people.models import Contact
 
-from . import builders_purchase, builders_sales, builders_stock  # noqa: F401  (importing them registers the reports)
+from . import builders_customer, builders_finance, builders_purchase, builders_sales, builders_stock  # noqa: F401
 from . import helpers
 from .helpers import FILTER_LABELS, Params
 from .registry import BUILDERS, USES, get_sections
+from pos.models import Payment
+from storeconfig.models import StoreSettings
 
 
 class ReportIndex(AdminRequiredMixin, TemplateView):
@@ -30,15 +32,27 @@ class ReportIndex(AdminRequiredMixin, TemplateView):
         ctx = super().get_context_data(**kwargs)
         p = Params(self.request)
         contacts = Contact.objects.filter(is_active=True, is_system=False).order_by("name")
+        selected = self.request.GET.get("selected", "")
+        ready_reports = get_sections()[1]
+        if selected not in ready_reports or not ready_reports[selected]["ready"]:
+            selected = ""
         ctx.update(
             sections=get_sections()[0],
             products=Product.objects.only("id", "name").order_by("name"),
             categories=Category.objects.all(),
             customers=contacts.filter(is_customer=True),
+            walk_in_customer=Contact.objects.filter(is_system=True, is_customer=True).first(),
             suppliers=contacts.filter(is_supplier=True),
             users=get_user_model().objects.order_by("username"),
             date_from=p.date_from,
             date_to=p.date_to,
+            selected_report=selected,
+            selected_customer=p.party,
+            selected_user=p.user,
+            selected_product=p.product,
+            selected_group=p.group,
+            selected_payment_method=p.payment_method or "",
+            payment_methods=Payment.Method.choices,
         )
         return ctx
 
@@ -60,6 +74,15 @@ class ReportView(AdminRequiredMixin, View):
         if request.GET.get("format") == "csv":
             return self._csv(slug, report)
 
+        customer = Contact.objects.filter(pk=p.party, is_customer=True).first() if p.party else None
+        cashier = get_user_model().objects.filter(pk=p.user).first() if p.user else None
+        cashier_name = (cashier.get_full_name() or cashier.username) if cashier else "All"
+        product = Product.objects.filter(pk=p.product).first() if p.product else None
+        store = StoreSettings.load().as_store_info()
+        back_params = request.GET.copy()
+        back_params.pop("format", None)
+        back_params.pop("print", None)
+        back_params["selected"] = slug
         rows, truncated = report.page_rows()
         return render(request, "reports/report.html", {
             "report": report,
@@ -73,6 +96,32 @@ class ReportView(AdminRequiredMixin, View):
             "notes": notes,
             "generated": timezone.localtime(),
             "autoprint": request.GET.get("print") == "1",
+            "customer": customer,
+            "cashier": cashier,
+            "cashier_name": cashier_name,
+            "product": product,
+            "selected_group": p.group,
+            "selected_payment_method": p.payment_method or "",
+            "back_query": back_params.urlencode(),
+            "date_from": p.date_from,
+            "date_to": p.date_to,
+            "customers": Contact.objects.filter(
+                is_active=True, is_customer=True, is_system=False
+            ).order_by("name"),
+            "walk_in_customer": Contact.objects.filter(is_system=True, is_customer=True).first(),
+            "users": get_user_model().objects.order_by("username"),
+            "products": Product.objects.only("id", "name").order_by("name"),
+            "categories": Category.objects.all(),
+            "store_address": store["address"],
+            "report_header": slug in {
+                "customers-sales-by-customer", "customers-invoice-list", "customers-item-list",
+            },
+            "print_title": {
+                "customers-sales-by-customer": "SALES BY CUSTOMER",
+                "customers-invoice-list": "INVOICES",
+                "customers-item-list": "CUSTOMER ITEM LIST",
+            }.get(slug, info["title"].upper()),
+            "payment_methods": Payment.Method.choices,
         })
 
     def _csv(self, slug, report):

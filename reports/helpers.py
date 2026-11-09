@@ -9,12 +9,16 @@ from dashboard.views import inr
 from inventory.models import Category, Product
 from inventory.stock import qty_fmt
 from people.models import Contact
+from pos.models import Payment
 
 PAGE_CAP = 5000       # rows shown on the page
 CSV_CAP = 50000       # rows in the Excel (CSV) file
 TWO = Decimal("0.01")
 NUM_KINDS = {"money", "qty", "int", "pct"}
-FILTER_LABELS = {"product": "Product", "group": "Product group", "party": "Customers & suppliers", "user": "User"}
+FILTER_LABELS = {
+    "product": "Product", "group": "Product group", "party": "Customers & suppliers",
+    "user": "User", "payment_method": "Payment method",
+}
 
 
 def safe(value):
@@ -46,8 +50,8 @@ class Params:
         today = timezone.localdate()
         self.notes = []
 
-        d_from, bad_from = _to_date(g.get("date_from"))
-        d_to, bad_to = _to_date(g.get("date_to"))
+        d_from, bad_from = _to_date(g.get("start_date") or g.get("date_from"))
+        d_to, bad_to = _to_date(g.get("end_date") or g.get("date_to"))
         if bad_from or bad_to:
             self.notes.append("A date was not valid, so the default was used.")
         self.date_to = d_to or today
@@ -56,10 +60,14 @@ class Params:
             self.date_from, self.date_to = self.date_to, self.date_from
             self.notes.append("The From date was after the To date, so they were swapped.")
 
-        self.product = _to_int(g.get("product"))
+        self.product = _to_int(g.get("product_id") or g.get("product"))
         self.group = _to_int(g.get("group"))
-        self.party = _to_int(g.get("party"))
-        self.user = _to_int(g.get("user"))
+        self.party = _to_int(g.get("customer_id") or g.get("party"))
+        self.user = _to_int(g.get("user_id") or g.get("user"))
+        method = (g.get("payment_method") or "").strip()
+        self.payment_method = method if method in Payment.Method.values else None
+        if method and not self.payment_method:
+            self.notes.append("A payment method was not valid, so the filter was ignored.")
         self.supplied = {name for name in FILTER_LABELS if getattr(self, name)}
 
     def chips(self, uses=(), dates=True, party_label="Customer"):

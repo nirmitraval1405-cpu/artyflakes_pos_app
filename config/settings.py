@@ -51,7 +51,8 @@ INSTALLED_APPS = [
     'people',
     'expenses',
     'backups.apps.BackupsConfig',
-    'storeconfig'
+    'storeconfig',
+    'promotions'
 ]
 
 MIDDLEWARE = [

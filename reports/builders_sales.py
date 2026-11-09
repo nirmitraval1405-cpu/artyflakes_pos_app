@@ -164,6 +164,46 @@ def sales_by_payment(p):
     return Report(cols, records, p.chips(("party", "user")), notes=notes)
 
 
+# ---------- Collected credit payments ----------
+@register("Sales", "Collected credit payments", uses=("party", "user"))
+def collected_credit_payments(p):
+    payments = (
+        Payment.objects.select_related("sale__customer", "sale__cashier")
+        .filter(
+            sale__status=Sale.Status.COMPLETED,
+            created_at__date__gte=p.date_from,
+            created_at__date__lte=p.date_to,
+        )
+        .order_by("created_at", "id")
+    )
+    if p.party:
+        payments = payments.filter(sale__customer_id=p.party)
+    if p.user:
+        payments = payments.filter(sale__cashier_id=p.user)
+
+    records = [
+        {
+            "when": _local_date(payment.created_at),
+            "invoice": payment.sale.invoice_no,
+            "customer": payment.sale.customer.name,
+            "method": payment.get_method_display(),
+            "reference": payment.reference,
+            "amount": payment.amount,
+            "cashier": payment.sale.cashier.get_full_name() or payment.sale.cashier.username,
+        }
+        for payment in payments
+    ]
+    cols = [
+        Col("Date", "when", "date"), Col("Invoice", "invoice"), Col("Customer", "customer"),
+        Col("Method", "method"), Col("Reference", "reference"), Col("Amount", "amount", "money"),
+        Col("Cashier", "cashier"),
+    ]
+    notes = [
+        "Customer payments recorded against completed sales. The POS does not currently record credit balances or later credit collections."
+    ]
+    return Report(cols, records, p.chips(("party", "user")), totals=("amount",), notes=notes)
+
+
 # ---------- 4. Bill-wise sales with GST ----------
 @register("Sales", "Bill-wise sales with GST", uses=("party", "user"))
 def bill_wise_gst(p):

@@ -24,7 +24,8 @@
      data-checkout-url="{% url 'pos:checkout' %}"
      data-customer-url="{% url 'pos:customer_search' %}"
      data-csrf="{{ csrf_token }}"
-     data-max-discount="{{ max_discount }}">
+     data-max-discount="{{ max_discount }}"
+     data-promo-url="{% url 'pos:promotion_rules' %}">
 
   <!-- Top bar -->
   <header class="pos-top">
@@ -59,8 +60,8 @@
       <div class="cart-head">
         <span class="c-name">Product Name</span>
         <span class="c-qty">Quantity</span>
-        <span class="c-num">Price</span>
         <span class="c-num">MRP</span>
+        <span class="c-num">Price</span>
         <span class="c-num">Discount</span>
         <span class="c-num">Amount</span>
         <span class="c-del"></span>
@@ -86,11 +87,6 @@
         <div class="tot grand"><span>Total</span><strong id="totGrand">₹ 0.00</strong><small id="totDisc"></small></div>
       </div>
 
-      <div class="cart-strip">
-        <div><i class="bi bi-globe2"></i><span>Website Order<br><small>None</small></span></div>
-        <div><i class="bi bi-box-seam"></i><span>Stock Auto Update<br><small>On</small></span></div>
-        <div><i class="bi bi-whatsapp"></i><span>WhatsApp Bill<br><small>Coming soon</small></span></div>
-      </div>
     </section>
 
     <!-- Right: buttons -->

@@ -1,0 +1,219 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} · {{ store_name }}{% endblock %}
+
+{% block content %}
+<style>
+  .promo-row { display: grid; grid-template-columns: 130px minmax(220px, 3fr) 150px 130px minmax(200px, 2fr) 80px; gap: .6rem; align-items: end; padding: .6rem 0; border-bottom: 1px solid var(--border); }
+  .promo-row .qcond { display: flex; align-items: center; gap: .5rem; }
+  .promo-row .qcond input[type=number] { min-width: 0; }
+  @media (max-width: 991.98px) { .promo-row { grid-template-columns: 1fr 1fr; } }
+</style>
+
+<div class="page-head">
+  <div>
+    <h3>{{ title }}</h3>
+    <p>A promotion applies on the POS by itself while it is running. Cashiers do not have to do anything.</p>
+  </div>
+  <a class="btn btn-outline-secondary" href="{% url 'promotions:list' %}">Back</a>
+</div>
+
+<form method="post" id="promoForm">
+  {% csrf_token %}
+  {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+
+  <div class="panel mb-3">
+    <div class="panel-body">
+      <div class="row g-3">
+        <div class="col-md-8">
+          <label class="form-label fw-semibold" for="{{ form.name.id_for_label }}">{{ form.name.label }}</label>
+          {{ form.name }}
+          {% for e in form.name.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+        </div>
+        <div class="col-md-4 d-flex align-items-end">
+          <div class="form-check form-switch fs-5">
+            {{ form.is_active }} <label class="form-check-label fs-6" for="{{ form.is_active.id_for_label }}">Active</label>
+          </div>
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label fw-semibold" for="{{ form.starts_at.id_for_label }}">Start <span class="text-muted fw-normal">(optional)</span></label>
+          {{ form.starts_at }}
+          {% for e in form.starts_at.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold" for="{{ form.ends_at.id_for_label }}">End <span class="text-muted fw-normal">(optional)</span></label>
+          {{ form.ends_at }}
+          {% for e in form.ends_at.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+        </div>
+
+        <div class="col-12">
+          <div class="d-flex flex-wrap align-items-center gap-3">
+            <div class="form-check">{{ form.all_days }} <label class="form-check-label" for="{{ form.all_days.id_for_label }}">All days</label></div>
+            {% for cb in form.days %}
+              <div class="form-check form-check-inline m-0">{{ cb.tag }} <label class="form-check-label" for="{{ cb.id_for_label }}">{{ cb.choice_label }}</label></div>
+            {% endfor %}
+          </div>
+          {% for e in form.days.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel mb-3">
+    <div class="panel-body">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h6 class="mb-0">Targets and discounts</h6>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="addRow">Add target</button>
+      </div>
+      <div class="small text-muted mb-2">
+        Choose a product, category, or brand. Category and brand discounts apply to all matching products.
+        <strong>Percent</strong> takes a percentage off the line. <strong>Amount</strong> takes that many rupees off <strong>each</strong> unit.
+        Tick <strong>Quantity condition</strong> to give the discount only when the bill has at least that many.
+        If two promotions cover the same product, the bigger discount applies.
+      </div>
+
+      <div id="promoLines">
+        {% for row in rows %}
+        <div class="promo-row">
+          <div>
+            <label class="form-label small text-muted">Target type</label>
+            <select data-f="type" name="target_type" class="form-select">
+              <option value="product" {% if row.target_type == "product" %}selected{% endif %}>Product</option>
+              <option value="category" {% if row.target_type == "category" %}selected{% endif %}>Category</option>
+              <option value="brand" {% if row.target_type == "brand" %}selected{% endif %}>Brand</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label small text-muted">Target</label>
+            <select data-f="target-product" name="target_id" class="form-select" {% if row.target_type != "product" %}hidden disabled{% endif %}>
+              <option value="">Select product</option>
+              {% for p in products %}
+                <option value="{{ p.pk }}" {% if row.target_type == "product" and p.pk|stringformat:"s" == row.target_id %}selected{% endif %}>{{ p.name }}{% if p.code %} ({{ p.code }}){% endif %} &ndash; ₹{{ p.sale_price|floatformat:"2" }}</option>
+              {% endfor %}
+            </select>
+            <select data-f="target-category" name="target_id" class="form-select" {% if row.target_type != "category" %}hidden disabled{% endif %}>
+              <option value="">Select category</option>
+              {% for c in categories %}
+                <option value="{{ c.pk }}" {% if row.target_type == "category" and c.pk|stringformat:"s" == row.target_id %}selected{% endif %}>{{ c.name }}</option>
+              {% endfor %}
+            </select>
+            <select data-f="target-brand" name="target_id" class="form-select" {% if row.target_type != "brand" %}hidden disabled{% endif %}>
+              <option value="">Select brand</option>
+              {% for b in brands %}
+                <option value="{{ b.pk }}" {% if row.target_type == "brand" and b.pk|stringformat:"s" == row.target_id %}selected{% endif %}>{{ b.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label class="form-label small text-muted">Discount type</label>
+            <select data-f="kind" name="kind_{{ forloop.counter0 }}" class="form-select">
+              <option value="percent" {% if row.kind == "percent" %}selected{% endif %}>Percent</option>
+              <option value="amount" {% if row.kind == "amount" %}selected{% endif %}>Amount</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label small text-muted">Discount <span data-f="suffix"></span></label>
+            <input data-f="value" name="value_{{ forloop.counter0 }}" type="number" min="0" step="0.01" class="form-control" value="{{ row.value }}">
+          </div>
+          <div>
+            <label class="form-label small text-muted">Quantity condition</label>
+            <div class="qcond">
+              <div class="form-check form-switch m-0"><input data-f="qcond" type="checkbox" class="form-check-input" {% if row.min_qty %}checked{% endif %}></div>
+              <input data-f="min" name="min_qty_{{ forloop.counter0 }}" type="number" min="0.001" step="0.001" class="form-control" placeholder="Minimum qty" value="{{ row.min_qty }}">
+            </div>
+          </div>
+          <div><button type="button" class="btn btn-outline-danger btn-sm w-100 remove-row">Remove</button></div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <button class="btn btn-brand" type="submit" id="saveBtn">Save promotion</button>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  (function () {
+    const form = document.getElementById("promoForm");
+    const lines = document.getElementById("promoLines");
+    const rows = () => Array.from(lines.querySelectorAll(".promo-row"));
+    const f = (row, n) => row.querySelector('[data-f="' + n + '"]');
+    const targetOf = (row) => row.querySelector('[data-f="target-' + f(row, "type").value + '"]');
+
+    // Names are rebuilt from each row's position, so removing a row never makes two rows share a name.
+    function renumber() {
+      rows().forEach((row, i) => {
+        f(row, "kind").name = "kind_" + i;
+        f(row, "value").name = "value_" + i;
+        f(row, "min").name = "min_qty_" + i;
+      });
+    }
+
+    function syncRow(row) {
+      const targetType = f(row, "type").value;
+      ["product", "category", "brand"].forEach((type) => {
+        const select = f(row, "target-" + type);
+        const active = type === targetType;
+        select.hidden = !active;
+        select.disabled = !active;
+        if (!active) select.value = "";
+      });
+      const on = f(row, "qcond").checked;
+      f(row, "min").disabled = !on;            // a disabled box is not sent, which means "no condition"
+      if (!on) f(row, "min").value = "";
+      const percent = f(row, "kind").value === "percent";
+      f(row, "suffix").textContent = percent ? "(%)" : "(\u20b9 off each)";
+      f(row, "value").max = percent ? "100" : "";
+    }
+
+    function addRow() {
+      const row = rows()[0].cloneNode(true);   // copies the target lists, so nothing is typed into JavaScript
+      f(row, "type").value = "product";
+      ["product", "category", "brand"].forEach((type) => { f(row, "target-" + type).value = ""; });
+      f(row, "kind").value = "percent";
+      f(row, "value").value = "";
+      f(row, "qcond").checked = false;
+      f(row, "min").value = "";
+      lines.appendChild(row);
+      renumber();
+      syncRow(row);
+    }
+
+    lines.addEventListener("change", (e) => {
+      const row = e.target.closest(".promo-row");
+      if (row) syncRow(row);
+    });
+    lines.addEventListener("click", (e) => {
+      const btn = e.target.closest(".remove-row");
+      if (!btn) return;
+      const row = btn.closest(".promo-row");
+      if (rows().length > 1) row.remove();
+      else {
+        f(row, "type").value = "product";
+        ["product", "category", "brand"].forEach((type) => { f(row, "target-" + type).value = ""; });
+        f(row, "value").value = ""; f(row, "qcond").checked = false; syncRow(row);
+      }
+      renumber();
+    });
+    document.getElementById("addRow").addEventListener("click", addRow);
+
+    // All days / single days
+    const all = document.getElementById("{{ form.all_days.id_for_label }}");
+    const boxes = document.querySelectorAll(".day-box");
+    function syncDays() { boxes.forEach((b) => { b.disabled = all.checked; if (all.checked) b.checked = false; }); }
+    all.addEventListener("change", syncDays);
+
+    form.addEventListener("submit", (e) => {
+      renumber();
+      if (!rows().some((r) => targetOf(r).value)) { e.preventDefault(); alert("Select at least one product, category, or brand."); return; }
+      document.getElementById("saveBtn").disabled = true;      // stops a double click
+    });
+
+    rows().forEach(syncRow);
+    renumber();
+    syncDays();
+  })();
+</script>
+{% endblock %}

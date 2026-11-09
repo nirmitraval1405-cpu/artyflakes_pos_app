@@ -25,6 +25,7 @@ from django.urls import reverse
 from django.utils import timezone
 from .models import Payment, Sale, SaleItem, SaleReturn, SaleReturnItem
 from .services import CheckoutError, create_return, create_sale, void_sale
+from promotions.engine import rules_for
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +57,7 @@ def _paise(value):
     return int((Decimal(value) * 100).to_integral_value())
 
 
-def _product_json(p, exact=False):
+def _product_json(p, rules, exact=False):
     return {
         "id": p.pk,
         "name": p.name,
@@ -69,6 +70,7 @@ def _product_json(p, exact=False):
         "stock": float(p.stock) if p.track_stock else None,
         "unit": p.unit,
         "exact": exact,
+        "promos": rules,
     }
 
 
@@ -84,14 +86,24 @@ def product_search(request):
     exact = list(base.filter(Q(barcode__iexact=q) | Q(code__iexact=q))[:5])
     exact_ids = [p.pk for p in exact]
 
-    others = (
+    others = list(
         base.filter(Q(name__icontains=q) | Q(code__icontains=q) | Q(barcode__icontains=q))
         .exclude(pk__in=exact_ids)
         .order_by("name")[:20]
     )
 
-    results = [_product_json(p, exact=True) for p in exact] + [_product_json(p) for p in others]
+    rules = rules_for([p.pk for p in exact + others])
+    results = [_product_json(p, rules.get(p.pk, []), exact=True) for p in exact] + [
+        _product_json(p, rules.get(p.pk, [])) for p in others
+    ]
     return JsonResponse({"results": results})
+
+
+@login_required
+def promotion_rules(request):
+    """The promotions running right now for the products in the cart. The POS re-checks them before payment."""
+    ids = [int(x) for x in request.GET.get("ids", "").split(",") if x.strip().isdigit()][:200]
+    return JsonResponse({"rules": {str(pid): r for pid, r in rules_for(ids).items()}})
 
 
 @login_required
@@ -496,6 +508,7 @@ def held_resume(request, pk):
         products = {
             p.pk: p for p in with_stock(Product.objects.filter(pk__in=[i["id"] for i in saved], is_active=True))
         }
+        product_rules = rules_for(list(products))
         items, skipped = [], []
         for i in saved:
             p = products.get(i["id"])
@@ -503,7 +516,7 @@ def held_resume(request, pk):
                 skipped.append(i.get("name") or f"product {i['id']}")
                 continue
             items.append({
-                "product": _product_json(p), "qty": i["qty"],
+                "product": _product_json(p, product_rules.get(p.pk, [])), "qty": i["qty"],
                 "dKind": i.get("dKind"), "dValue": i.get("dValue", 0), "price": i.get("price"),
             })
 

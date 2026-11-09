@@ -332,37 +332,6 @@
     color: var(--primary);
 }
 
-.cart-strip {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    margin: 0 .8rem .8rem;
-    background: #f4f6ef;
-    border: 1px solid #e3e8da;
-    border-radius: 8px;
-}
-
-.cart-strip>div {
-    display: flex;
-    align-items: center;
-    gap: .7rem;
-    padding: .6rem .9rem;
-    font-size: 12.5px;
-    color: var(--primary);
-}
-
-.cart-strip>div+div {
-    border-left: 1px solid #e3e8da;
-}
-
-.cart-strip i {
-    font-size: 1.5rem;
-    color: var(--success);
-}
-
-.cart-strip small {
-    color: var(--muted);
-}
-
 /* ---------- Key grid ---------- */
 .pos-keys {
     display: flex;
@@ -1449,11 +1418,11 @@
     }
 
     .cart-row>.c-num:nth-child(3)::before {
-        content: "Price";
+        content: "MRP";
     }
 
     .cart-row>.c-num:nth-child(4)::before {
-        content: "MRP";
+        content: "Price";
     }
 
     .cart-row>.c-num:nth-child(5)::before {
@@ -1488,21 +1457,6 @@
 
     .tot.grand {
         padding: .5rem .7rem;
-    }
-
-    .cart-strip {
-        grid-template-columns: 1fr;
-        margin: 0 .6rem .6rem;
-    }
-
-    .cart-strip>div {
-        min-height: 44px;
-        padding: .45rem .7rem;
-    }
-
-    .cart-strip>div+div {
-        border-top: 1px solid #e3e8da;
-        border-left: 0;
     }
 
     .pos-foot {
@@ -1653,3 +1607,5 @@ body.pos-locked .pos-app {
     display: block;
     color: var(--muted);
 }
+.item-promo { font-size: 12px; color: var(--secondary); font-weight: 600; }
+.pr-promo { font-size: 11px; color: var(--secondary); font-weight: 600; max-width: 260px; white-space: normal; }
