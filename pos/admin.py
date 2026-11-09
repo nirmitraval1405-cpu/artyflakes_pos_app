@@ -1,5 +1,5 @@
 from django.contrib import admin
-
+from .models import DrawerEvent, HeldSale
 from .models import Payment, Sale, SaleItem, SaleReturn, SaleReturnItem
 
 
@@ -52,3 +52,10 @@ class SaleReturnAdmin(_ReadOnlyAdmin):
     list_display = ("return_no", "created_at", "sale", "refund_method", "refund_total")
     search_fields = ("return_no", "sale__invoice_no")
     inlines = [ReturnItemInline]
+    
+admin.site.register(HeldSale)
+
+
+@admin.register(DrawerEvent)
+class DrawerEventAdmin(admin.ModelAdmin):
+    list_display = ("created_at", "user", "reason")

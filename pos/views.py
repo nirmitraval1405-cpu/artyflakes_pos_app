@@ -15,11 +15,14 @@ from django.db.models import Count, Exists, OuterRef, Q, Sum
 from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
-
+from .models import DrawerEvent, HeldSale, Payment, Sale, SaleItem, SaleReturn, SaleReturnItem
 from inventory.models import Product, Unit
 from inventory.stock import with_stock
 from people.models import Contact
-
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
+from django.db import transaction
+from django.urls import reverse
+from django.utils import timezone
 from .models import Payment, Sale, SaleItem, SaleReturn, SaleReturnItem
 from .services import CheckoutError, create_return, create_sale, void_sale
 
@@ -35,7 +38,10 @@ def screen(request):
     cfg = StoreSettings.load()
     # Admins have no discount limit, so the page shows the limit to Cashiers only
     limit = "" if request.user.is_admin_role else f"{cfg.cashier_max_discount_percent.normalize():f}"
-    return render(request, "pos/screen.html", {"max_discount": limit, "store": cfg.as_store_info()})
+    return render(request, "pos/screen.html", {
+        "max_discount": limit, "store": cfg.as_store_info(),
+        "locked": bool(request.session.get("pos_locked")),
+    })
 
 
 @login_required
@@ -92,7 +98,7 @@ def product_search(request):
 def customer_search(request):
     """Name and phone only. Cashiers can pick a customer without seeing GST or address details."""
     q = request.GET.get("q", "").strip()
-    qs = Contact.objects.filter(is_customer=True, is_active=True, is_system=False)
+    qs = Contact.objects.filter(is_customer=True, is_supplier=False, is_active=True, is_system=False)
     if q:
         qs = qs.filter(Q(name__icontains=q) | Q(phone__icontains=q))
     results = [{"id": c.pk, "name": c.name, "phone": c.phone} for c in qs.order_by("name")[:20]]
@@ -102,6 +108,8 @@ def customer_search(request):
 @login_required
 @require_POST
 def checkout(request):
+    if request.session.get("pos_locked"):
+        return JsonResponse({"error": "The POS is locked. Unlock it first."}, status=423)
     try:
         data = json.loads(request.body)
     except (ValueError, UnicodeDecodeError):
@@ -378,3 +386,190 @@ def return_list(request):
     return render(request, "pos/return_list.html", {
         "page": page, "total": paginator.count, "q": q, "querystring": params.urlencode(),
     })
+    
+# =====================  Saved sales, drawer, refund lookup, lock  =====================
+def _bad(message="Invalid request.", status=400):
+    return JsonResponse({"error": message}, status=status)
+
+
+def _body(request):
+    try:
+        data = json.loads(request.body)
+    except (ValueError, UnicodeDecodeError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _int(value, lo=0, hi=10**9):
+    if isinstance(value, bool) or not isinstance(value, int) or not lo <= value <= hi:
+        raise ValueError
+    return value
+
+
+@login_required
+def held_list(request):
+    rows = HeldSale.objects.select_related("customer", "user")[:50]
+    return JsonResponse({"results": [
+        {
+            "id": h.pk,
+            "customer": h.customer.name if h.customer else "Walk-in customer",
+            "items": h.item_count,
+            "total": str(h.total),
+            "by": h.user.get_username(),
+            "at": timezone.localtime(h.created_at).strftime("%d %b, %I:%M %p"),
+        }
+        for h in rows
+    ]})
+
+
+@login_required
+@require_POST
+def held_save(request):
+    if request.session.get("pos_locked"):
+        return _bad("The POS is locked.", 423)
+    data = _body(request)
+    if data is None:
+        return _bad()
+    raw = data.get("items")
+    if not isinstance(raw, list) or not raw or len(raw) > 200:
+        return _bad("Add items to the bill first.")
+
+    try:
+        items = []
+        for r in raw:
+            if not isinstance(r, dict):
+                raise ValueError
+            qty = Decimal(str(r.get("qty")))
+            if not qty.is_finite() or qty <= 0 or qty > 100000:
+                raise ValueError
+            kind = r.get("dKind")
+            if kind not in (None, "percent", "amount"):
+                raise ValueError
+            price = r.get("price")
+            items.append({
+                "id": _int(r.get("id"), 1),
+                "qty": format(qty.normalize(), "f"),
+                "dKind": kind,
+                "dValue": _int(r.get("dValue") or 0),
+                "price": None if price is None else _int(price, 1),
+            })
+        bill = data.get("bill") or {}
+        bill_kind = bill.get("kind")
+        if bill_kind not in (None, "percent", "amount"):
+            raise ValueError
+        bill_value = _int(bill.get("value") or 0)
+        total = _int(data.get("total") or 0)
+    except (ValueError, InvalidOperation, TypeError):
+        return _bad()
+
+    names = dict(Product.objects.filter(pk__in=[i["id"] for i in items]).values_list("pk", "name"))
+    if len(names) != len({i["id"] for i in items}):
+        return _bad("A product on the bill no longer exists.")
+    for i in items:
+        i["name"] = names[i["id"]]
+
+    customer = None
+    cid = data.get("customer_id")
+    if cid not in (None, ""):
+        customer = Contact.objects.filter(pk=cid, is_customer=True, is_supplier=False, is_active=True).first()
+
+    hold = HeldSale.objects.create(
+        user=request.user, customer=customer, item_count=len(items),
+        total=(Decimal(total) / 100).quantize(Decimal("0.01")),
+        data={"items": items, "bill": {"kind": bill_kind, "value": bill_value}},
+    )
+    return JsonResponse({"ok": True, "label": f"#{hold.pk}"})
+
+
+@login_required
+@require_POST
+def held_resume(request, pk):
+    """Hands the saved bill back with today's prices and stock, and removes it from the saved list."""
+    if request.session.get("pos_locked"):
+        return _bad("The POS is locked.", 423)
+    with transaction.atomic():
+        hold = HeldSale.objects.select_related("customer").filter(pk=pk).first()
+        if hold is None or not HeldSale.objects.filter(pk=pk).delete()[0]:
+            return _bad("That saved sale was already opened or deleted.", 404)
+
+        saved = hold.data.get("items", [])
+        products = {
+            p.pk: p for p in with_stock(Product.objects.filter(pk__in=[i["id"] for i in saved], is_active=True))
+        }
+        items, skipped = [], []
+        for i in saved:
+            p = products.get(i["id"])
+            if p is None:
+                skipped.append(i.get("name") or f"product {i['id']}")
+                continue
+            items.append({
+                "product": _product_json(p), "qty": i["qty"],
+                "dKind": i.get("dKind"), "dValue": i.get("dValue", 0), "price": i.get("price"),
+            })
+
+        customer = None
+        c = hold.customer
+        if c and c.is_customer and c.is_active:
+            customer = {"id": c.pk, "name": c.name}
+
+        return JsonResponse({
+            "ok": True, "items": items, "skipped": skipped,
+            "bill": hold.data.get("bill") or {"kind": None, "value": 0}, "customer": customer,
+        })
+
+
+@login_required
+@require_POST
+def held_delete(request, pk):
+    HeldSale.objects.filter(pk=pk).delete()
+    return JsonResponse({"ok": True})
+
+
+@login_required
+@require_POST
+def drawer_open(request):
+    if request.session.get("pos_locked"):
+        return _bad("The POS is locked.", 423)
+    data = _body(request) or {}
+    reason = str(data.get("reason") or "").strip()[:120]
+    if not reason:
+        return _bad("Choose a reason.")
+    DrawerEvent.objects.create(user=request.user, reason=reason)
+    return JsonResponse({"ok": True})
+
+
+@login_required
+def find_sale(request):
+    """Finds a bill by invoice number so the Refund button can open its return page."""
+    if not request.user.is_admin_role:
+        return _bad("Only an admin can process refunds.", 403)
+    q = request.GET.get("q", "").strip()
+    sale = Sale.objects.filter(invoice_no__iexact=q).first() if q else None
+    if sale is None and q.isdigit():
+        sale = Sale.objects.filter(invoice_no=f"AF-{timezone.localdate().year}-{int(q):04d}").first()
+    if sale is None:
+        return _bad("No bill found with that number.", 404)
+    return JsonResponse({"ok": True, "invoice_no": sale.invoice_no,
+                         "url": reverse("pos:sale_return", args=[sale.pk])})
+
+
+@login_required
+@require_POST
+def lock(request):
+    request.session["pos_locked"] = True
+    return JsonResponse({"ok": True})
+
+
+@login_required
+@require_POST
+def unlock(request):
+    tries = request.session.get("pos_unlock_tries", 0)
+    if tries >= 5:
+        return _bad("Too many wrong attempts. Please log out and sign in again.", 429)
+    data = _body(request) or {}
+    if request.user.check_password(str(data.get("password") or "")):
+        request.session["pos_locked"] = False
+        request.session["pos_unlock_tries"] = 0
+        return JsonResponse({"ok": True})
+    request.session["pos_unlock_tries"] = tries + 1
+    return _bad("Wrong password.", 403)

@@ -38,7 +38,7 @@
 
   <button type="button" class="tb" onclick="window.print()"><i class="bi bi-printer"></i><span>Print</span></button>
   <button type="button" class="tb" onclick="window.print()" title="Choose 'Save as PDF' as the printer"><i class="bi bi-file-earmark-pdf"></i><span>Save as PDF</span></button>
-  <span class="tb disabled" title="Coming soon"><i class="bi bi-hash"></i><span>Price tags</span></span>
+    <a class="tb" href="{% url 'inventory:price_tags' %}{% if group %}?group={{ group }}{% endif %}"><i class="bi bi-hash"></i><span>Price tags</span></a>
   <span class="tb disabled" title="Coming soon"><i class="bi bi-intersect"></i><span>Merge</span></span>
   <span class="tb disabled" title="Coming soon"><i class="bi bi-sort-down"></i><span>Sorting</span></span>
   <span class="tb disabled" title="Coming soon"><i class="bi bi-graph-up"></i><span>Mov. avg. price</span></span>

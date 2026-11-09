@@ -36,4 +36,5 @@ urlpatterns = [
     path("stock/count/", views.StockEntry.as_view(kind="count"), name="stock_count"),
     path("stock/damage/", views.StockEntry.as_view(kind="damage"), name="stock_damage"),
     path("stock/movements/", views.movement_list, name="movement_list"),
+    path("products/price-tags/", views.price_tags, name="price_tags"),
 ]

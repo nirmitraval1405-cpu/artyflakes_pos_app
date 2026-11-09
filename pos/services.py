@@ -194,7 +194,13 @@ def create_sale(user, data):
         if qty <= 0 or qty > 100000 or milli != milli.to_integral_value():
             raise CheckoutError("Quantity must be above zero with at most 3 decimals.")
         kind, value = parse_discount(raw.get("discount"), "Item discount")
-        specs.append({"pid": pid, "qty_milli": int(milli), "disc_kind": kind, "disc_value": value})
+        price_override = None
+        if raw.get("price") not in (None, ""):
+            price_override = to_paise(raw.get("price"), "Item price")
+            if price_override <= 0:
+                raise CheckoutError("An item price must be above zero.")
+        specs.append({"pid": pid, "qty_milli": int(milli), "disc_kind": kind,
+                      "disc_value": value, "price": price_override})
 
     bill_kind, bill_value = parse_discount(data.get("bill_discount"), "Bill discount")
 
@@ -237,8 +243,12 @@ def create_sale(user, data):
                     raise CheckoutError(f"{p.name} is inactive and cannot be sold.")
                 if p.unit in whole_units and s["qty_milli"] % 1000:
                     raise CheckoutError(f"{p.name} must be sold in whole numbers.")
+                list_price = int((p.sale_price * 100).to_integral_value())   # the server's list price
+                price = list_price
+                if s["price"] is not None and s["price"] != list_price:
+                    price = s["price"]
                 lines.append({
-                    "price": int((p.sale_price * 100).to_integral_value()),   # the server's price, never the browser's
+                    "price": price,
                     "qty_milli": s["qty_milli"],
                     "gst_bp": int((p.gst_rate * 100).to_integral_value()),
                     "disc_kind": s["disc_kind"],
@@ -276,7 +286,9 @@ def create_sale(user, data):
             if customer_id in (None, ""):
                 customer = Contact.walk_in()
             else:
-                customer = Contact.objects.filter(pk=customer_id, is_customer=True, is_active=True).first()
+                customer = Contact.objects.filter(
+                    pk=customer_id, is_customer=True, is_supplier=False, is_active=True
+                ).first()
                 if customer is None:
                     raise CheckoutError("That customer was not found.")
 
@@ -297,7 +309,7 @@ def create_sale(user, data):
                 items.append(SaleItem(
                     sale=sale, product=p, product_name=p.name, product_code=p.code or "",
                     hsn_code=p.hsn_code, unit=p.unit, quantity=qty,
-                    unit_price=p.sale_price, mrp=p.mrp or p.sale_price, cost_price=p.cost_price,
+                    unit_price=rupees(line["price"]), mrp=p.mrp or p.sale_price, cost_price=p.cost_price,
                     gst_rate=p.gst_rate, discount=rupees(result["discount"]),
                     tax_amount=rupees(result["tax"]), line_total=rupees(result["total"]),
                 ))

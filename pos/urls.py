@@ -18,4 +18,12 @@ urlpatterns = [
     path("sales/<int:pk>/void/", views.sale_void, name="sale_void"),
     path("sales/<int:pk>/return/", views.sale_return, name="sale_return"),
     path("returns/", views.return_list, name="return_list"),
+    path("api/held/", views.held_list, name="held_list"),
+    path("api/held/save/", views.held_save, name="held_save"),
+    path("api/held/<int:pk>/resume/", views.held_resume, name="held_resume"),
+    path("api/held/<int:pk>/delete/", views.held_delete, name="held_delete"),
+    path("api/drawer/", views.drawer_open, name="drawer_open"),
+    path("api/find-sale/", views.find_sale, name="find_sale"),
+    path("api/lock/", views.lock, name="lock"),
+    path("api/unlock/", views.unlock, name="unlock"),
 ]

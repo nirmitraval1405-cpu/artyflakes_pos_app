@@ -112,7 +112,7 @@
     } else {
       state.items.push({
         id: p.id, name: p.name, sku: p.sku || "",
-        price: p.price, mrp: p.mrp || p.price, gstBp: Math.round((p.gst || 0) * 100),
+        price: p.price, listPrice: p.price, mrp: p.mrp || p.price, gstBp: Math.round((p.gst || 0) * 100),
         qty: 1, stock: p.stock === undefined ? null : p.stock, track: !!p.track,
         dKind: null, dValue: 0,
       });
@@ -169,6 +169,7 @@
       const txt = el("div");
       txt.appendChild(el("div", "item-name", item.name));
       txt.appendChild(el("div", "item-sku", item.sku));
+      if (item.price !== item.listPrice) txt.appendChild(el("div", "item-sku", "Price changed from " + inr(item.listPrice)));
       if (r.lineDisc > 0) {
         const label = item.dKind === "percent" ? "-" + (item.dValue / 100) + "%" : "-" + inr(r.lineDisc);
         txt.appendChild(el("div", "item-sku", "Discount " + label));
@@ -216,7 +217,7 @@
 
   // ---------- Dialogs ----------
   const backdrop = $("dlgBackdrop");
-  const dialogs = ["dlgPay", "dlgDisc", "dlgCust", "dlgDone"].map($);
+    const dialogs = ["dlgPay", "dlgDisc", "dlgCust", "dlgDone", "dlgPrice", "dlgHeld", "dlgDrawer", "dlgRefund"].map($);
 
   function openDialog(id) {
     dialogs.forEach((d) => (d.hidden = d.id !== id));
@@ -244,7 +245,7 @@
   }
 
   // ---------- Payment ----------
-  const payInputs = { cash: $("payCash"), upi: $("payUpi"), card: $("payCard") };
+  const payInputs = { cash: $("payCash"), upi: $("payUpi"), card: $("payCard"), cheque: $("payCheque") };
   let payCalc = { total: 0, valid: false };
 
   function openPayment(preset) {
@@ -253,6 +254,7 @@
     Object.values(payInputs).forEach((i) => (i.value = ""));
     $("payUpiRef").value = "";
     $("payCardRef").value = "";
+    $("payChequeRef").value = "";
     payInputs[preset].value = hStr(total);
     $("payError").hidden = true;
     $("payTotal").textContent = inr(total);
@@ -283,7 +285,7 @@
       message = "Enter amounts like 250 or 250.50.";
       $("payPaid").textContent = "—";
     } else {
-      const paid = vals.cash + vals.upi + vals.card;
+      const paid = vals.cash + vals.upi + vals.card + vals.cheque;
       const change = paid - total;
       $("payPaid").textContent = inr(paid);
       if (paid < total) {
@@ -293,7 +295,7 @@
         $("payLeftLabel").textContent = "Change to return";
         $("payLeft").textContent = inr(change);
       }
-      if (change > vals.cash) message = "Only cash can be overpaid. UPI and card cannot be more than the bill.";
+      if (change > vals.cash) message = "Only cash can be overpaid. UPI, card and cheque cannot be more than the bill.";
       else valid = paid >= total && total > 0;
     }
 
@@ -309,9 +311,9 @@
 
   document.querySelectorAll("[data-fill]").forEach((btn) => {
     btn.addEventListener("click", () => {
-      const vals = readPay() || { cash: 0, upi: 0, card: 0 };
+      const vals = readPay() || { cash: 0, upi: 0, card: 0, cheque: 0 };
       const target = btn.dataset.fill;
-      const key = target === "payCash" ? "cash" : target === "payUpi" ? "upi" : "card";
+      const key = { payCash: "cash", payUpi: "upi", payCard: "card", payCheque: "cheque" }[target];
       const others = Object.keys(vals).filter((k) => k !== key).reduce((s, k) => s + vals[k], 0);
       $(target).value = hStr(Math.max(compute().total - others, 0));
       updatePay();
@@ -324,6 +326,7 @@
     if (vals.cash > 0) payments.push({ method: "cash", amount: hStr(vals.cash), reference: "" });
     if (vals.upi > 0) payments.push({ method: "upi", amount: hStr(vals.upi), reference: $("payUpiRef").value.trim() });
     if (vals.card > 0) payments.push({ method: "card", amount: hStr(vals.card), reference: $("payCardRef").value.trim() });
+    if (vals.cheque > 0) payments.push({ method: "cheque", amount: hStr(vals.cheque), reference: $("payChequeRef").value.trim() });
 
     if (!state.token) state.token = makeToken();   // reused if the same bill is retried
     return {
@@ -332,6 +335,7 @@
       items: state.items.map((it) => ({
         product_id: it.id,
         quantity: String(it.qty),
+        price: it.price !== it.listPrice ? hStr(it.price) : null,
         discount: { type: it.dKind || "none", value: it.dKind ? hStr(it.dValue) : "0" },
       })),
       bill_discount: { type: state.bill.kind || "none", value: state.bill.kind ? hStr(state.bill.value) : "0" },
@@ -523,6 +527,21 @@
     resultsBox.innerHTML = "";
   }
 
+  function resetProductSearch() {
+    clearTimeout(timer);
+    timer = null;
+    reqId++;
+    searchInput.value = "";
+    hits = [];
+    active = 0;
+    lastQuery = null;
+    closeResults();
+  }
+
+  window.addEventListener("pageshow", () => {
+    if (searchInput.value) resetProductSearch();
+  });
+
   function renderResults() {
     resultsBox.innerHTML = "";
     if (!hits.length) {
@@ -671,7 +690,7 @@
   const actions = {
     search: focusSearch, quantity: focusQuantity, new: newSale, void: voidOrder, menu: openMenu,
     cash: () => openPayment("cash"), card: () => openPayment("card"), pay: () => openPayment("cash"),
-    discount: openDiscount, customer: openCustomer,
+    discount: openDiscount, customer: openCustomer, cheque: () => openPayment("cheque"),
   };
 
   document.querySelectorAll("[data-action]").forEach((btn) => {
@@ -703,7 +722,11 @@
   tick();
   setInterval(tick, 30000);
 
-  window.POS = { addItem, resetSale };
+  window.POS = {
+    addItem, resetSale, state, render, touch, showNote, openDialog, closeDialogs, hideDialogs,
+    requireItems, compute, inr, hStr, toHundredths, el, app, CSRF,
+  };
   render();
+  resetProductSearch();
   searchInput.focus();
 })();

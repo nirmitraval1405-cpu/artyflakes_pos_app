@@ -1,0 +1,277 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Price tags · Artyflakes POS{% endblock %}
+{% block extra_css %}
+<link href="{% static 'css/inventory.css' %}" rel="stylesheet">
+<style>
+  .pt-wrap{display:grid;grid-template-columns:310px 1fr;gap:16px;align-items:start}
+  .pt-side{background:#fff;border:1px solid #e3e6ec;border-radius:8px;padding:14px;max-height:78vh;overflow:auto}
+  .pt-side h6{margin:16px 0 8px;font-weight:700;border-bottom:1px solid #e3e6ec;padding-bottom:4px}
+  .pt-side h6:first-child{margin-top:0}
+  .pt-side .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+  .pt-side label.s{font-size:12px;color:#6b7280;display:block;margin-bottom:2px}
+  .pt-preview{background:#dcdcdc;border-radius:8px;padding:16px;max-height:78vh;overflow:auto}
+  #preview .pt-page{margin:0 auto 12px;box-shadow:0 1px 6px rgba(0,0,0,.3)}
+  .pt-list{max-height:220px;overflow:auto;border:1px solid #e3e6ec;border-radius:6px;padding:4px;margin-top:6px}
+  .pt-row{display:flex;gap:8px;padding:3px 6px;font-size:13px;cursor:pointer;margin:0}
+  @media(max-width:992px){.pt-wrap{grid-template-columns:1fr}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div><h3>Price tags</h3><p>Management &bull; Inventory</p></div>
+</div>
+
+<div class="toolbar">
+  <a class="tb" href="{% url 'inventory:product_list' %}"><i class="bi bi-arrow-left"></i><span>Back</span></a>
+  <button type="button" class="tb" id="btnPrint"><i class="bi bi-printer"></i><span>Print</span></button>
+</div>
+
+<div class="pt-wrap">
+  <aside class="pt-side">
+    <h6>Layout</h6>
+    <label class="s">Paper size</label>
+    <select id="paper" class="form-select form-select-sm mb-2">
+      <option value="A4">A4</option><option value="A5">A5</option>
+      <option value="Letter">Letter</option><option value="Custom">Custom</option>
+    </select>
+    <div class="row2">
+      <div><label class="s">Page width (mm)</label><input id="pw" type="number" class="form-control form-control-sm" value="210"></div>
+      <div><label class="s">Page height (mm)</label><input id="ph" type="number" class="form-control form-control-sm" value="297"></div>
+    </div>
+    <div class="form-check form-switch mb-2">
+      <input class="form-check-input" type="checkbox" id="roll"><label class="form-check-label" for="roll">Roll paper (unlimited height)</label>
+    </div>
+    <div class="row2">
+      <div><label class="s">Top margin</label><input id="mt" type="number" class="form-control form-control-sm" value="5"></div>
+      <div><label class="s">Bottom margin</label><input id="mb" type="number" class="form-control form-control-sm" value="5"></div>
+      <div><label class="s">Left margin</label><input id="ml" type="number" class="form-control form-control-sm" value="5"></div>
+      <div><label class="s">Right margin</label><input id="mr" type="number" class="form-control form-control-sm" value="5"></div>
+    </div>
+    <div class="row2">
+      <div><label class="s">Columns</label><input id="cols" type="number" min="1" max="10" class="form-control form-control-sm" value="3"></div>
+      <div><label class="s">Label width (auto)</label><input id="lw" class="form-control form-control-sm" readonly></div>
+      <div><label class="s">Label height (mm)</label><input id="lh" type="number" class="form-control form-control-sm" value="30"></div>
+      <div></div>
+      <div><label class="s">Row spacing</label><input id="gy" type="number" class="form-control form-control-sm" value="0"></div>
+      <div><label class="s">Column spacing</label><input id="gx" type="number" class="form-control form-control-sm" value="0"></div>
+    </div>
+
+    <h6>Display</h6>
+    <div class="row2">
+    <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="sLogo" checked><label class="form-check-label" for="sLogo">Logo</label></div>
+      <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="sName" checked><label class="form-check-label" for="sName">Product name</label></div>
+      <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="sPrice" checked><label class="form-check-label" for="sPrice">Price</label></div>
+      <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="sCode" checked><label class="form-check-label" for="sCode">Code (SKU)</label></div>
+      <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="sBarcode" checked><label class="form-check-label" for="sBarcode">Barcode</label></div>
+      <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="sBorder" checked><label class="form-check-label" for="sBorder">Borders</label></div>
+    </div>
+    <label class="s">Price to print</label>
+    <select id="priceField" class="form-select form-select-sm mb-2">
+      <option value="price">Sale price</option><option value="mrp">MRP</option>
+    </select>
+    <label class="s">Barcode type</label>
+    <select id="btype" class="form-select form-select-sm mb-2">
+      <option value="CODE128">CODE 128</option><option value="EAN13">EAN-13</option>
+      <option value="EAN8">EAN-8</option><option value="UPC">UPC-A</option><option value="CODE39">CODE 39</option>
+    </select>
+    <label class="s">Product name size</label><input id="nameSize" type="range" class="form-range" min="6" max="16" value="9">
+    <label class="s">Price size</label><input id="priceSize" type="range" class="form-range" min="8" max="28" value="14">
+    <label class="s">Barcode height</label><input id="barH" type="range" class="form-range" min="15" max="80" value="40">
+    <label class="s">Logo height (mm)</label><input id="logoH" type="range" class="form-range" min="3" max="20" value="6">
+
+    <h6>Products</h6>
+    <input id="q" class="form-control form-control-sm" placeholder="Search product name, code or barcode">
+    <div class="d-flex gap-2 mt-2">
+      <button type="button" class="btn btn-sm btn-outline-secondary" id="selAll">Select shown</button>
+      <button type="button" class="btn btn-sm btn-outline-secondary" id="selNone">Clear</button>
+    </div>
+    <div class="pt-list" id="plist"></div>
+    <div class="text-muted small mt-1" id="info"></div>
+
+    <h6>Number of copies</h6>
+    <input id="copies" type="number" min="1" max="100" class="form-control form-control-sm" value="1">
+    <div class="text-danger small mt-2" id="warn"></div>
+  </aside>
+
+  <section class="pt-preview"><div id="preview"></div></section>
+</div>
+
+{{ products|json_script:"productData" }}
+{{ preselect|json_script:"preselect" }}
+
+<div id="logoData" data-src="{{ store_logo_url }}" hidden></div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+<script>
+(function () {
+  const $ = id => document.getElementById(id);
+  const PRODUCTS = JSON.parse($('productData').textContent);
+  const selected = new Set(JSON.parse($('preselect').textContent));
+  const PAPERS = { A4: [210, 297], A5: [148, 210], Letter: [216, 279] };
+  const INPUTS = ['paper','pw','ph','roll','mt','mb','ml','mr','cols','lh','gx','gy',
+    'sName','sPrice','sCode','sBarcode','sBorder','sLogo','priceField','btype','nameSize','priceSize','barH','logoH','copies'];
+  const num = id => parseFloat($(id).value) || 0;
+  const on = id => $(id).checked;
+
+  // The same CSS is used in the preview and in the print window
+  const TAG_CSS =
+    '*{box-sizing:border-box}' +
+    '.pt-page{position:relative;background:#fff;overflow:hidden;break-after:page}' +
+    '.pt-page:last-child{break-after:auto}' +
+    '.tag{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;' +
+    'padding:1mm 2mm;overflow:hidden;font-family:Arial,sans-serif;color:#000;line-height:1.2}' +
+    '.tag.bordered{outline:.2mm dashed #555;outline-offset:-.2mm}' +
+    '.tag svg{max-width:100%;height:auto}' +
+    '.tag .nm{font-weight:600;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}' +
+    '.tag .cd{font-size:7pt;color:#333}' +
+    '.tag .pr{font-weight:700}' +
+    '.tag img.lg{max-width:100%;object-fit:contain;display:block}' +
+    '.tag .bad{font-size:7pt;color:#b00020}';
+  const st = document.createElement('style'); st.textContent = TAG_CSS; document.head.appendChild(st);
+  let pageCss = '';
+  const LOGO = $('logoData').dataset.src;
+
+  function save() {
+    try {
+      const o = {};
+      INPUTS.forEach(i => { const e = $(i); o[i] = e.type === 'checkbox' ? e.checked : e.value; });
+      localStorage.setItem('ptSettings', JSON.stringify(o));
+    } catch (e) {}
+  }
+  function load() {
+    try {
+      const o = JSON.parse(localStorage.getItem('ptSettings') || '{}');
+      INPUTS.forEach(i => { if (i in o) { const e = $(i); if (e.type === 'checkbox') e.checked = o[i]; else e.value = o[i]; } });
+    } catch (e) {}
+  }
+
+  function tag(p) {
+    const d = document.createElement('div');
+    d.className = 'tag' + (on('sBorder') ? ' bordered' : '');
+    if (on('sLogo') && LOGO) {
+      const im = document.createElement('img'); im.className = 'lg'; im.src = LOGO;
+      im.style.height = num('logoH') + 'mm';
+      im.onerror = () => im.remove();
+      d.appendChild(im);
+    }
+    if (on('sName')) {
+      const e = document.createElement('div'); e.className = 'nm';
+      e.style.fontSize = num('nameSize') + 'pt'; e.textContent = p.name; d.appendChild(e);
+    }
+    if (on('sCode') && p.code) {
+      const e = document.createElement('div'); e.className = 'cd'; e.textContent = 'SKU: ' + p.code; d.appendChild(e);
+    }
+    if (on('sBarcode')) {
+      const v = p.barcode || p.code;
+      if (v) {
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        try {
+          JsBarcode(svg, v, { format: $('btype').value, height: num('barH'), width: 1.5,
+                              fontSize: 11, margin: 0, displayValue: true });
+          d.appendChild(svg);
+        } catch (err) {
+          const e = document.createElement('div'); e.className = 'bad';
+          e.textContent = v + ' is not valid for ' + $('btype').value; d.appendChild(e);
+        }
+      }
+    }
+    if (on('sPrice')) {
+      const e = document.createElement('div'); e.className = 'pr';
+      e.style.fontSize = num('priceSize') + 'pt';
+      e.textContent = '\u20B9 ' + Number(p[$('priceField').value]).toLocaleString('en-IN',
+        { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      d.appendChild(e);
+    }
+    return d;
+  }
+
+  function render() {
+    const roll = on('roll');
+    const cols = Math.max(1, Math.round(num('cols')));
+    const pw = num('pw'), ph0 = num('ph');
+    const mt = num('mt'), mr = num('mr'), mb = num('mb'), ml = num('ml');
+    const lh = num('lh'), gx = num('gx'), gy = num('gy');
+    const lw = (pw - ml - mr - (cols - 1) * gx) / cols;
+    $('lw').value = lw > 0 ? lw.toFixed(1) : '0';
+    $('ph').disabled = roll;
+
+    const base = selected.size ? PRODUCTS.filter(p => selected.has(p.id)) : PRODUCTS;
+    $('info').textContent = selected.size
+      ? selected.size + ' selected'
+      : 'No products selected. All products (' + PRODUCTS.length + ') will be printed.';
+    const copies = Math.max(1, Math.min(100, Math.round(num('copies')) || 1));
+    let list = [];
+    base.forEach(p => { for (let i = 0; i < copies; i++) list.push(p); });
+
+    const prev = $('preview'); prev.innerHTML = '';
+    if (lw < 10 || lh < 10) { prev.textContent = 'Label is too small. Check page width, columns and label height.'; return; }
+    if (!list.length) { prev.textContent = 'No products to print.'; return; }
+    if (list.length > 2000) { list = list.slice(0, 2000); $('warn').textContent = 'Only the first 2000 labels are shown.'; }
+    else $('warn').textContent = '';
+
+    const rowsAll = Math.ceil(list.length / cols);
+    let rowsPer = Math.max(1, Math.floor((ph0 - mt - mb + gy) / (lh + gy)));
+    let ph = ph0;
+    if (roll) { rowsPer = rowsAll; ph = mt + mb + rowsAll * lh + (rowsAll - 1) * gy; }
+    const perPage = rowsPer * cols;
+    pageCss = '@page{size:' + pw + 'mm ' + ph + 'mm;margin:0}';
+
+    for (let i = 0; i < list.length; i += perPage) {
+      const pg = document.createElement('div'); pg.className = 'pt-page';
+      pg.style.cssText = 'width:' + pw + 'mm;height:' + (ph - 0.3) + 'mm;' +
+        'padding:' + mt + 'mm ' + mr + 'mm ' + mb + 'mm ' + ml + 'mm;display:grid;' +
+        'grid-template-columns:repeat(' + cols + ',' + lw + 'mm);grid-auto-rows:' + lh + 'mm;' +
+        'column-gap:' + gx + 'mm;row-gap:' + gy + 'mm;align-content:start';
+      list.slice(i, i + perPage).forEach(p => pg.appendChild(tag(p)));
+      prev.appendChild(pg);
+    }
+    save();
+  }
+
+  function drawList() {
+    const q = $('q').value.toLowerCase();
+    const box = $('plist'); box.innerHTML = '';
+    PRODUCTS.forEach(p => {
+      if (q && !(p.name + ' ' + p.code + ' ' + p.barcode).toLowerCase().includes(q)) return;
+      const l = document.createElement('label'); l.className = 'pt-row'; l.dataset.id = p.id;
+      const c = document.createElement('input'); c.type = 'checkbox'; c.checked = selected.has(p.id);
+      c.onchange = () => { if (c.checked) selected.add(p.id); else selected.delete(p.id); render(); };
+      const t = document.createElement('span'); t.textContent = p.name + (p.code ? ' (' + p.code + ')' : '');
+      l.append(c, t); box.appendChild(l);
+    });
+  }
+
+  $('paper').onchange = () => {
+    const v = PAPERS[$('paper').value];
+    if (v) { $('pw').value = v[0]; $('ph').value = v[1]; }
+    render();
+  };
+  ['pw', 'ph'].forEach(i => $(i).addEventListener('input', () => { $('paper').value = 'Custom'; }));
+  INPUTS.forEach(i => $(i).addEventListener('input', render));
+  INPUTS.forEach(i => $(i).addEventListener('change', render));
+  $('q').addEventListener('input', drawList);
+  $('selAll').onclick = () => {
+    document.querySelectorAll('#plist .pt-row').forEach(r => selected.add(Number(r.dataset.id)));
+    drawList(); render();
+  };
+  $('selNone').onclick = () => { selected.clear(); drawList(); render(); };
+
+  $('btnPrint').onclick = () => {
+    const w = window.open('', '_blank');
+    if (!w) { alert('Please allow pop-ups to print.'); return; }
+    w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>Price tags</title><style>' +
+      TAG_CSS + pageCss + 'body{margin:0}</style></head><body>' + $('preview').innerHTML + '</body></html>');
+    w.document.close(); w.focus();
+    const ready = Array.from(w.document.images).map(i =>
+      i.complete ? Promise.resolve() : new Promise(r => { i.onload = i.onerror = r; }));
+    Promise.all(ready).then(() => setTimeout(() => w.print(), 300));
+  };
+
+  load(); drawList(); render();
+})();
+</script>
+{% endblock %}

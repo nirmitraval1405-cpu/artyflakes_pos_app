@@ -155,10 +155,28 @@ class CheckoutTests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(Sale.objects.count(), 0)
 
-    def test_browser_cannot_change_the_price(self):
-        data = self.body(items=[{"product_id": self.product.pk, "quantity": "2", "price": "1.00"}])
+    def test_cashier_can_set_a_custom_price_and_sale_saves_it(self):
+        data = self.body(
+            items=[{"product_id": self.product.pk, "quantity": "2", "price": "125.00"}],
+            payments=[{"method": "cash", "amount": "250.00"}],
+        )
         response = self.post(data)
-        self.assertEqual(response.json()["total"], "500.00")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["total"], "250.00")
+        item = Sale.objects.get().items.get()
+        self.assertEqual(item.unit_price, Decimal("125.00"))
+        self.assertEqual(item.line_total, Decimal("250.00"))
+        self.assertEqual(current_stock(self.product), 3)
+
+    def test_cashier_can_set_a_custom_price_above_list_price(self):
+        data = self.body(
+            items=[{"product_id": self.product.pk, "quantity": "2", "price": "275.00"}],
+            payments=[{"method": "cash", "amount": "550.00"}],
+        )
+        response = self.post(data)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["total"], "550.00")
+        self.assertEqual(Sale.objects.get().items.get().unit_price, Decimal("275.00"))
 
     def test_wrong_expected_total_is_rejected(self):
         response = self.post(self.body(expected_total=12345))
@@ -218,6 +236,7 @@ class CheckoutTests(TestCase):
         Contact.walk_in()
         Contact.objects.create(name="Asha", phone="9876543210")
         Contact.objects.create(name="Vendor Co", is_customer=False, is_supplier=True)
+        Contact.objects.create(name="Mixed Co", is_customer=True, is_supplier=True)
         names = [c["name"] for c in self.client.get(reverse("pos:customer_search")).json()["results"]]
         self.assertEqual(names, ["Asha"])
 

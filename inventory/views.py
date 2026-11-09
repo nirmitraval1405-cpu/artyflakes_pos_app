@@ -527,3 +527,27 @@ def movement_list(request):
         "mtype": mtype, "types": StockMovement.Type.choices,
         "querystring": params.urlencode(),
     })
+@login_required
+def price_tags(request):
+    products = Product.objects.filter(is_active=True).order_by("name")
+    data = [
+        {
+            "id": p.pk,
+            "name": p.name,
+            "code": p.code or "",
+            "barcode": p.barcode or "",
+            "price": str(p.sale_price),
+            "mrp": str(p.mrp),
+            "cat": p.category_id,
+        }
+        for p in products
+    ]
+    # Opened from a group on the Products page: pre-select that group's products
+    group = request.GET.get("group", "")
+    if group.isdigit():
+        pre = [p["id"] for p in data if p["cat"] == int(group)]
+    elif group == "none":
+        pre = [p["id"] for p in data if p["cat"] is None]
+    else:
+        pre = []
+    return render(request, "inventory/price_tags.html", {"products": data, "preselect": pre})

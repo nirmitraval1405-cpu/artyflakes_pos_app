@@ -106,6 +106,7 @@ class Payment(TimeStampedModel):
         CASH = "cash", "Cash"
         UPI = "upi", "UPI"
         CARD = "card", "Card"
+        CHEQUE = "cheque", "Cheque"
 
     sale = models.ForeignKey(Sale, on_delete=models.CASCADE, related_name="payments")
     method = models.CharField(max_length=10, choices=Method.choices)
@@ -148,3 +149,29 @@ class SaleReturnItem(models.Model):
 
     def __str__(self):
         return f"{self.product_name} x {self.quantity}"
+    
+class HeldSale(TimeStampedModel):
+    """A bill saved with F9 to finish later. Not a real sale: no invoice number, no stock change."""
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="+")
+    customer = models.ForeignKey(Contact, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    data = models.JSONField(default=dict)
+    item_count = models.PositiveIntegerField(default=0)
+    total = models.DecimalField(default=0, **MONEY)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+
+    def __str__(self):
+        return f"Held sale #{self.pk}"
+
+
+class DrawerEvent(TimeStampedModel):
+    """Every time someone opens the cash drawer from the POS."""
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    reason = models.CharField(max_length=120)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+
+    def __str__(self):
+        return f"{self.reason} ({self.created_at:%d %b %H:%M})"
