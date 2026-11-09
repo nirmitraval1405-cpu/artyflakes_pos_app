@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}{{ sale.invoice_no }} · Sales{% endblock %}
+{% block extra_css %}<link href="{% static 'css/inventory.css' %}" rel="stylesheet">{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h3>Sale {{ sale.invoice_no }}</h3>
+    <p>{{ sale.customer.name }} &bull; {{ sale.created_at|date:"d-m-Y H:i" }} &bull; {{ sale.cashier.get_full_name|default:sale.cashier.username }}</p>
+  </div>
+  <span class="st {% if sale.status == 'voided' %}st-out{% else %}st-ok{% endif %}">
+    {% if sale.status == 'voided' %}Voided{% else %}Completed{% endif %}
+  </span>
+</div>
+
+{% if messages %}
+  {% for message in messages %}<div class="alert alert-{{ message.tags|default:'info' }}">{{ message }}</div>{% endfor %}
+{% endif %}
+
+<div class="toolbar">
+  <a class="tb" href="{% url 'pos:sale_list' %}"><i class="bi bi-arrow-left"></i><span>Sales list</span></a>
+  <a class="tb" href="{% url 'pos:receipt' sale.pk %}" target="_blank"><i class="bi bi-receipt"></i><span>Receipt</span></a>
+  <a class="tb" href="{% url 'pos:invoice' sale.pk %}" target="_blank"><i class="bi bi-printer"></i><span>Invoice</span></a>
+  {% if can_return %}
+  <a class="tb" href="{% url 'pos:sale_return' sale.pk %}"><i class="bi bi-arrow-counterclockwise"></i><span>Return items</span></a>
+  {% endif %}
+  {% if can_void %}
+  <form method="post" action="{% url 'pos:sale_void' sale.pk %}" class="d-inline"
+        onsubmit="return confirm('Void this sale and put its stock back? This cannot be undone.');">
+    {% csrf_token %}
+    <button class="tb text-danger" type="submit"><i class="bi bi-x-circle"></i><span>Void sale</span></button>
+  </form>
+  {% endif %}
+</div>
+
+{% if sale.status == 'voided' %}
+<div class="alert alert-warning">
+  This sale was voided{% if sale.void_reason %}: {{ sale.void_reason }}{% endif %}.
+  {% if sale.voided_at %}Voided on {{ sale.voided_at|date:"d-m-Y H:i" }}.{% endif %}
+</div>
+{% endif %}
+
+<section class="grid-panel mb-3">
+  <div class="grid-wrap">
+    <table class="grid">
+      <thead>
+        <tr><th>Item</th><th>Code</th><th class="num">Qty</th><th class="num">Unit price</th><th class="num">Discount</th><th class="num">GST</th><th class="num">Total</th><th class="num">Returned</th><th class="num">Remaining</th></tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          <td>{{ row.it.product_name }}</td>
+          <td>{{ row.it.product_code|default:"—" }}</td>
+          <td class="num">{{ row.it.quantity|floatformat:"-3" }} {{ row.it.unit }}</td>
+          <td class="num">₹{{ row.it.unit_price|floatformat:"2g" }}</td>
+          <td class="num">₹{{ row.it.discount|floatformat:"2g" }}</td>
+          <td class="num">{{ row.it.gst_rate|floatformat:"-2" }}%</td>
+          <td class="num">₹{{ row.it.line_total|floatformat:"2g" }}</td>
+          <td class="num">{{ row.returned|floatformat:"-3" }}</td>
+          <td class="num">{{ row.left|floatformat:"-3" }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="9" class="grid-empty">No items on this sale.</td></tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr><th colspan="6" class="text-end">Sale total</th><th class="num">₹{{ sale.total|floatformat:"2g" }}</th><th colspan="2"></th></tr>
+      </tfoot>
+    </table>
+  </div>
+</section>
+
+<div class="row g-3">
+  <div class="col-lg-6">
+    <section class="grid-panel h-100">
+      <div class="p-3 border-bottom"><strong>Payment</strong></div>
+      <div class="p-3">
+        {% for p in pay_lines %}
+        <div class="d-flex justify-content-between gap-3"><span>{{ p.label }}{% if p.reference %} · {{ p.reference }}{% endif %}</span><strong>₹{{ p.amount|floatformat:"2g" }}</strong></div>
+        {% empty %}<div class="text-muted">No payment recorded.</div>{% endfor %}
+        <hr>
+        <div class="d-flex justify-content-between gap-3"><span>Amount paid</span><strong>₹{{ sale.amount_paid|floatformat:"2g" }}</strong></div>
+        {% if sale.change_due > 0 %}<div class="d-flex justify-content-between gap-3"><span>Change returned</span><strong>₹{{ sale.change_due|floatformat:"2g" }}</strong></div>{% endif %}
+        {% if sale.discount_total > 0 %}<div class="d-flex justify-content-between gap-3"><span>Discount</span><strong>₹{{ sale.discount_total|floatformat:"2g" }}</strong></div>{% endif %}
+        {% if refunded > 0 %}<div class="d-flex justify-content-between gap-3 text-danger"><span>Refunded</span><strong>₹{{ refunded|floatformat:"2g" }}</strong></div>{% endif %}
+        {% if sale.note %}<hr><div><strong>Note</strong><br>{{ sale.note }}</div>{% endif %}
+      </div>
+    </section>
+  </div>
+  <div class="col-lg-6">
+    <section class="grid-panel h-100">
+      <div class="p-3 border-bottom"><strong>Returns</strong></div>
+      <div class="grid-wrap">
+        <table class="grid">
+          <thead><tr><th>Return</th><th>Date</th><th>Refund method</th><th class="num">Amount</th><th>Processed by</th></tr></thead>
+          <tbody>
+            {% for ret in returns %}
+            <tr>
+              <td><strong>{{ ret.return_no }}</strong>{% if ret.reason %}<div class="small text-muted">{{ ret.reason }}</div>{% endif %}</td>
+              <td>{{ ret.created_at|date:"d-m-Y H:i" }}</td>
+              <td>{{ ret.get_refund_method_display }}</td>
+              <td class="num">₹{{ ret.refund_total|floatformat:"2g" }}</td>
+              <td>{{ ret.processed_by.get_full_name|default:ret.processed_by.username }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="grid-empty">No returns recorded.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+</div>
+{% endblock %}

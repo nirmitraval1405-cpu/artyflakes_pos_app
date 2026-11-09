@@ -32,7 +32,7 @@
 
     <div class="pos-search">
       <i class="bi bi-search"></i>
-      <input id="posSearch" type="text" placeholder="Search product by name, code or barcode..." autocomplete="off" data-url="{% url 'pos:product_search' %}">
+      <input id="posSearch" type="search" placeholder="Search product by name, code or barcode..." autocomplete="off" autocapitalize="off" spellcheck="false" data-url="{% url 'pos:product_search' %}">
       <button type="button" class="scan-btn" id="scanBtn" disabled title="Barcode scanners type into the search box"><i class="bi bi-upc-scan"></i> Scan Barcode</button>
       <div class="pos-results" id="posResults" hidden></div>
     </div>
@@ -293,11 +293,11 @@
   {% endif %}
   <hr class="sp-line">
 
-  <button class="sp-item" disabled title="Coming soon"><i class="bi bi-check2-all"></i> View sales history</button>
+  <a class="sp-item" href="{% url 'pos:sale_list' %}" target="_blank"><i class="bi bi-check2-all"></i> View sales history</a>
   <button class="sp-item" type="button" data-x="held-list"><i class="bi bi-layers-fill"></i> View open sales</button>
-  <button class="sp-item" disabled title="Coming soon"><i class="bi bi-box-arrow-in-down"></i> Cash In / Out</button>
-  <button class="sp-item" disabled title="Coming soon"><i class="bi bi-journal-text"></i> Credit payments</button>
-  <button class="sp-item" disabled title="Coming soon"><i class="bi bi-door-open"></i> End of day</button>
+  <button class="sp-item" type="button" data-x="drawer"><i class="bi bi-box-arrow-in-down"></i> Cash In / Out</button>
+  <a class="sp-item" href="{% url 'reports:view' 'sales-sales-by-payment-type' %}" target="_blank"><i class="bi bi-journal-text"></i> Credit payments</a>
+  <a class="sp-item" href="{% url 'reports:view' 'sales-daily-sales' %}" target="_blank"><i class="bi bi-door-open"></i> End of day</a>
 
   <div class="sp-section"><span>User</span></div>
   <button class="sp-item" type="button" id="userInfoBtn"><i class="bi bi-person"></i> User info</button>

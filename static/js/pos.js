@@ -521,6 +521,7 @@
   let lastQuery = null;
   let timer = null;
   let reqId = 0;
+  let searchEdited = false;
 
   function closeResults() {
     resultsBox.hidden = true;
@@ -539,7 +540,11 @@
   }
 
   window.addEventListener("pageshow", () => {
-    if (searchInput.value) resetProductSearch();
+    searchEdited = false;
+    resetProductSearch();
+    setTimeout(() => {
+      if (!searchEdited) resetProductSearch();
+    }, 100);
   });
 
   function renderResults() {
@@ -603,6 +608,7 @@
   }
 
   searchInput.addEventListener("input", () => {
+    searchEdited = true;
     clearTimeout(timer);
     const q = searchInput.value.trim();
     if (q.length < 2) { lastQuery = null; closeResults(); return; }

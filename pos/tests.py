@@ -277,6 +277,15 @@ class BillPrintTests(TestCase):
         self.assertContains(response, "76.27")
         self.assertContains(response, "38.14")
 
+    def test_sale_detail_renders_items_payments_and_actions(self):
+        self.client.force_login(User.objects.get(username="boss2"))
+        response = self.client.get(reverse("pos:sale_detail", args=[self.sale.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.sale.invoice_no)
+        self.assertContains(response, "Resin")
+        self.assertContains(response, "Return items")
+        self.assertContains(response, "Void sale")
+
     def test_another_cashier_cannot_open_the_bill(self):
         self.client.logout()
         self.client.login(username="c2", password="pw12345!")
