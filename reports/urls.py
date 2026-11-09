@@ -9,4 +9,6 @@ urlpatterns = [
     path("view/<slug:slug>/", views.ReportView.as_view(), name="view"),
     path("gstr1/", views.Gstr1Page.as_view(), name="gstr1"),
     path("gstr1/download/", views.Gstr1Download.as_view(), name="gstr1_download"),
+    path("gstr3b/", views.Gstr3bPage.as_view(), name="gstr3b"),
+    path("gstr3b/download/", views.Gstr3bDownload.as_view(), name="gstr3b_download"),
 ]

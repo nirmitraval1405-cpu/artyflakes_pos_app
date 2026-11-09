@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}GSTR-3B export · {{ store_name }}{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div><h3>GSTR-3B export</h3><p>Reports &bull; GST returns</p></div>
+</div>
+
+<form method="get" class="d-flex flex-wrap align-items-end gap-2 mb-3">
+  <div>
+    <label class="form-label small text-muted mb-1" for="month">Month</label>
+    <input type="month" id="month" name="month" value="{{ month }}" class="form-control form-control-sm">
+  </div>
+  <button type="submit" class="btn btn-sm btn-outline-secondary">Show</button>
+  {% if not error %}
+    <a class="btn btn-sm btn-brand" href="{% url 'reports:gstr3b_download' %}?month={{ month }}">
+      <i class="bi bi-file-earmark-excel"></i> Download Excel
+    </a>
+  {% endif %}
+</form>
+
+{% if error %}
+  <div class="alert alert-danger">{{ error }}</div>
+{% else %}
+  <p class="text-muted small">
+    Worksheet for <strong>{{ label }}</strong>, laid out like the GSTR-3B form. Use it to check or fill the portal.
+    Compare it with your GSTR-1 and GSTR-2B before filing.
+  </p>
+
+  {% if warnings %}
+  <div class="alert alert-warning">
+    <strong>Please check before filing:</strong>
+    <ul class="mb-0">{% for w in warnings %}<li>{{ w }}</li>{% endfor %}</ul>
+  </div>
+  {% endif %}
+
+  <div class="table-responsive">
+    <table class="table table-sm align-middle" style="max-width: 760px;">
+      <thead>
+        <tr><th></th><th class="text-end">Taxable value</th><th class="text-end">IGST</th>
+            <th class="text-end">CGST</th><th class="text-end">SGST</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>3.1(a) Outward taxable supplies</td>
+            <td class="text-end">₹ {{ t.out_taxable|floatformat:2 }}</td><td class="text-end">₹ {{ t.out_igst|floatformat:2 }}</td>
+            <td class="text-end">₹ {{ t.out_cgst|floatformat:2 }}</td><td class="text-end">₹ {{ t.out_sgst|floatformat:2 }}</td></tr>
+        <tr><td>3.1(c) Nil rated and exempt outward</td>
+            <td class="text-end">₹ {{ t.nil_out|floatformat:2 }}</td><td></td><td></td><td></td></tr>
+        <tr><td>4(A)(5) ITC from purchases</td><td></td>
+            <td class="text-end">₹ {{ t.itc_igst|floatformat:2 }}</td><td class="text-end">₹ {{ t.itc_cgst|floatformat:2 }}</td>
+            <td class="text-end">₹ {{ t.itc_sgst|floatformat:2 }}</td></tr>
+        <tr><td>5 Nil rated and exempt inward (inter / intra)</td>
+            <td class="text-end">₹ {{ t.inward_nil_inter|floatformat:2 }}</td>
+            <td class="text-end">₹ {{ t.inward_nil_intra|floatformat:2 }}</td><td></td><td></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="text-muted small">
+    Not tracked, so left at zero (yellow cells in the file): zero-rated and reverse-charge supplies, imports, ISD,
+    ITC reversals, ineligible ITC, interest and late fee.
+  </p>
+{% endif %}
+{% endblock %}

@@ -1,7 +1,7 @@
 import csv
 import calendar
 from datetime import date, timedelta
-
+from . import gstr3b
 from django.shortcuts import redirect
 from django.urls import reverse
 
@@ -128,4 +128,40 @@ class Gstr1Download(AdminRequiredMixin, View):
             content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
         response["Content-Disposition"] = f'attachment; filename="GSTR1_{first:%m%Y}.xlsx"'
+        return response
+    
+def _gstr3b_data(first):
+    last = first.replace(day=calendar.monthrange(first.year, first.month)[1])
+    shop_gstin, sales, returns = gstr1.collect(first, last)
+    if not shop_gstin:
+        raise ValueError("Add your GSTIN in Store Settings first. GSTR-3B needs it.")
+    purchases = gstr3b.collect_purchases(first, last)
+    return shop_gstin, gstr3b.build_3b(sales, returns, purchases, shop_gstin)
+
+
+class Gstr3bPage(AdminRequiredMixin, View):
+    def get(self, request):
+        first = _gstr1_month(request.GET.get("month"))
+        ctx = {"month": f"{first:%Y-%m}", "label": f"{first:%B %Y}"}
+        try:
+            _, data = _gstr3b_data(first)
+            ctx.update(t=data["totals"], warnings=data["warnings"])
+        except ValueError as exc:
+            ctx["error"] = str(exc)
+        return render(request, "reports/gstr3b.html", ctx)
+
+
+class Gstr3bDownload(AdminRequiredMixin, View):
+    def get(self, request):
+        from storeconfig.models import StoreSettings
+
+        first = _gstr1_month(request.GET.get("month"))
+        try:
+            gstin, data = _gstr3b_data(first)
+        except ValueError:
+            return redirect(f"{reverse('reports:gstr3b')}?month={first:%Y-%m}")
+        xlsx = gstr3b.build_workbook(data, f"{first:%B %Y}", gstin, StoreSettings.load().name)
+        response = HttpResponse(
+            xlsx, content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        response["Content-Disposition"] = f'attachment; filename="GSTR3B_{first:%m%Y}.xlsx"'
         return response
