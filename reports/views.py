@@ -1,5 +1,11 @@
 import csv
+import calendar
+from datetime import date, timedelta
 
+from django.shortcuts import redirect
+from django.urls import reverse
+
+from . import gstr1
 from django.contrib.auth import get_user_model
 from django.http import Http404, HttpResponse
 from django.shortcuts import render
@@ -81,4 +87,45 @@ class ReportView(AdminRequiredMixin, View):
             writer.writerow(total)
         if truncated:
             writer.writerow([f"Only the first {helpers.CSV_CAP} rows are included. Narrow the dates."])
+        return response
+def _gstr1_month(text):
+    """First day of the month asked for (YYYY-MM). Default: last month, which is what you file."""
+    try:
+        year, month = (int(p) for p in str(text).split("-"))
+        return date(year, month, 1)
+    except (ValueError, TypeError):
+        return (timezone.localdate().replace(day=1) - timedelta(days=1)).replace(day=1)
+
+
+def _gstr1_data(first):
+    last = first.replace(day=calendar.monthrange(first.year, first.month)[1])
+    shop_gstin, sales, returns = gstr1.collect(first, last)
+    if not shop_gstin:
+        raise ValueError("Add your GSTIN in Store Settings first. GSTR-1 needs it.")
+    return gstr1.build_sections(sales, returns, shop_gstin)
+
+
+class Gstr1Page(AdminRequiredMixin, View):
+    def get(self, request):
+        first = _gstr1_month(request.GET.get("month"))
+        ctx = {"month": f"{first:%Y-%m}", "label": f"{first:%B %Y}"}
+        try:
+            ctx.update(_gstr1_data(first))
+        except ValueError as exc:
+            ctx["error"] = str(exc)
+        return render(request, "reports/gstr1.html", ctx)
+
+
+class Gstr1Download(AdminRequiredMixin, View):
+    def get(self, request):
+        first = _gstr1_month(request.GET.get("month"))
+        try:
+            data = _gstr1_data(first)
+        except ValueError:
+            return redirect(f"{reverse('reports:gstr1')}?month={first:%Y-%m}")   # the page shows the reason
+        response = HttpResponse(
+            gstr1.build_workbook(data["sheets"]),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        response["Content-Disposition"] = f'attachment; filename="GSTR1_{first:%m%Y}.xlsx"'
         return response

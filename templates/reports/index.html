@@ -9,11 +9,13 @@
   <!-- Report list -->
   <section class="rp-list">
     <div class="rp-top">
+      
       <h4>Select report to view or print</h4>
       <div class="rp-search">
         <i class="bi bi-search"></i>
         <input id="rpSearch" type="text" placeholder="Search reports" autocomplete="off">
       </div>
+      <a class="btn btn-sm btn-brand" href="{% url 'reports:gstr1' %}"><i class="bi bi-file-earmark-excel"></i> GSTR-1 export</a>
     </div>
     <p class="rp-note" id="rpNote"></p>
 

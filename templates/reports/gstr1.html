@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}GSTR-1 export · {{ store_name }}{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div><h3>GSTR-1 export</h3><p>Reports &bull; GST returns</p></div>
+</div>
+
+<form method="get" class="d-flex flex-wrap align-items-end gap-2 mb-3">
+  <div>
+    <label class="form-label small text-muted mb-1" for="month">Month</label>
+    <input type="month" id="month" name="month" value="{{ month }}" class="form-control form-control-sm">
+  </div>
+  <button type="submit" class="btn btn-sm btn-outline-secondary">Show</button>
+  {% if not error %}
+    <a class="btn btn-sm btn-brand" href="{% url 'reports:gstr1_download' %}?month={{ month }}">
+      <i class="bi bi-file-earmark-excel"></i> Download Excel
+    </a>
+  {% endif %}
+</form>
+
+{% if error %}
+  <div class="alert alert-danger">{{ error }}</div>
+{% else %}
+  <p class="text-muted small">
+    Everything for <strong>{{ label }}</strong> in the GSTN offline-tool format. Import the file in the GSTR-1
+    offline tool, or copy the sheets into the official template.
+  </p>
+
+  {% if warnings %}
+  <div class="alert alert-warning">
+    <strong>Please check before filing:</strong>
+    <ul class="mb-0">{% for w in warnings %}<li>{{ w }}</li>{% endfor %}</ul>
+  </div>
+  {% endif %}
+
+  <div class="table-responsive">
+    <table class="table table-sm align-middle" style="max-width: 760px;">
+      <thead>
+        <tr><th>Section</th><th class="text-end">Rows</th><th class="text-end">Taxable value</th><th class="text-end">GST</th></tr>
+      </thead>
+      <tbody>
+        {% for s in summary %}
+        <tr>
+          <td>{{ s.section }}</td>
+          <td class="text-end">{{ s.rows }}</td>
+          <td class="text-end">{% if s.taxable is not None %}₹ {{ s.taxable|floatformat:2 }}{% else %}&ndash;{% endif %}</td>
+          <td class="text-end">{% if s.tax is not None %}₹ {{ s.tax|floatformat:2 }}{% else %}&ndash;{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="text-muted small">
+    Not generated: B2CL, exports, advances, amendments and e-commerce sheets. They stay empty in the file.
+  </p>
+{% endif %}
+{% endblock %}
