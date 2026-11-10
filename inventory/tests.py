@@ -312,3 +312,17 @@ class InventoryCatalogTests(TestCase):
         self.assertRedirects(response, reverse("inventory:category_list"))
         self.assertTrue(Category.objects.filter(pk=category.pk).exists())
         self.assertTrue(Category.objects.get(pk=category.pk).is_active)
+
+
+class PriceTagLayoutTests(TestCase):
+    def setUp(self):
+        user = User.objects.create_user(username="tag-user")
+        self.client.force_login(user)
+
+    def test_label_width_is_a_manual_field(self):
+        response = self.client.get(reverse("inventory:price_tags"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Label width (mm, manual)")
+        self.assertContains(response, 'id="lw" type="number"')
+        self.assertContains(response, "const lw = num('lw')")

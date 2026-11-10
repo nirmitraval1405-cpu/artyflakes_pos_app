@@ -51,7 +51,7 @@
     </div>
     <div class="row2">
       <div><label class="s">Columns</label><input id="cols" type="number" min="1" max="10" class="form-control form-control-sm" value="3"></div>
-      <div><label class="s">Label width (auto)</label><input id="lw" class="form-control form-control-sm" readonly></div>
+      <div><label class="s" for="lw">Label width (mm, manual)</label><input id="lw" type="number" min="10" step="0.1" class="form-control form-control-sm" value="66.6"></div>
       <div><label class="s">Label height (mm)</label><input id="lh" type="number" class="form-control form-control-sm" value="30"></div>
       <div></div>
       <div><label class="s">Row spacing</label><input id="gy" type="number" class="form-control form-control-sm" value="0"></div>
@@ -112,7 +112,7 @@
   const PRODUCTS = JSON.parse($('productData').textContent);
   const selected = new Set(JSON.parse($('preselect').textContent));
   const PAPERS = { A4: [210, 297], A5: [148, 210], Letter: [216, 279] };
-  const INPUTS = ['paper','pw','ph','roll','mt','mb','ml','mr','cols','lh','gx','gy',
+  const INPUTS = ['paper','pw','ph','roll','mt','mb','ml','mr','cols','lw','lh','gx','gy',
     'sName','sPrice','sCode','sBarcode','sBorder','sLogo','priceField','btype','nameSize','priceSize','barH','logoH','copies'];
   const num = id => parseFloat($(id).value) || 0;
   const on = id => $(id).checked;
@@ -195,9 +195,9 @@
     const pw = num('pw'), ph0 = num('ph');
     const mt = num('mt'), mr = num('mr'), mb = num('mb'), ml = num('ml');
     const lh = num('lh'), gx = num('gx'), gy = num('gy');
-    const lw = (pw - ml - mr - (cols - 1) * gx) / cols;
-    $('lw').value = lw > 0 ? lw.toFixed(1) : '0';
+    const lw = num('lw');
     $('ph').disabled = roll;
+    $('warn').textContent = '';
 
     const base = selected.size ? PRODUCTS.filter(p => selected.has(p.id)) : PRODUCTS;
     $('info').textContent = selected.size
@@ -208,7 +208,14 @@
     base.forEach(p => { for (let i = 0; i < copies; i++) list.push(p); });
 
     const prev = $('preview'); prev.innerHTML = '';
-    if (lw < 10 || lh < 10) { prev.textContent = 'Label is too small. Check page width, columns and label height.'; return; }
+    if (lw < 10 || lh < 10) { prev.textContent = 'Label width and height must each be at least 10 mm.'; return; }
+    const printableWidth = pw - ml - mr;
+    const labelsWidth = cols * lw + (cols - 1) * gx;
+    if (printableWidth <= 0 || labelsWidth > printableWidth) {
+      $('warn').textContent = 'The manual label widths and column spacing exceed the printable page width.';
+      prev.textContent = 'Reduce the label width, number of columns, or column spacing.';
+      return;
+    }
     if (!list.length) { prev.textContent = 'No products to print.'; return; }
     if (list.length > 2000) { list = list.slice(0, 2000); $('warn').textContent = 'Only the first 2000 labels are shown.'; }
     else $('warn').textContent = '';
