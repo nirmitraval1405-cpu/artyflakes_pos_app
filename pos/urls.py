@@ -27,4 +27,5 @@ urlpatterns = [
     path("api/lock/", views.lock, name="lock"),
     path("api/unlock/", views.unlock, name="unlock"),
     path("api/promotions/", views.promotion_rules, name="promotion_rules"),
+        path("api/print-settings/", views.print_settings_save, name="print_settings_save"),
 ]

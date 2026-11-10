@@ -1,4 +1,6 @@
 {% load static %}
+{% url 'pos:cash_move' as cash_url %}
+{% url 'pos:end_of_day' as eod_url %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -12,6 +14,10 @@
 </head>
 <body class="pos-body">
 <div class="pos-app"
+     data-checkout-url="{% url 'pos:checkout' %}"
+     data-customer-url="{% url 'pos:customer_search' %}"
+     data-csrf="{{ csrf_token }}"
+     data-max-discount="{{ max_discount }}"
      data-admin="{% if user.is_admin_role %}1{% else %}0{% endif %}"
      data-held-url="{% url 'pos:held_list' %}"
      data-held-save-url="{% url 'pos:held_save' %}"
@@ -21,11 +27,8 @@
      data-find-url="{% url 'pos:find_sale' %}"
      data-lock-url="{% url 'pos:lock' %}"
      data-unlock-url="{% url 'pos:unlock' %}"
-     data-checkout-url="{% url 'pos:checkout' %}"
-     data-customer-url="{% url 'pos:customer_search' %}"
-     data-csrf="{{ csrf_token }}"
-     data-max-discount="{{ max_discount }}"
-     data-promo-url="{% url 'pos:promotion_rules' %}">
+     data-print-url="{% url 'pos:print_settings_save' %}"
+     {% if cash_url %}data-cash-url="{{ cash_url }}"{% endif %}>
 
   <!-- Top bar -->
   <header class="pos-top">
@@ -33,13 +36,10 @@
 
     <div class="pos-search">
       <i class="bi bi-search"></i>
-      <input id="posSearch" type="search" placeholder="Search product by name, code or barcode..." autocomplete="off" autocapitalize="off" spellcheck="false" data-url="{% url 'pos:product_search' %}">
+      <input id="posSearch" type="text" placeholder="Search product by name, code or barcode..." autocomplete="off" data-url="{% url 'pos:product_search' %}">
       <button type="button" class="scan-btn" id="scanBtn" disabled title="Barcode scanners type into the search box"><i class="bi bi-upc-scan"></i> Scan Barcode</button>
       <div class="pos-results" id="posResults" hidden></div>
     </div>
-
-    <button class="pos-pill pill-brand" disabled title="Coming soon"><i class="bi bi-globe2"></i> Website Orders</button>
-    <button class="pos-pill pill-green" disabled title="Coming soon"><i class="bi bi-whatsapp"></i> WhatsApp Bill</button>
 
     <div class="pos-user">
       <i class="bi bi-bell"></i>
@@ -60,8 +60,8 @@
       <div class="cart-head">
         <span class="c-name">Product Name</span>
         <span class="c-qty">Quantity</span>
-        <span class="c-num">MRP</span>
         <span class="c-num">Price</span>
+        <span class="c-num">MRP</span>
         <span class="c-num">Discount</span>
         <span class="c-num">Amount</span>
         <span class="c-del"></span>
@@ -254,9 +254,115 @@
     <div class="dlg-hint">Opens the return page in a new tab, so the bill on this screen stays as it is.</div>
     <div class="dlg-error" id="refundError" hidden></div>
     <div class="dlg-actions">
-      <a class="btn btn-link me-auto" href="{% url 'pos:sale_list' %}" target="_blank">Browse bills</a>
+      <a class="btn btn-link me-auto" href="{% url 'pos:sale_list' %}" target="_blank" rel="noopener">Browse bills</a>
       <button type="button" class="btn btn-outline-secondary" data-close>Cancel</button>
       <button type="button" class="btn btn-brand" id="refundGo">Find bill</button>
+    </div>
+  </div>
+
+  <!-- Cash in / out -->
+  <div class="dlg" id="dlgCash" hidden role="dialog" aria-modal="true" aria-label="Cash in or out">
+    <h5>Cash In / Out</h5>
+    <div class="btn-group w-100 mb-2" role="group">
+      <button type="button" class="btn btn-outline-success active" id="cashKindIn">Cash in</button>
+      <button type="button" class="btn btn-outline-danger" id="cashKindOut">Cash out</button>
+    </div>
+    <label class="dlg-label" for="cashAmount">Amount (₹)</label>
+    <input id="cashAmount" class="form-control" inputmode="decimal" autocomplete="off" placeholder="0.00">
+    <label class="dlg-label" for="cashReason">Reason</label>
+    <select id="cashReason" class="form-select"></select>
+    <input id="cashNote" class="form-control mt-2" maxlength="60" placeholder="Note (optional)" autocomplete="off">
+    <div class="dlg-error" id="cashError" hidden></div>
+    <div class="dlg-actions">
+      <button type="button" class="btn btn-outline-secondary" data-close>Cancel</button>
+      <button type="button" class="btn btn-brand" id="cashGo">Save</button>
+    </div>
+  </div>
+
+  <!-- Print settings -->
+  <div class="dlg dlg-wide" id="dlgPrint" hidden role="dialog" aria-modal="true" aria-label="Print settings">
+    <h5>Print settings</h5>
+    <div class="ps-tabs">
+      <button type="button" class="ps-tab active" data-tab="psPrinter">Printer</button>
+      <button type="button" class="ps-tab" data-tab="psReceipt">Customize receipt</button>
+      <button type="button" class="ps-tab" data-tab="psTexts">Receipt text</button>
+      <button type="button" class="ps-tab" data-tab="psInvoice">Invoice</button>
+    </div>
+
+    <div class="ps-panel" id="psPrinter">
+      <label class="dlg-label" for="ps_receipt_width_mm">Receipt paper width</label>
+      <select id="ps_receipt_width_mm" class="form-select">
+        <option value="80">80 mm</option>
+        <option value="58">58 mm</option>
+      </select>
+      <div class="dlg-hint mt-2">
+        A web page cannot pick the printer. In the print window choose your receipt printer, and set it as the
+        Windows default so it is already selected. Set margins to None and turn off "Headers and footers".
+      </div>
+    </div>
+
+    <div class="ps-panel" id="psReceipt" hidden>
+      <div class="ps-grid" id="psRecSwitches"></div>
+      <div class="ps-grid mt-2">
+        <div>
+          <label class="dlg-label" for="ps_r_summary">Print line items summary</label>
+          <select id="ps_r_summary" class="form-select">
+            <option value="none">None</option>
+            <option value="count">Items count</option>
+            <option value="qty">Total quantity</option>
+          </select>
+        </div>
+        <div>
+          <label class="dlg-label" for="ps_r_decimals">Decimal places</label>
+          <input id="ps_r_decimals" type="number" min="0" max="3" class="form-control">
+        </div>
+      </div>
+      <div class="ps-sub">Customer details printed on the receipt</div>
+      <div class="ps-grid" id="psRecCust"></div>
+    </div>
+
+    <div class="ps-panel" id="psTexts" hidden>
+      <div class="dlg-hint mb-2">
+        Change any word on the receipt, for example to Gujarati or Hindi. Leave a box empty to keep the original word.
+      </div>
+      <div class="ps-grid" id="psLabels"></div>
+    </div>
+
+    <div class="ps-panel" id="psInvoice" hidden>
+      <div class="ps-grid">
+        <div>
+          <label class="dlg-label" for="ps_font">Font (invoice and receipt)</label>
+          <select id="ps_font" class="form-select">
+            <option value="">(Default)</option>
+            <option>Arial</option><option>Calibri</option><option>Georgia</option><option>Times New Roman</option>
+            <option>Verdana</option><option>Tahoma</option><option>Trebuchet MS</option><option>Segoe UI</option>
+            <option>Courier New</option>
+          </select>
+        </div>
+        <div>
+          <label class="dlg-label" for="ps_i_title">Title</label>
+          <input id="ps_i_title" class="form-control" maxlength="40" placeholder="TAX INVOICE">
+        </div>
+      </div>
+      <div class="ps-grid mt-2" id="psInvCols"></div>
+      <div class="ps-sub">Customer details</div>
+      <div class="ps-grid" id="psInvCust"></div>
+      <div class="ps-sub">Other settings</div>
+      <div class="ps-grid" id="psInvOther"></div>
+      <label class="dlg-label mt-2" for="ps_i_footer">Footer</label>
+      <textarea id="ps_i_footer" class="form-control" rows="3" maxlength="300"
+                placeholder="Leave empty to use the receipt footer from Store Settings"></textarea>
+      <label class="dlg-label" for="ps_i_footer_align">Footer alignment</label>
+      <select id="ps_i_footer_align" class="form-select" style="width: 160px;">
+        <option value="left">Left</option>
+        <option value="center">Center</option>
+      </select>
+    </div>
+
+    <div class="dlg-error" id="psError" hidden></div>
+    <div class="dlg-actions">
+      <button type="button" class="btn btn-outline-secondary" data-close>Cancel</button>
+      <button type="button" class="btn btn-brand" id="psSave">Save</button>
     </div>
   </div>
 
@@ -289,11 +395,19 @@
   {% endif %}
   <hr class="sp-line">
 
-  <a class="sp-item" href="{% url 'pos:sale_list' %}" target="_blank"><i class="bi bi-check2-all"></i> View sales history</a>
+  <a class="sp-item" href="{% url 'pos:sale_list' %}" target="_blank" rel="noopener"><i class="bi bi-check2-all"></i> View sales history</a>
   <button class="sp-item" type="button" data-x="held-list"><i class="bi bi-layers-fill"></i> View open sales</button>
-  <button class="sp-item" type="button" data-x="drawer"><i class="bi bi-box-arrow-in-down"></i> Cash In / Out</button>
-  <a class="sp-item" href="{% url 'reports:view' 'sales-sales-by-payment-type' %}" target="_blank"><i class="bi bi-journal-text"></i> Credit payments</a>
-  <a class="sp-item" href="{% url 'reports:view' 'sales-daily-sales' %}" target="_blank"><i class="bi bi-door-open"></i> End of day</a>
+  {% if cash_url %}
+  <button class="sp-item" type="button" data-x="cash"><i class="bi bi-box-arrow-in-down"></i> Cash In / Out</button>
+  {% else %}
+  <button class="sp-item" disabled title="Coming soon"><i class="bi bi-box-arrow-in-down"></i> Cash In / Out</button>
+  {% endif %}
+  <button class="sp-item" disabled title="Needs credit sales, which are not set up yet"><i class="bi bi-journal-text"></i> Credit payments</button>
+  {% if eod_url and user.is_admin_role %}
+  <a class="sp-item" href="{{ eod_url }}" target="_blank" rel="noopener"><i class="bi bi-door-open"></i> End of day</a>
+  {% else %}
+  <button class="sp-item" disabled title="{% if eod_url %}Admin only{% else %}Coming soon{% endif %}"><i class="bi bi-door-open"></i> End of day</button>
+  {% endif %}
 
   <div class="sp-section"><span>User</span></div>
   <button class="sp-item" type="button" id="userInfoBtn"><i class="bi bi-person"></i> User info</button>
@@ -306,7 +420,7 @@
   <div class="sp-date">{% now "d-m-Y" %}</div>
 
   <div class="sp-foot">
-    <button type="button" disabled title="Coming soon"><i class="bi bi-sliders"></i></button>
+    <button type="button" id="printSettingsBtn" title="Print settings"><i class="bi bi-sliders"></i></button>
     <button type="button" id="fsBtn" title="Full screen"><i class="bi bi-fullscreen"></i></button>
     <form method="post" action="{% url 'accounts:logout' %}">
       {% csrf_token %}
@@ -314,6 +428,8 @@
     </form>
   </div>
 </aside>
+
+<!-- After payment: how would the customer like their bill? -->
 <div class="done-screen" id="doneScreen" hidden
      data-receipt-url="{% url 'pos:receipt' 0 %}"
      data-invoice-url="{% url 'pos:invoice' 0 %}"
@@ -376,6 +492,7 @@
   </div>
 </div>
 
+<!-- Lock screen -->
 <div class="lock-screen" id="lockScreen" {% if not locked %}hidden{% endif %}>
   <div class="lock-box">
     <i class="bi bi-lock-fill"></i>
@@ -390,6 +507,8 @@
     </form>
   </div>
 </div>
+
+{{ print_dialog|json_script:"printDialogData" }}
 
 <script src="{% static 'js/pos.js' %}"></script>
 <script src="{% static 'js/pos-done.js' %}"></script>

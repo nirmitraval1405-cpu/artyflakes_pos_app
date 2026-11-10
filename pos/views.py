@@ -26,7 +26,8 @@ from django.utils import timezone
 from .models import Payment, Sale, SaleItem, SaleReturn, SaleReturnItem
 from .services import CheckoutError, create_return, create_sale, void_sale
 from promotions.engine import rules_for
-
+from storeconfig import printing
+from storeconfig.models import PrintSettings, StoreSettings
 logger = logging.getLogger(__name__)
 
 
@@ -39,9 +40,12 @@ def screen(request):
     cfg = StoreSettings.load()
     # Admins have no discount limit, so the page shows the limit to Cashiers only
     limit = "" if request.user.is_admin_role else f"{cfg.cashier_max_discount_percent.normalize():f}"
+    print_dialog = None
+    if request.user.is_admin_role:
+        print_dialog = {"settings": PrintSettings.load().as_dict(), "defaults": printing.LABEL_DEFAULTS}
     return render(request, "pos/screen.html", {
         "max_discount": limit, "store": cfg.as_store_info(),
-        "locked": bool(request.session.get("pos_locked")),
+        "locked": bool(request.session.get("pos_locked")), "print_dialog": print_dialog,
     })
 
 
@@ -49,7 +53,12 @@ def screen(request):
 def screen(request):
     # Admins have no discount limit, so the page shows the limit to Cashiers only
     limit = "" if request.user.is_admin_role else str(getattr(settings, "POS_CASHIER_MAX_DISCOUNT_PERCENT", 10))
-    return render(request, "pos/screen.html", {"max_discount": limit, "store": _store()})
+    print_dialog = None
+    if request.user.is_admin_role:
+        print_dialog = {"settings": PrintSettings.load().as_dict(), "defaults": printing.LABEL_DEFAULTS}
+    return render(request, "pos/screen.html", {
+        "max_discount": limit, "store": _store(), "print_dialog": print_dialog,
+    })
 
 
 def _paise(value):
@@ -146,7 +155,19 @@ def _sale_for(request, pk):
     if not request.user.is_admin_role and sale.cashier_id != request.user.pk:
         raise Http404
     return sale
-
+def _print_context(sale, items):
+    ps = PrintSettings.load().as_context()
+    order_no = None
+    if ps["r_order_no"]:
+        day = timezone.localtime(sale.created_at).date()
+        order_no = Sale.objects.filter(created_at__date=day, id__lte=sale.pk).count()
+    return {
+        "ps": ps, "L": ps["labels"],
+        "short_no": sale.invoice_no.rsplit("-", 1)[-1],
+        "order_no": order_no,
+        "items_count": len(items),
+        "qty_total": sum((i["qty"] for i in items), Decimal("0")),
+    }
 
 def _bill_context(request, sale):
     items, groups = [], {}
@@ -193,6 +214,7 @@ def _bill_context(request, sale):
         "cashier_name": sale.cashier.get_full_name() or sale.cashier.username,
                 "store": sale.store_info or _store(),     # old bills use the current details
         "autoprint": request.GET.get("print") == "1",
+        **_print_context(sale, items),
     }
 
 
@@ -586,3 +608,23 @@ def unlock(request):
         return JsonResponse({"ok": True})
     request.session["pos_unlock_tries"] = tries + 1
     return _bad("Wrong password.", 403)
+
+
+@login_required
+@require_POST
+def print_settings_save(request):
+    if not request.user.is_admin_role:
+        return _bad("Only an admin can change print settings.", 403)
+    data = _body(request)
+    if data is None:
+        return _bad()
+    try:
+        clean = printing.clean_payload(data)
+    except ValueError as exc:
+        return _bad(str(exc))
+    ps = PrintSettings.load()
+    for name, value in clean.items():
+        setattr(ps, name, value)
+    ps.updated_by = request.user
+    ps.save()
+    return JsonResponse({"ok": True, "settings": ps.as_dict()})

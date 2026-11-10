@@ -4,9 +4,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% if store.gstin %}Tax invoice{% else %}Invoice{% endif %} {{ sale.invoice_no }}</title>
+  <title>{% if ps.i_title %}{{ ps.i_title }}{% elif store.gstin %}Tax invoice{% else %}Invoice{% endif %} {{ sale.invoice_no }}</title>
   <link href="{% static 'css/bill.css' %}" rel="stylesheet">
-  <style>@page { size: A4; margin: 12mm; }</style>
+  <style>
+    @page { size: {% if ps.i_a5 %}A5{% else %}A4{% endif %}; margin: {% if ps.i_a5 %}8mm{% else %}12mm{% endif %}; }
+    .i-sheet { width: {{ ps.i_sheet_mm }}mm; }
+    {% if ps.font_css %}body.invoice { font-family: {{ ps.font_css|safe }}; }{% endif %}
+  </style>
 </head>
 <body class="invoice">
 <div class="no-print">
@@ -19,16 +23,20 @@
 
   <div class="i-head">
     <div class="i-store">
-      {% if store.logo %}<img class="i-logo" src="{{ store.logo }}" alt="{{ store.name }} logo">{% endif %}
       <h1>{{ store.name }}</h1>
       {% if store.tagline %}<div>{{ store.tagline }}</div>{% endif %}
       {% if store.address %}<div>{{ store.address|linebreaksbr }}</div>{% endif %}
       {% if store.phone %}<div>Phone: {{ store.phone }}</div>{% endif %}
-      {% if store.email %}<div>Email: {{ store.email }}</div>{% endif %}
       {% if store.gstin %}<div>GSTIN: {{ store.gstin }}</div>{% endif %}
+      {% if store.bank_account_number or store.bank_details %}
+      <div class="i-bank">
+        {% if store.bank_account_number %}<div>Bank account: {{ store.bank_account_number }}</div>{% endif %}
+        {% if store.bank_details %}<div>{{ store.bank_details|linebreaksbr }}</div>{% endif %}
+      </div>
+      {% endif %}
     </div>
     <div class="i-doc">
-      <h2>{% if store.gstin %}TAX INVOICE{% else %}INVOICE{% endif %}</h2>
+      <h2>{% if ps.i_title %}{{ ps.i_title }}{% elif store.gstin %}TAX INVOICE{% else %}INVOICE{% endif %}</h2>
       <table>
         <tr><td>Invoice no.</td><td><strong>{{ sale.invoice_no }}</strong></td></tr>
         <tr><td>Date</td><td>{{ sale.created_at|date:"d-m-Y H:i" }}</td></tr>
@@ -43,9 +51,11 @@
       Walk-in customer
     {% else %}
       <strong>{{ sale.customer.name }}</strong>
-      {% if sale.customer.phone %}<br>Phone: {{ sale.customer.phone }}{% endif %}
+      {% if ps.i_cust_code and sale.customer.code %}<br>Code: {{ sale.customer.code }}{% endif %}
+      {% if ps.i_cust_phone and sale.customer.phone %}<br>Phone: {{ sale.customer.phone }}{% endif %}
+      {% if ps.i_cust_email and sale.customer.email %}<br>Email: {{ sale.customer.email }}{% endif %}
       {% if sale.customer.address %}<br>{{ sale.customer.address|linebreaksbr }}{% endif %}
-      {% if sale.customer.gstin %}<br>GSTIN: {{ sale.customer.gstin }}{% endif %}
+      {% if ps.i_cust_gstin and sale.customer.gstin %}<br>GSTIN: {{ sale.customer.gstin }}{% endif %}
     {% endif %}
   </div>
 
@@ -53,7 +63,9 @@
     <thead>
       <tr>
         <th>#</th><th>Item</th><th>HSN</th><th class="n">Qty</th><th class="n">Rate (incl. GST)</th>
-        <th class="n">Disc.</th><th class="n">Taxable</th><th class="n">GST %</th><th class="n">GST</th><th class="n">Amount</th>
+        {% if ps.i_col_discount %}<th class="n">Disc.</th>{% endif %}
+        {% if ps.i_col_tax %}<th class="n">Taxable</th><th class="n">GST %</th><th class="n">GST</th>{% endif %}
+        <th class="n">Amount</th>
       </tr>
     </thead>
     <tbody>
@@ -64,10 +76,12 @@
         <td>{{ it.hsn }}</td>
         <td class="n">{{ it.qty|floatformat:"-3" }}</td>
         <td class="n">{{ it.price|floatformat:"2g" }}</td>
-        <td class="n">{{ it.discount|floatformat:"2g" }}</td>
+        {% if ps.i_col_discount %}<td class="n">{{ it.discount|floatformat:"2g" }}</td>{% endif %}
+        {% if ps.i_col_tax %}
         <td class="n">{{ it.taxable|floatformat:"2g" }}</td>
         <td class="n">{{ it.gst_rate|floatformat:"-2" }}</td>
         <td class="n">{{ it.tax|floatformat:"2g" }}</td>
+        {% endif %}
         <td class="n">{{ it.total|floatformat:"2g" }}</td>
       </tr>
       {% endfor %}
@@ -94,6 +108,7 @@
       </table>
       {% endif %}
 
+      {% if ps.i_payments %}
       <div style="margin-top:10px;">
         <b>Payment</b>
         {% for p in pay_lines %}
@@ -101,6 +116,7 @@
         {% endfor %}
         {% if sale.change_due > 0 %}<div>Change returned: {{ sale.change_due|floatformat:"2g" }}</div>{% endif %}
       </div>
+      {% endif %}
 
       {% if sale.note %}<div style="margin-top:10px;"><b>Note</b><br>{{ sale.note }}</div>{% endif %}
     </div>
@@ -119,15 +135,9 @@
     </div>
   </div>
 
-  {% if store.bank_account_number or store.bank_details %}
-  <div class="i-bank">
-    <b>Bank account</b>
-    {% if store.bank_account_number %}<div>Account number: {{ store.bank_account_number }}</div>{% endif %}
-    {% if store.bank_details %}<div>{{ store.bank_details|linebreaksbr }}</div>{% endif %}
-  </div>
-  {% endif %}
-
-  <div class="i-foot">{{ store.footer }} &nbsp;&bull;&nbsp; This is a computer-generated invoice.</div>
+  {% with foot=ps.i_footer|default:store.footer %}
+  <div class="i-foot" style="text-align: {{ ps.i_footer_align }};">{% if foot %}{{ foot|linebreaksbr }}<br>{% endif %}This is a computer-generated invoice.</div>
+  {% endwith %}
 </div>
 
 <script>

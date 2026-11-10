@@ -252,7 +252,7 @@
 
   // ---------- Dialogs ----------
   const backdrop = $("dlgBackdrop");
-  const dialogs = ["dlgPay", "dlgDisc", "dlgCust", "dlgDone"].map($);
+  const dialogs = ["dlgPay", "dlgDisc", "dlgCust", "dlgDone", "dlgPrice", "dlgHeld", "dlgDrawer", "dlgRefund", "dlgPrint"].map($);
 
   function openDialog(id) {
     dialogs.forEach((d) => (d.hidden = d.id !== id));
@@ -748,7 +748,10 @@
   tick();
   setInterval(tick, 30000);
 
-  window.POS = { addItem, resetSale };
+  window.POS = {
+    app, state, addItem, resetSale, render, touch, showNote, openDialog, closeDialogs, hideDialogs,
+    requireItems, inr, hStr, toHundredths, el, compute, CSRF,
+  };
   render();
   searchInput.focus();
 })();

@@ -1607,5 +1607,64 @@ body.pos-locked .pos-app {
     display: block;
     color: var(--muted);
 }
-.item-promo { font-size: 12px; color: var(--secondary); font-weight: 600; }
-.pr-promo { font-size: 11px; color: var(--secondary); font-weight: 600; max-width: 260px; white-space: normal; }
+
+.item-promo {
+    font-size: 12px;
+    color: var(--secondary);
+    font-weight: 600;
+}
+
+.pr-promo {
+    font-size: 11px;
+    color: var(--secondary);
+    font-weight: 600;
+    max-width: 260px;
+    white-space: normal;
+}
+
+/* ---------- Print settings dialog ---------- */
+.dlg.dlg-wide {
+    width: min(720px, 94vw);
+    max-height: 90vh;
+    overflow: auto;
+}
+
+.ps-tabs {
+    display: flex;
+    gap: 4px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 12px;
+}
+
+.ps-tab {
+    border: 0;
+    background: none;
+    padding: 8px 12px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    color: inherit;
+}
+
+.ps-tab.active {
+    border-color: var(--primary);
+    color: var(--primary);
+    font-weight: 600;
+}
+
+.ps-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px 18px;
+    align-items: end;
+}
+
+.ps-sub {
+    font-weight: 700;
+    margin: 14px 0 6px;
+}
+
+@media (max-width: 600px) {
+    .ps-grid {
+        grid-template-columns: 1fr;
+    }
+}

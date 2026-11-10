@@ -4,7 +4,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
-
+from .printing import BOOLS, CHOICES, FIELD_NAMES, FONTS, INTS, LABEL_DEFAULTS, TEXTS
 from core.models import TimeStampedModel
 from people.models import phone_validator, validate_gstin
 
@@ -112,3 +112,64 @@ class StoreSettings(TimeStampedModel):
             "logo": self.logo.url if self.logo else "",
             "footer": self.receipt_footer,
         }
+
+class PrintSettings(TimeStampedModel):
+    """How receipts and invoices print. Always exactly one row (pk=1)."""
+    receipt_width_mm = models.PositiveSmallIntegerField(default=80)
+    r_tax_totals = models.BooleanField(default=True)
+    r_item_gst = models.BooleanField(default=False)
+    r_summary = models.CharField(max_length=5, default="none")
+    r_unit = models.BooleanField(default=False)
+    r_short_no = models.BooleanField(default=False)
+    r_order_no = models.BooleanField(default=False)
+    r_decimals = models.PositiveSmallIntegerField(default=2)
+    r_cust_name = models.BooleanField(default=True)
+    r_cust_code = models.BooleanField(default=False)
+    r_cust_gstin = models.BooleanField(default=False)
+    r_cust_address = models.BooleanField(default=False)
+    font = models.CharField(max_length=20, blank=True, default="")
+    i_title = models.CharField(max_length=40, blank=True)
+    i_a5 = models.BooleanField(default=False)
+    i_col_tax = models.BooleanField(default=True)
+    i_col_discount = models.BooleanField(default=True)
+    i_cust_gstin = models.BooleanField(default=True)
+    i_cust_code = models.BooleanField(default=False)
+    i_cust_phone = models.BooleanField(default=True)
+    i_cust_email = models.BooleanField(default=False)
+    i_payments = models.BooleanField(default=True)
+    i_footer = models.CharField(max_length=300, blank=True)
+    i_footer_align = models.CharField(max_length=6, default="center")
+    labels = models.JSONField(default=dict, blank=True)
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+
+    class Meta:
+        verbose_name_plural = "print settings"
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Print settings cannot be deleted.")
+
+    @classmethod
+    def load(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    def as_dict(self):
+        data = {name: getattr(self, name) for name in FIELD_NAMES}
+        data["labels"] = dict(self.labels or {})
+        return data
+
+    def as_context(self):
+        """What receipt.html and invoice.html read as `ps`."""
+        data = self.as_dict()
+        data["labels"] = {**LABEL_DEFAULTS, **{k: v for k, v in (self.labels or {}).items() if k in LABEL_DEFAULTS and v}}
+        data["money_fmt"] = f"{self.r_decimals}g"
+        data["font_css"] = FONTS.get(self.font, "")
+        data["receipt_inner_mm"] = self.receipt_width_mm - 8
+        data["i_sheet_mm"] = 118 if self.i_a5 else 186
+        return data

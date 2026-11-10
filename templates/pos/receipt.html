@@ -6,7 +6,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Receipt {{ sale.invoice_no }}</title>
   <link href="{% static 'css/bill.css' %}" rel="stylesheet">
-  <style>@page { size: 80mm auto; margin: 3mm; }</style>
+  <style>
+    @page { size: {{ ps.receipt_width_mm }}mm auto; margin: 3mm; }
+    .r-sheet { width: {{ ps.receipt_inner_mm }}mm; }
+    {% if ps.font_css %}body.receipt { font-family: {{ ps.font_css|safe }}; }{% endif %}
+  </style>
 </head>
 <body class="receipt">
 <div class="no-print">
@@ -18,49 +22,58 @@
   {% if sale.status == 'voided' %}<div class="void-banner">VOIDED</div>{% endif %}
 
   <div class="r-center">
-    {% if store.logo %}<img class="r-logo" src="{{ store.logo }}" alt="{{ store.name }} logo">{% endif %}
     <h1>{{ store.name }}</h1>
     {% if store.tagline %}<div>{{ store.tagline }}</div>{% endif %}
     {% if store.address %}<div>{{ store.address|linebreaksbr }}</div>{% endif %}
     {% if store.phone %}<div>Ph: {{ store.phone }}</div>{% endif %}
-    {% if store.email %}<div>{{ store.email }}</div>{% endif %}
     {% if store.gstin %}<div>GSTIN: {{ store.gstin }}</div>{% endif %}
   </div>
   <hr>
 
-  <div class="r-row"><span>Invoice</span><strong>{{ sale.invoice_no }}</strong></div>
-  <div class="r-row"><span>Date</span><span>{{ sale.created_at|date:"d-m-Y H:i" }}</span></div>
-  <div class="r-row"><span>Cashier</span><span>{{ cashier_name }}</span></div>
-  {% if not walk_in %}<div class="r-row"><span>Customer</span><span>{{ sale.customer.name }}</span></div>{% endif %}
+  <div class="r-row"><span>{{ L.invoice }}</span><strong>{% if ps.r_short_no %}{{ short_no }}{% else %}{{ sale.invoice_no }}{% endif %}</strong></div>
+  {% if ps.r_order_no and order_no %}<div class="r-row"><span>{{ L.order_no }}</span><span>{{ order_no }}</span></div>{% endif %}
+  <div class="r-row"><span>{{ L.date }}</span><span>{{ sale.created_at|date:"d-m-Y H:i" }}</span></div>
+  <div class="r-row"><span>{{ L.cashier }}</span><span>{{ cashier_name }}</span></div>
+  {% if not walk_in %}
+    {% if ps.r_cust_name %}<div class="r-row"><span>{{ L.customer }}</span><span>{{ sale.customer.name }}</span></div>{% endif %}
+    {% if ps.r_cust_code and sale.customer.code %}<div class="r-row"><span>Code</span><span>{{ sale.customer.code }}</span></div>{% endif %}
+    {% if ps.r_cust_gstin and sale.customer.gstin %}<div class="r-row"><span>GSTIN</span><span>{{ sale.customer.gstin }}</span></div>{% endif %}
+    {% if ps.r_cust_address and sale.customer.address %}<div class="r-small">{{ sale.customer.address|linebreaksbr }}</div>{% endif %}
+  {% endif %}
   <hr>
 
   {% for it in items %}
   <div class="r-name">{{ it.name }}</div>
   <div class="r-line">
-    <span>{{ it.qty|floatformat:"-3" }} x {{ it.price|floatformat:"2g" }}{% if it.discount > 0 %} (-{{ it.discount|floatformat:"2g" }}){% endif %}</span>
-    <span>{{ it.total|floatformat:"2g" }}</span>
+    <span>{{ it.qty|floatformat:"-3" }}{% if ps.r_unit and it.unit %} {{ it.unit }}{% endif %} x {{ it.price|floatformat:ps.money_fmt }}{% if it.discount > 0 %} (-{{ it.discount|floatformat:ps.money_fmt }}){% endif %}{% if ps.r_item_gst and it.gst_rate > 0 %} GST {{ it.gst_rate|floatformat:"-2" }}%{% endif %}</span>
+    <span>{{ it.total|floatformat:ps.money_fmt }}</span>
   </div>
   {% endfor %}
   <hr>
 
-  <div class="r-row"><span>Subtotal</span><span>{{ sale.subtotal|floatformat:"2g" }}</span></div>
-  {% if sale.discount_total > 0 %}
-  <div class="r-row"><span>Discount</span><span>-{{ sale.discount_total|floatformat:"2g" }}</span></div>
+  {% if ps.r_summary == "count" %}
+  <div class="r-row r-small"><span>{{ L.n_items }}</span><span>{{ items_count }}</span></div>
+  {% elif ps.r_summary == "qty" %}
+  <div class="r-row r-small"><span>{{ L.n_qty }}</span><span>{{ qty_total|floatformat:"-3" }}</span></div>
   {% endif %}
-  <div class="r-row r-total"><span>TOTAL</span><span>{{ sale.total|floatformat:"2g" }}</span></div>
-  {% if sale.tax_total > 0 %}
-  <div class="r-row r-small"><span>Includes GST</span><span>{{ sale.tax_total|floatformat:"2g" }}</span></div>
+  <div class="r-row"><span>{{ L.subtotal }}</span><span>{{ sale.subtotal|floatformat:ps.money_fmt }}</span></div>
+  {% if sale.discount_total > 0 %}
+  <div class="r-row"><span>{{ L.discount }}</span><span>-{{ sale.discount_total|floatformat:ps.money_fmt }}</span></div>
+  {% endif %}
+  <div class="r-row r-total"><span>{{ L.total }}</span><span>{{ sale.total|floatformat:ps.money_fmt }}</span></div>
+  {% if ps.r_tax_totals and sale.tax_total > 0 %}
+  <div class="r-row r-small"><span>{{ L.gst_included }}</span><span>{{ sale.tax_total|floatformat:ps.money_fmt }}</span></div>
   {% endif %}
   <hr>
 
   {% for p in pay_lines %}
-  <div class="r-row"><span>{{ p.label }}{% if p.reference %} ({{ p.reference }}){% endif %}</span><span>{{ p.amount|floatformat:"2g" }}</span></div>
+  <div class="r-row"><span>{{ p.label }}{% if p.reference %} ({{ p.reference }}){% endif %}</span><span>{{ p.amount|floatformat:ps.money_fmt }}</span></div>
   {% endfor %}
   {% if sale.change_due > 0 %}
-  <div class="r-row"><span>Change</span><span>{{ sale.change_due|floatformat:"2g" }}</span></div>
+  <div class="r-row"><span>{{ L.change }}</span><span>{{ sale.change_due|floatformat:ps.money_fmt }}</span></div>
   {% endif %}
 
-  {% if sale.note %}<hr><div class="r-note">Note: {{ sale.note }}</div>{% endif %}
+  {% if sale.note %}<hr><div class="r-note">{{ L.note }}: {{ sale.note }}</div>{% endif %}
   <hr>
   <div class="r-center r-small">{{ store.footer }}</div>
 </div>

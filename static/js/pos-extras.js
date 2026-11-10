@@ -235,7 +235,98 @@
   $("lockPass").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); unlock(); } });
 
   if (!$("lockScreen").hidden) setLocked(true);   // the server says this session is locked
+  // ---------- Print settings ----------
+  const PS = JSON.parse($("printDialogData").textContent);   // null for cashiers
 
+  const SWITCHES = {
+    psRecSwitches: [["r_tax_totals", "Print GST totals"], ["r_item_gst", "Print GST rate on each item"],
+      ["r_unit", "Print measurement unit"], ["r_short_no", "Short receipt number"],
+      ["r_order_no", "Print order number (today's bill count)"]],
+    psRecCust: [["r_cust_name", "Name"], ["r_cust_code", "Code"], ["r_cust_gstin", "Tax number (GSTIN)"],
+      ["r_cust_address", "Address"]],
+    psInvCols: [["i_col_tax", "Tax columns"], ["i_col_discount", "Discount column"]],
+    psInvCust: [["i_cust_gstin", "Tax number (GSTIN)"], ["i_cust_code", "Code"], ["i_cust_phone", "Phone number"],
+      ["i_cust_email", "Email"]],
+    psInvOther: [["i_a5", "Print in A5 size"], ["i_payments", "Payment methods"]],
+  };
+
+  function buildPrintDialog() {
+    Object.keys(SWITCHES).forEach((boxId) => {
+      SWITCHES[boxId].forEach(([name, text]) => {
+        const row = el("div", "form-check form-switch");
+        const input = el("input", "form-check-input");
+        input.type = "checkbox";
+        input.id = "ps_" + name;
+        const label = el("label", "form-check-label", text);
+        label.htmlFor = input.id;
+        row.append(input, label);
+        $(boxId).appendChild(row);
+      });
+    });
+    Object.keys(PS.defaults).forEach((key) => {
+      const wrap = el("div");
+      const label = el("label", "dlg-label", PS.defaults[key]);
+      label.htmlFor = "ps_lbl_" + key;
+      const input = el("input", "form-control form-control-sm");
+      input.id = "ps_lbl_" + key;
+      input.maxLength = 30;
+      input.placeholder = PS.defaults[key];
+      wrap.append(label, input);
+      $("psLabels").appendChild(wrap);
+    });
+    document.querySelectorAll(".ps-tab").forEach((tab) => {
+      tab.addEventListener("click", () => {
+        document.querySelectorAll(".ps-tab").forEach((t) => t.classList.toggle("active", t === tab));
+        document.querySelectorAll(".ps-panel").forEach((p) => { p.hidden = p.id !== tab.dataset.tab; });
+      });
+    });
+    $("psSave").addEventListener("click", savePrint);
+  }
+
+  function fillPrint() {
+    Object.keys(PS.settings).forEach((k) => {
+      if (k === "labels") return;
+      const e = $("ps_" + k);
+      if (!e) return;
+      if (e.type === "checkbox") e.checked = !!PS.settings[k]; else e.value = PS.settings[k];
+    });
+    Object.keys(PS.defaults).forEach((k) => { $("ps_lbl_" + k).value = (PS.settings.labels && PS.settings.labels[k]) || ""; });
+  }
+
+  function readPrint() {
+    const out = {};
+    Object.keys(PS.settings).forEach((k) => {
+      if (k === "labels") return;
+      const e = $("ps_" + k);
+      if (!e) return;
+      if (e.type === "checkbox") out[k] = e.checked;
+      else if (typeof PS.settings[k] === "number") out[k] = Number(e.value);
+      else out[k] = e.value;
+    });
+    out.labels = {};
+    Object.keys(PS.defaults).forEach((k) => { out.labels[k] = $("ps_lbl_" + k).value.trim(); });
+    return out;
+  }
+
+  function openPrint() {
+    if (!PS) { showNote("Only an admin can change print settings."); return; }
+    fillPrint();
+    showErr("psError", "");
+    openDialog("dlgPrint");
+  }
+
+  async function savePrint() {
+    $("psSave").disabled = true;
+    const r = await post(D.printUrl, readPrint());
+    $("psSave").disabled = false;
+    if (!r.ok) { showErr("psError", r.data.error || "Could not save the print settings."); return; }
+    PS.settings = r.data.settings;
+    closeDialogs();
+    showNote("Print settings saved. They apply the next time you open a receipt or invoice.");
+  }
+
+  if (PS) buildPrintDialog();
+  $("printSettingsBtn").addEventListener("click", () => { $("sideClose").click(); openPrint(); });
   // ---------- Wiring ----------
   const wire = { price: openPrice, hold: holdSale, drawer: openDrawer, refund: openRefund, lock: lockNow, "held-list": openHeld };
   document.querySelectorAll("[data-x]").forEach((btn) => {
