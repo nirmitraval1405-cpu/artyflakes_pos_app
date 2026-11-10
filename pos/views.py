@@ -15,7 +15,7 @@ from django.db.models import Count, Exists, OuterRef, Q, Sum
 from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
-from .models import DrawerEvent, HeldSale, Payment, Sale, SaleItem, SaleReturn, SaleReturnItem
+from .models import CashMovement, DrawerEvent, HeldSale, Payment, Sale, SaleItem, SaleReturn, SaleReturnItem
 from inventory.models import Product, Unit
 from inventory.stock import with_stock
 from people.models import Contact
@@ -24,7 +24,7 @@ from django.db import transaction
 from django.urls import reverse
 from django.utils import timezone
 from .models import Payment, Sale, SaleItem, SaleReturn, SaleReturnItem
-from .services import CheckoutError, create_return, create_sale, void_sale
+from .services import CheckoutError, create_return, create_sale, to_paise, void_sale
 from promotions.engine import rules_for
 from storeconfig import printing
 from storeconfig.models import PrintSettings, StoreSettings
@@ -571,6 +571,46 @@ def drawer_open(request):
         return _bad("Choose a reason.")
     DrawerEvent.objects.create(user=request.user, reason=reason)
     return JsonResponse({"ok": True})
+
+
+@login_required
+@require_POST
+def cash_move(request):
+    if request.session.get("pos_locked"):
+        return _bad("The POS is locked.", 423)
+    data = _body(request)
+    if data is None:
+        return _bad("Invalid request.")
+
+    direction = data.get("direction")
+    if direction not in CashMovement.Direction.values:
+        return _bad("Choose cash in or cash out.")
+    reason = str(data.get("reason") or "").strip()
+    if not reason or len(reason) > 60:
+        return _bad("Choose a valid reason.")
+    note = str(data.get("note") or "").strip()
+    if len(note) > 60:
+        return _bad("The note must be 60 characters or fewer.")
+    try:
+        amount = to_paise(data.get("amount"), "Amount")
+    except CheckoutError as exc:
+        return _bad(str(exc))
+    if amount <= 0:
+        return _bad("Amount must be greater than zero.")
+
+    movement = CashMovement.objects.create(
+        user=request.user,
+        direction=direction,
+        amount=Decimal(amount) / 100,
+        reason=reason,
+        note=note,
+    )
+    return JsonResponse({
+        "ok": True,
+        "movement_id": movement.pk,
+        "direction": movement.direction,
+        "amount": f"{movement.amount:.2f}",
+    })
 
 
 @login_required

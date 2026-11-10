@@ -26,6 +26,37 @@
     white-space: nowrap;
 }
 
+.website-orders-placeholder {
+    display: flex;
+    align-items: center;
+    gap: .55rem;
+    flex: 0 0 auto;
+    padding: .45rem .7rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--cream);
+    color: var(--primary);
+}
+
+.website-orders-placeholder > i {
+    font-size: 1.2rem;
+}
+
+.website-orders-placeholder span,
+.website-orders-placeholder strong,
+.website-orders-placeholder small {
+    display: block;
+}
+
+.website-orders-placeholder strong {
+    font-size: .82rem;
+}
+
+.website-orders-placeholder small {
+    color: var(--muted);
+    font-size: .68rem;
+}
+
 .pos-search {
     width: 100%;
     display: flex;
@@ -1347,6 +1378,11 @@
     .pos-title {
         flex: 1 1 100%;
         font-size: 1.2rem;
+    }
+
+    .website-orders-placeholder {
+        order: 2;
+        flex: 1 1 auto;
     }
 
     .pos-search {

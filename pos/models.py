@@ -177,3 +177,21 @@ class DrawerEvent(TimeStampedModel):
 
     def __str__(self):
         return f"{self.reason} ({self.created_at:%d %b %H:%M})"
+
+
+class CashMovement(TimeStampedModel):
+    class Direction(models.TextChoices):
+        IN = "in", "Cash in"
+        OUT = "out", "Cash out"
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    direction = models.CharField(max_length=3, choices=Direction.choices)
+    amount = models.DecimalField(**MONEY)
+    reason = models.CharField(max_length=60)
+    note = models.CharField(max_length=60, blank=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+
+    def __str__(self):
+        return f"{self.get_direction_display()}: {self.amount} ({self.reason})"

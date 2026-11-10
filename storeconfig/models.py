@@ -4,7 +4,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
-from .printing import BOOLS, CHOICES, FIELD_NAMES, FONTS, INTS, LABEL_DEFAULTS, TEXTS
+from .printing import BOOLS, CHOICES, DARKNESS, FIELD_NAMES, FONTS, INTS, LABEL_DEFAULTS, TEXTS
 from core.models import TimeStampedModel
 from people.models import phone_validator, validate_gstin
 
@@ -116,6 +116,8 @@ class StoreSettings(TimeStampedModel):
 class PrintSettings(TimeStampedModel):
     """How receipts and invoices print. Always exactly one row (pk=1)."""
     receipt_width_mm = models.PositiveSmallIntegerField(default=80)
+    r_font_size = models.PositiveSmallIntegerField(default=100)
+    r_darkness = models.CharField(max_length=8, default="extra")
     r_tax_totals = models.BooleanField(default=True)
     r_item_gst = models.BooleanField(default=False)
     r_summary = models.CharField(max_length=5, default="none")
@@ -127,7 +129,7 @@ class PrintSettings(TimeStampedModel):
     r_cust_code = models.BooleanField(default=False)
     r_cust_gstin = models.BooleanField(default=False)
     r_cust_address = models.BooleanField(default=False)
-    font = models.CharField(max_length=20, blank=True, default="")
+    font = models.CharField(max_length=20, blank=True, default="Arial Black")
     i_title = models.CharField(max_length=40, blank=True)
     i_a5 = models.BooleanField(default=False)
     i_col_tax = models.BooleanField(default=True)
@@ -170,6 +172,10 @@ class PrintSettings(TimeStampedModel):
         data["labels"] = {**LABEL_DEFAULTS, **{k: v for k, v in (self.labels or {}).items() if k in LABEL_DEFAULTS and v}}
         data["money_fmt"] = f"{self.r_decimals}g"
         data["font_css"] = FONTS.get(self.font, "")
+        data["receipt_font_scale"] = self.r_font_size / 100
+        darkness = DARKNESS.get(self.r_darkness, DARKNESS["bold"])
+        data["receipt_font_weight"] = darkness["weight"]
+        data["receipt_text_stroke"] = darkness["stroke"]
         data["receipt_inner_mm"] = self.receipt_width_mm - 8
         data["i_sheet_mm"] = 118 if self.i_a5 else 186
         return data

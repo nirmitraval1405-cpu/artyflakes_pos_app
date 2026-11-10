@@ -10,7 +10,7 @@ from inventory.models import Product, StockMovement
 from inventory.stock import current_stock
 from people.models import Contact
 
-from .models import InvoiceCounter, Payment, Sale
+from .models import CashMovement, InvoiceCounter, Payment, Sale
 from .services import compute_bill, div_round
 
 
@@ -144,6 +144,15 @@ class CheckoutTests(TestCase):
         total = sum(p.amount for p in Payment.objects.all())
         self.assertEqual(total, Decimal("500.00"))
 
+    def test_cheque_payment_is_saved_with_its_reference(self):
+        response = self.post(self.body(
+            payments=[{"method": "cheque", "amount": "500.00", "reference": "CHQ-42"}],
+        ))
+        self.assertEqual(response.status_code, 200)
+        payment = Payment.objects.get()
+        self.assertEqual(payment.method, Payment.Method.CHEQUE)
+        self.assertEqual(payment.reference, "CHQ-42")
+
     def test_short_payment_is_rejected_and_nothing_is_saved(self):
         response = self.post(self.body(payments=[{"method": "cash", "amount": "100.00"}]))
         self.assertEqual(response.status_code, 400)
@@ -241,6 +250,93 @@ class CheckoutTests(TestCase):
         self.assertEqual(names, ["Asha"])
 
 
+class CashMovementTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user("cash-mover", role="cashier")
+        self.client.force_login(self.user)
+        self.url = reverse("pos:cash_move")
+
+    def post(self, data):
+        return self.client.post(self.url, data=json.dumps(data), content_type="application/json")
+
+    def test_cash_in_and_out_are_recorded_for_the_cashier(self):
+        for direction in (CashMovement.Direction.IN, CashMovement.Direction.OUT):
+            response = self.post({
+                "direction": direction,
+                "amount": "125.50",
+                "reason": "Other",
+                "note": "Till adjustment",
+            })
+            self.assertEqual(response.status_code, 200)
+            self.assertTrue(response.json()["ok"])
+
+        movements = list(CashMovement.objects.order_by("direction"))
+        self.assertEqual(len(movements), 2)
+        self.assertTrue(all(m.user == self.user for m in movements))
+        self.assertTrue(all(m.amount == Decimal("125.50") for m in movements))
+        self.assertTrue(all(m.note == "Till adjustment" for m in movements))
+
+    def test_invalid_cash_amount_is_not_recorded(self):
+        response = self.post({
+            "direction": CashMovement.Direction.IN,
+            "amount": "0",
+            "reason": "Other",
+        })
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(CashMovement.objects.count(), 0)
+
+    def test_cash_movement_is_blocked_while_pos_is_locked(self):
+        session = self.client.session
+        session["pos_locked"] = True
+        session.save()
+        response = self.post({
+            "direction": CashMovement.Direction.IN,
+            "amount": "10.00",
+            "reason": "Other",
+        })
+        self.assertEqual(response.status_code, 423)
+        self.assertEqual(CashMovement.objects.count(), 0)
+
+    def test_pos_screen_connects_cash_in_out_to_its_endpoint(self):
+        response = self.client.get(reverse("pos:screen"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'data-cash-url="/api/cash-movements/"')
+
+    def test_pos_screen_connects_promotion_refresh_to_its_endpoint(self):
+        response = self.client.get(reverse("pos:screen"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'data-promo-url="/api/promotions/"')
+
+    def test_pos_header_shows_frontend_website_order_placeholder(self):
+        response = self.client.get(reverse("pos:screen"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="website-orders-placeholder"')
+        self.assertContains(response, "Website Orders")
+        self.assertContains(response, "Frontend preview")
+
+
+class PrintSettingTests(TestCase):
+    def setUp(self):
+        admin = User.objects.create_user("printer-admin", role="admin")
+        self.client.force_login(admin)
+
+    def test_admin_can_save_receipt_size_and_darkness(self):
+        response = self.client.post(
+            reverse("pos:print_settings_save"),
+            data=json.dumps({"r_font_size": 130, "r_darkness": "extra"}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["settings"]["r_font_size"], 130)
+        self.assertEqual(response.json()["settings"]["r_darkness"], "extra")
+
+    def test_admin_print_settings_show_receipt_controls(self):
+        response = self.client.get(reverse("pos:screen"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="ps_r_font_size"')
+        self.assertContains(response, 'id="ps_r_darkness"')
+
+
 class BillPrintTests(TestCase):
     def setUp(self):
         User.objects.create_user("c1", password="pw12345!", role="cashier")
@@ -270,6 +366,13 @@ class BillPrintTests(TestCase):
         response = self.client.get(reverse("pos:receipt", args=[self.sale.pk]))
         self.assertContains(response, self.sale.invoice_no)
         self.assertContains(response, "500.00")
+
+    def test_receipt_shows_gst_split(self):
+        response = self.client.get(reverse("pos:receipt", args=[self.sale.pk]))
+        self.assertContains(response, "Includes GST")
+        self.assertContains(response, "CGST")
+        self.assertContains(response, "SGST")
+        self.assertContains(response, "38.14")
 
     def test_invoice_shows_the_gst_split(self):
         response = self.client.get(reverse("pos:invoice", args=[self.sale.pk]))

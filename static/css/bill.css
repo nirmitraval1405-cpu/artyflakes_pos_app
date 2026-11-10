@@ -1,45 +1,266 @@
-body { margin: 0; color: #000; }
-.no-print { display: flex; gap: .5rem; padding: .5rem; background: #f1eded; font-family: Arial, sans-serif; }
-.no-print button { padding: .4rem .9rem; border: 1px solid #999; background: #fff; border-radius: 4px; cursor: pointer; }
-.void-banner { text-align: center; font-weight: 700; letter-spacing: .2em; border: 2px solid #000; padding: 2px; margin-bottom: 6px; }
+body {
+  margin: 0;
+  color: #000;
+}
+
+.no-print {
+  display: flex;
+  gap: .5rem;
+  padding: .5rem;
+  background: #f1eded;
+  font-family: Arial, sans-serif;
+}
+
+.no-print button {
+  padding: .4rem .9rem;
+  border: 1px solid #999;
+  background: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.void-banner {
+  text-align: center;
+  font-weight: 700;
+  letter-spacing: .2em;
+  border: 2px solid #000;
+  padding: 2px;
+  margin-bottom: 6px;
+}
 
 /* ---------- 80 mm thermal receipt ---------- */
-body.receipt { background: #e8e8e8; font-family: "Courier New", Courier, monospace; font-size: 12px; }
-.r-sheet { width: 72mm; margin: 10px auto; background: #fff; padding: 3mm; box-sizing: content-box; }
-.r-center { text-align: center; }
-.r-center h1 { font-size: 17px; margin: 0 0 2px; }
-.r-logo { display: block; max-width: 35mm; max-height: 20mm; margin: 0 auto 4px; object-fit: contain; }
-.r-sheet hr { border: 0; border-top: 1px dashed #000; margin: 6px 0; }
-.r-row, .r-line { display: flex; justify-content: space-between; gap: 6px; }
-.r-name { font-weight: 700; margin-top: 3px; word-break: break-word; }
-.r-total { font-size: 15px; font-weight: 700; margin: 2px 0; }
-.r-small { font-size: 11px; }
-.r-note { margin-top: 4px; word-break: break-word; }
+body.receipt {
+  background: #e8e8e8;
+  font-family: "Arial Black", Arial, Helvetica, sans-serif;
+  font-size: calc(12px * var(--receipt-font-scale, 1));
+  font-weight: var(--receipt-font-weight, 900);
+}
+
+.r-sheet {
+  width: 72mm;
+  margin: 10px auto;
+  background: #fff;
+  padding: 3mm;
+  box-sizing: content-box;
+}
+
+.r-center {
+  text-align: center;
+}
+
+.r-center h1 {
+  font-size: calc(17px * var(--receipt-font-scale, 1));
+  margin: 0 0 2px;
+}
+
+.r-logo {
+  display: block;
+  max-width: 35mm;
+  max-height: 20mm;
+  margin: 0 auto 4px;
+  object-fit: contain;
+}
+
+.r-sheet hr {
+  border: 0;
+  border-top: 1px dashed #000;
+  margin: 6px 0;
+}
+
+.r-row,
+.r-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  font-weight: var(--receipt-font-weight, 900);
+}
+
+.r-center>div,
+.r-note {
+  font-weight: var(--receipt-font-weight, 900);
+}
+
+.r-row strong,
+.r-line strong,
+.r-center h1 {
+  font-weight: var(--receipt-font-weight, 900);
+}
+
+.r-name {
+  font-weight: var(--receipt-font-weight, 900);
+  margin-top: 3px;
+  word-break: break-word;
+}
+
+.r-total {
+  font-size: calc(17px * var(--receipt-font-scale, 1));
+  font-weight: var(--receipt-font-weight, 900);
+  margin: 2px 0;
+}
+
+.r-small {
+  font-size: calc(12px * var(--receipt-font-scale, 1));
+}
+
+.r-note {
+  margin-top: 4px;
+  word-break: break-word;
+}
+
+body.receipt .r-row:not(.r-total),
+body.receipt .r-line,
+body.receipt .r-center > div,
+body.receipt .r-small,
+body.receipt .r-note {
+  font-family: Arial, Helvetica, sans-serif;
+  font-weight: 500;
+}
 
 /* ---------- A4 invoice ---------- */
-body.invoice { font-family: Arial, Helvetica, sans-serif; font-size: 12px; background: #e8e8e8; }
-.i-sheet { width: 186mm; margin: 12px auto; background: #fff; padding: 10mm; box-sizing: content-box; }
-.i-head { display: flex; justify-content: space-between; gap: 20px; border-bottom: 2px solid #000; padding-bottom: 8px; }
-.i-store h1 { font-size: 22px; margin: 0 0 3px; }
-.i-logo { display: block; max-width: 55mm; max-height: 25mm; margin-bottom: 5px; object-fit: contain; }
-.i-doc { text-align: right; }
-.i-doc h2 { margin: 0 0 4px; font-size: 18px; letter-spacing: .08em; }
-.i-doc table { margin-left: auto; text-align: left; }
-.i-doc td { padding: 1px 0 1px 12px; }
-.i-bill { margin: 10px 0; padding: 6px 8px; border: 1px solid #999; }
-.i-bill b { display: block; font-size: 11px; text-transform: uppercase; color: #555; margin-bottom: 2px; }
-table.i-items, table.i-tax { width: 100%; border-collapse: collapse; margin-top: 8px; }
-.i-items th, .i-items td, .i-tax th, .i-tax td { border: 1px solid #777; padding: 4px 5px; }
-.i-items th, .i-tax th { background: #eee; text-align: left; font-size: 11px; }
-.i-items td.n, .i-items th.n, .i-tax td.n, .i-tax th.n { text-align: right; }
-.i-lower { display: flex; justify-content: space-between; gap: 16px; margin-top: 10px; align-items: flex-start; }
-.i-lower > div { flex: 1; }
-table.i-sum { width: 100%; border-collapse: collapse; }
-.i-sum td { padding: 3px 5px; }
-.i-sum td:last-child { text-align: right; }
-.i-sum tr.grand td { border-top: 2px solid #000; border-bottom: 2px solid #000; font-size: 15px; font-weight: 700; }
-.i-foot { margin-top: 18px; padding-top: 6px; border-top: 1px solid #999; text-align: center; font-size: 11px; color: #444; }
-.i-bank { margin-top: 12px; padding-top: 6px; border-top: 1px solid #999; font-size: 11px; }
+body.invoice {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 12px;
+  background: #e8e8e8;
+}
+
+.i-sheet {
+  width: 186mm;
+  margin: 12px auto;
+  background: #fff;
+  padding: 10mm;
+  box-sizing: content-box;
+}
+
+.i-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  border-bottom: 2px solid #000;
+  padding-bottom: 8px;
+}
+
+.i-store h1 {
+  font-size: 22px;
+  margin: 0 0 3px;
+}
+
+.i-logo {
+  display: block;
+  max-width: 55mm;
+  max-height: 25mm;
+  margin-bottom: 5px;
+  object-fit: contain;
+}
+
+.i-doc {
+  text-align: right;
+}
+
+.i-doc h2 {
+  margin: 0 0 4px;
+  font-size: 18px;
+  letter-spacing: .08em;
+}
+
+.i-doc table {
+  margin-left: auto;
+  text-align: left;
+}
+
+.i-doc td {
+  padding: 1px 0 1px 12px;
+}
+
+.i-bill {
+  margin: 10px 0;
+  padding: 6px 8px;
+  border: 1px solid #999;
+}
+
+.i-bill b {
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  color: #555;
+  margin-bottom: 2px;
+}
+
+table.i-items,
+table.i-tax {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+}
+
+.i-items th,
+.i-items td,
+.i-tax th,
+.i-tax td {
+  border: 1px solid #777;
+  padding: 4px 5px;
+}
+
+.i-items th,
+.i-tax th {
+  background: #eee;
+  text-align: left;
+  font-size: 11px;
+}
+
+.i-items td.n,
+.i-items th.n,
+.i-tax td.n,
+.i-tax th.n {
+  text-align: right;
+}
+
+.i-lower {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 10px;
+  align-items: flex-start;
+}
+
+.i-lower>div {
+  flex: 1;
+}
+
+table.i-sum {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.i-sum td {
+  padding: 3px 5px;
+}
+
+.i-sum td:last-child {
+  text-align: right;
+}
+
+.i-sum tr.grand td {
+  border-top: 2px solid #000;
+  border-bottom: 2px solid #000;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.i-foot {
+  margin-top: 18px;
+  padding-top: 6px;
+  border-top: 1px solid #999;
+  text-align: center;
+  font-size: 11px;
+  color: #444;
+}
+
+.i-bank {
+  margin-top: 12px;
+  padding-top: 6px;
+  border-top: 1px solid #999;
+  font-size: 11px;
+}
 
 @media screen and (max-width: 800px) {
   .i-sheet {
@@ -89,9 +310,80 @@ table.i-sum { width: 100%; border-collapse: collapse; }
 }
 
 @media print {
-  .no-print { display: none !important; }
-  body.receipt, body.invoice { background: #fff; }
-  .r-sheet { margin: 0; width: auto; padding: 0; }
-  .i-sheet { margin: 0; width: auto; padding: 0; }
-  .i-items th, .i-tax th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .no-print {
+    display: none !important;
+  }
+
+  body.receipt,
+  body.invoice {
+    background: #fff;
+  }
+
+  .r-sheet {
+    margin: 0;
+    width: auto;
+    padding: 0;
+  }
+
+  .i-sheet {
+    margin: 0;
+    width: auto;
+    padding: 0;
+  }
+
+  .i-items th,
+  .i-tax th {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+
+/* ---------- Receipt print contrast ---------- */
+body.receipt,
+body.receipt * {
+  color: #000 !important;
+}
+
+.r-sheet hr {
+  border-top: 2px dashed #000;
+}
+
+.void-banner {
+  border-width: 3px;
+}
+
+@media print {
+  body.receipt {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    -webkit-text-stroke: var(--receipt-text-stroke, 0.25px) #000;
+  }
+
+  body.receipt * {
+    -webkit-text-stroke: var(--receipt-text-stroke, 0.25px) #000;
+  }
+  body.receipt .r-row:not(.r-total),
+  body.receipt .r-line,
+  body.receipt .r-center > div,
+  body.receipt .r-small,
+  body.receipt .r-note {
+    -webkit-text-stroke: 0 #000;
+  }
+}
+
+@media print {
+
+  .i-bill b,
+  .i-foot {
+    color: #000;
+  }
+
+  .i-items th,
+  .i-items td,
+  .i-tax th,
+  .i-tax td,
+  .i-bill,
+  .i-foot {
+    border-color: #000;
+  }
 }

@@ -20,12 +20,19 @@ class PrintingSchemaTests(SimpleTestCase):
             self.assertEqual(getattr(s, name), default, name)
 
     def test_valid_payload_is_cleaned(self):
-        clean = printing.clean_payload({"r_decimals": 0, "r_summary": "qty", "i_title": "  Bill ", "receipt_width_mm": 58})
-        self.assertEqual(clean, {"r_decimals": 0, "r_summary": "qty", "i_title": "Bill", "receipt_width_mm": 58})
+        clean = printing.clean_payload({
+            "r_decimals": 0, "r_summary": "qty", "i_title": "  Bill ", "receipt_width_mm": 58,
+            "r_font_size": 125, "r_darkness": "extra",
+        })
+        self.assertEqual(clean, {
+            "r_decimals": 0, "r_summary": "qty", "i_title": "Bill", "receipt_width_mm": 58,
+            "r_font_size": 125, "r_darkness": "extra",
+        })
 
     def test_bad_values_are_refused(self):
         for bad in ({"r_decimals": 4}, {"r_decimals": True}, {"r_summary": "all"}, {"i_a5": "yes"},
-                    {"receipt_width_mm": 70}, {"font": "Comic Sans"}, {"labels": []}):
+                    {"receipt_width_mm": 70}, {"font": "Comic Sans"}, {"r_font_size": 151},
+                    {"r_darkness": "maximum"}, {"labels": []}):
             with self.assertRaises(ValueError, msg=str(bad)):
                 printing.clean_payload(bad)
 
@@ -35,8 +42,15 @@ class PrintingSchemaTests(SimpleTestCase):
 
     def test_context_has_what_the_bill_templates_use(self):
         ctx = PrintSettings(r_decimals=0, receipt_width_mm=58, font="Arial", i_a5=True,
-                            labels={"total": "Kul"}).as_context()
+                            r_font_size=125, r_darkness="extra", labels={"total": "Kul"}).as_context()
         self.assertEqual((ctx["money_fmt"], ctx["receipt_inner_mm"], ctx["i_sheet_mm"]), ("0g", 50, 118))
         self.assertEqual(ctx["labels"]["total"], "Kul")
         self.assertEqual(ctx["labels"]["subtotal"], "Subtotal")
         self.assertIn("Arial", ctx["font_css"])
+        self.assertEqual(ctx["receipt_font_scale"], 1.25)
+        self.assertEqual(ctx["receipt_font_weight"], 900)
+        self.assertEqual(ctx["receipt_text_stroke"], 0.6)
+
+    def test_bold_receipt_font_is_a_supported_setting(self):
+        clean = printing.clean_payload({"font": "Arial Black"})
+        self.assertEqual(clean, {"font": "Arial Black"})

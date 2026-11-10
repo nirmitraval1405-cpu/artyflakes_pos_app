@@ -173,6 +173,59 @@
     showNote(opened ? "Cash drawer opened." : "Logged. No drawer is connected to this browser, so it did not open.");
   });
 
+  // ---------- Cash in / out ----------
+  const cashReasons = {
+    in: ["Opening cash float", "Cash received", "Other"],
+    out: ["Petty cash", "Supplier payment", "Cash pickup", "Other"],
+  };
+  let cashDirection = "in";
+
+  function setCashDirection(direction) {
+    cashDirection = direction;
+    $("cashKindIn").classList.toggle("active", direction === "in");
+    $("cashKindOut").classList.toggle("active", direction === "out");
+    $("cashReason").replaceChildren(...cashReasons[direction].map((reason) => {
+      const option = document.createElement("option");
+      option.value = reason;
+      option.textContent = reason;
+      return option;
+    }));
+  }
+
+  function openCash() {
+    $("cashAmount").value = "";
+    $("cashNote").value = "";
+    showErr("cashError", "");
+    setCashDirection("in");
+    openDialog("dlgCash");
+    $("cashAmount").focus();
+  }
+
+  $("cashKindIn").addEventListener("click", () => setCashDirection("in"));
+  $("cashKindOut").addEventListener("click", () => setCashDirection("out"));
+  $("cashGo").addEventListener("click", async () => {
+    const amount = toHundredths($("cashAmount").value);
+    if (amount === null || amount <= 0) {
+      showErr("cashError", "Enter an amount greater than zero, with up to 2 decimal places.");
+      return;
+    }
+
+    $("cashGo").disabled = true;
+    const result = await post(D.cashUrl, {
+      direction: cashDirection,
+      amount: hStr(amount),
+      reason: $("cashReason").value,
+      note: $("cashNote").value.trim(),
+    });
+    $("cashGo").disabled = false;
+    if (!result.ok) {
+      showErr("cashError", result.data.error || "Could not record this cash movement.");
+      return;
+    }
+    closeDialogs();
+    showNote(`${cashDirection === "in" ? "Cash in" : "Cash out"} recorded: ${money(result.data.amount)}.`);
+  });
+
   // ---------- Refund ----------
   function openRefund() {
     if (!IS_ADMIN) { showNote("Only an admin can process refunds. Ask an admin to sign in."); return; }
@@ -274,6 +327,9 @@
       wrap.append(label, input);
       $("psLabels").appendChild(wrap);
     });
+    $("ps_r_font_size").addEventListener("input", () => {
+      $("psReceiptFontSizeValue").textContent = $("ps_r_font_size").value + "%";
+    });
     document.querySelectorAll(".ps-tab").forEach((tab) => {
       tab.addEventListener("click", () => {
         document.querySelectorAll(".ps-tab").forEach((t) => t.classList.toggle("active", t === tab));
@@ -290,6 +346,7 @@
       if (!e) return;
       if (e.type === "checkbox") e.checked = !!PS.settings[k]; else e.value = PS.settings[k];
     });
+    $("psReceiptFontSizeValue").textContent = PS.settings.r_font_size + "%";
     Object.keys(PS.defaults).forEach((k) => { $("ps_lbl_" + k).value = (PS.settings.labels && PS.settings.labels[k]) || ""; });
   }
 
@@ -328,7 +385,10 @@
   if (PS) buildPrintDialog();
   $("printSettingsBtn").addEventListener("click", () => { $("sideClose").click(); openPrint(); });
   // ---------- Wiring ----------
-  const wire = { price: openPrice, hold: holdSale, drawer: openDrawer, refund: openRefund, lock: lockNow, "held-list": openHeld };
+  const wire = {
+    price: openPrice, hold: holdSale, drawer: openDrawer, cash: openCash, refund: openRefund,
+    lock: lockNow, "held-list": openHeld,
+  };
   document.querySelectorAll("[data-x]").forEach((btn) => {
     btn.addEventListener("click", () => {
       if (btn.dataset.x === "held-list") $("sideClose").click();

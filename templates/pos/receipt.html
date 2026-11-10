@@ -9,6 +9,11 @@
   <style>
     @page { size: {{ ps.receipt_width_mm }}mm auto; margin: 3mm; }
     .r-sheet { width: {{ ps.receipt_inner_mm }}mm; }
+    body.receipt {
+      --receipt-font-scale: {{ ps.receipt_font_scale }};
+      --receipt-font-weight: {{ ps.receipt_font_weight }};
+      --receipt-text-stroke: {{ ps.receipt_text_stroke }}px;
+    }
     {% if ps.font_css %}body.receipt { font-family: {{ ps.font_css|safe }}; }{% endif %}
   </style>
 </head>
@@ -63,6 +68,8 @@
   <div class="r-row r-total"><span>{{ L.total }}</span><span>{{ sale.total|floatformat:ps.money_fmt }}</span></div>
   {% if ps.r_tax_totals and sale.tax_total > 0 %}
   <div class="r-row r-small"><span>{{ L.gst_included }}</span><span>{{ sale.tax_total|floatformat:ps.money_fmt }}</span></div>
+  <div class="r-row r-small"><span>CGST</span><span>{{ cgst_total|floatformat:ps.money_fmt }}</span></div>
+  <div class="r-row r-small"><span>SGST</span><span>{{ sgst_total|floatformat:ps.money_fmt }}</span></div>
   {% endif %}
   <hr>
 

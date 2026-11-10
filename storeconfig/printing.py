@@ -7,6 +7,7 @@ No Django imports here, so it is easy to test. storeconfig/models.py (PrintSetti
 # Font name -> CSS font stack. "" means "leave the template's own font".
 FONTS = {
     "": "",
+    "Arial Black": '"Arial Black", Arial, Helvetica, sans-serif',
     "Arial": "Arial, Helvetica, sans-serif",
     "Calibri": "Calibri, Carlito, Arial, sans-serif",
     "Georgia": "Georgia, 'Times New Roman', serif",
@@ -16,6 +17,12 @@ FONTS = {
     "Trebuchet MS": "'Trebuchet MS', Helvetica, sans-serif",
     "Segoe UI": "'Segoe UI', Arial, sans-serif",
     "Courier New": "'Courier New', Courier, monospace",
+}
+
+DARKNESS = {
+    "normal": {"weight": 500, "stroke": 0},
+    "bold": {"weight": 700, "stroke": 0.25},
+    "extra": {"weight": 900, "stroke": 0.6},
 }
 
 # Words printed on the receipt, and the text used when nothing custom is set.
@@ -41,12 +48,13 @@ BOOLS = {
 # name -> (default, allowed values)
 CHOICES = {
     "receipt_width_mm": (80, [58, 80]),
+    "r_darkness": ("extra", list(DARKNESS)),
     "r_summary": ("none", ["none", "count", "qty"]),
-    "font": ("", list(FONTS)),
+    "font": ("Arial Black", list(FONTS)),
     "i_footer_align": ("center", ["left", "center"]),
 }
 # name -> (default, lowest, highest)
-INTS = {"r_decimals": (2, 0, 3)}
+INTS = {"r_decimals": (2, 0, 3), "r_font_size": (100, 80, 150)}
 # name -> longest allowed text
 TEXTS = {"i_title": 40, "i_footer": 300}
 

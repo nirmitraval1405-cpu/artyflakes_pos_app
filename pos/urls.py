@@ -23,6 +23,7 @@ urlpatterns = [
     path("api/held/<int:pk>/resume/", views.held_resume, name="held_resume"),
     path("api/held/<int:pk>/delete/", views.held_delete, name="held_delete"),
     path("api/drawer/", views.drawer_open, name="drawer_open"),
+    path("api/cash-movements/", views.cash_move, name="cash_move"),
     path("api/find-sale/", views.find_sale, name="find_sale"),
     path("api/lock/", views.lock, name="lock"),
     path("api/unlock/", views.unlock, name="unlock"),

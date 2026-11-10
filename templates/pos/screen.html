@@ -16,6 +16,7 @@
 <div class="pos-app"
      data-checkout-url="{% url 'pos:checkout' %}"
      data-customer-url="{% url 'pos:customer_search' %}"
+     data-promo-url="{% url 'pos:promotion_rules' %}"
      data-csrf="{{ csrf_token }}"
      data-max-discount="{{ max_discount }}"
      data-admin="{% if user.is_admin_role %}1{% else %}0{% endif %}"
@@ -33,6 +34,14 @@
   <!-- Top bar -->
   <header class="pos-top">
     <a class="pos-title" href="{% url 'dashboard:home' %}" title="Back to dashboard">POS Billing System</a>
+
+    <div class="website-orders-placeholder" aria-label="Website orders preview">
+      <i class="bi bi-globe2" aria-hidden="true"></i>
+      <span>
+        <strong>Website Orders</strong>
+        <small>Frontend preview</small>
+      </span>
+    </div>
 
     <div class="pos-search">
       <i class="bi bi-search"></i>
@@ -295,9 +304,26 @@
         <option value="80">80 mm</option>
         <option value="58">58 mm</option>
       </select>
+      <label class="dlg-label mt-2" for="ps_font">Font family (receipt and invoice)</label>
+      <select id="ps_font" class="form-select">
+        <option>Arial Black</option>
+        <option value="">Browser default</option>
+        <option>Arial</option><option>Calibri</option><option>Georgia</option><option>Times New Roman</option>
+        <option>Verdana</option><option>Tahoma</option><option>Trebuchet MS</option><option>Segoe UI</option>
+        <option>Courier New</option>
+      </select>
+      <label class="dlg-label mt-2" for="ps_r_font_size">Receipt text size: <span id="psReceiptFontSizeValue">100%</span></label>
+      <input id="ps_r_font_size" type="range" class="form-range" min="80" max="150" step="5">
+      <label class="dlg-label mt-2" for="ps_r_darkness">Receipt text darkness</label>
+      <select id="ps_r_darkness" class="form-select">
+        <option value="normal">Normal</option>
+        <option value="bold">Bold</option>
+        <option value="extra">Extra bold</option>
+      </select>
       <div class="dlg-hint mt-2">
-        A web page cannot pick the printer. In the print window choose your receipt printer, and set it as the
-        Windows default so it is already selected. Set margins to None and turn off "Headers and footers".
+        These controls change the printed receipt text. To change the printer's actual ink or heat intensity,
+        use the printer driver's preferences in Windows. In the print window choose your receipt printer,
+        set margins to None, and turn off "Headers and footers".
       </div>
     </div>
 
@@ -330,15 +356,6 @@
 
     <div class="ps-panel" id="psInvoice" hidden>
       <div class="ps-grid">
-        <div>
-          <label class="dlg-label" for="ps_font">Font (invoice and receipt)</label>
-          <select id="ps_font" class="form-select">
-            <option value="">(Default)</option>
-            <option>Arial</option><option>Calibri</option><option>Georgia</option><option>Times New Roman</option>
-            <option>Verdana</option><option>Tahoma</option><option>Trebuchet MS</option><option>Segoe UI</option>
-            <option>Courier New</option>
-          </select>
-        </div>
         <div>
           <label class="dlg-label" for="ps_i_title">Title</label>
           <input id="ps_i_title" class="form-control" maxlength="40" placeholder="TAX INVOICE">
