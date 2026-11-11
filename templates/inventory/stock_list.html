@@ -30,7 +30,7 @@
     </select>
     <select name="group" class="grid-field" onchange="this.form.submit()">
       <option value="">All groups</option>
-      {% for c in categories %}<option value="{{ c.pk }}" {% if group == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
+      {% for c in categories %}<option value="{{ c.pk }}" {% if group == c.pk|stringformat:"s" %}selected{% endif %}>{{ c }}</option>{% endfor %}
     </select>
     <input type="text" name="q" value="{{ q }}" placeholder="Search by name, code or barcode" autocomplete="off">
     <i class="bi bi-search"></i>

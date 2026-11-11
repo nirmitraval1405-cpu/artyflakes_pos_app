@@ -32,7 +32,16 @@
         {% for item in items %}
         <tr>
           {% if kind == "unit" %}<td>{{ item.code }}</td>{% endif %}
-          <td>{{ item.name }}</td>
+          <td>
+            {% if kind == "category" %}
+              <span style="display: inline-block; padding-left: calc({{ item.category_depth }} * 1.25rem);">
+                {% if item.category_depth %}<span class="text-muted">↳</span> {% endif %}{{ item.name }}
+                {% if item.category_depth == 0 %}<span class="small text-muted">Main category</span>{% endif %}
+              </span>
+            {% else %}
+              {{ item.name }}
+            {% endif %}
+          </td>
           {% if kind == "unit" %}<td>{% if item.allow_fraction %}Decimal quantities{% else %}Whole numbers{% endif %}</td>{% endif %}
           <td><span class="st st-{% if item.is_active %}ok{% else %}out{% endif %}">{% if item.is_active %}Active{% else %}Inactive{% endif %}</span></td>
           <td>{{ item.product_count }}</td>
@@ -40,9 +49,10 @@
             <div class="d-flex flex-wrap gap-2">
               {% if kind == "category" %}
                 <a class="btn btn-sm btn-outline-secondary" href="{% url 'inventory:category_update' item.pk %}">Edit</a>
+                <a class="btn btn-sm btn-outline-primary" href="{% url 'inventory:category_create' %}?parent={{ item.pk }}">Add subcategory</a>
                 <form method="post" action="{% url 'inventory:category_toggle' item.pk %}">
                 {% csrf_token %}<button class="btn btn-sm btn-outline-secondary" type="submit">{% if item.is_active %}Deactivate{% else %}Activate{% endif %}</button></form>
-                {% if not item.product_count %}<a class="btn btn-sm btn-outline-danger" href="{% url 'inventory:category_delete' item.pk %}">Delete</a>{% endif %}
+                {% if not item.product_count and not item.child_count %}<a class="btn btn-sm btn-outline-danger" href="{% url 'inventory:category_delete' item.pk %}">Delete</a>{% endif %}
               {% elif kind == "brand" %}
                 <a class="btn btn-sm btn-outline-secondary" href="{% url 'inventory:brand_update' item.pk %}">Edit</a>
                 <form method="post" action="{% url 'inventory:brand_toggle' item.pk %}">

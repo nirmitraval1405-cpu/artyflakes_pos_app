@@ -6,12 +6,14 @@ app_name = "woosync"
 
 urlpatterns = [
     path("", views.home, name="home"),
+    path("webhook/products/", views.product_webhook, name="product_webhook"),
     path("test/", views.test_connection, name="test"),
     path("toggle/", views.toggle, name="toggle"),
     path("settings/", views.save_settings, name="settings"),
     path("match/", views.match_view, name="match"),
     path("sync/", views.sync_now, name="sync"),
     path("products/", views.products, name="products"),
+    path("products/conflicts/<int:pk>/resolve/", views.resolve_product_conflict, name="resolve_conflict"),
     path("preview/", views.preview, name="preview"),
     path("log/", views.log_page, name="log"),
     path("orders/", views.orders, name="orders"),

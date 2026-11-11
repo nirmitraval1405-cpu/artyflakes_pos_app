@@ -1,24 +1,34 @@
 from functools import wraps
+import base64
+import hashlib
+import hmac
+import json
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.views import redirect_to_login
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Count, Q
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
 from inventory.models import Product
-from inventory.stock import qty_fmt, with_stock
+from inventory.stock import low_stock, qty_fmt, with_stock
 
 from .client import WooClient, WooError
-from .models import CLOSED, HOLDING, SyncRun, SyncState, WebOrder, WooLink
+from .models import (
+    CLOSED, HOLDING, ProductSyncConflict, ProductSyncJob, SyncRun, SyncState, WebOrder, WooLink,
+)
 from .sync import (
     MASS_ZERO_LIMIT, STALE_LOCK, SyncBusy, SyncOff, match_products, planned_pushes,
     reconcile_stock, run_sync,
 )
+from .products import enqueue_product_job, enqueue_webhook_job
 
 
 def admin_only(view):
@@ -54,6 +64,19 @@ def home(request):
         configured, problem = False, str(exc)
 
     online = WooLink.objects.filter(sell_online=True)
+    product_total = Product.objects.count()
+    product_stats = {
+        "pos": product_total,
+        "website": WooLink.objects.filter(woo_product_id__isnull=False).count(),
+        "synced": WooLink.objects.filter(sync_status="synced").count(),
+        "pending": ProductSyncJob.objects.filter(status__in=(
+            ProductSyncJob.Status.PENDING, ProductSyncJob.Status.PROCESSING,
+        )).count(),
+        "failed": ProductSyncJob.objects.filter(status=ProductSyncJob.Status.FAILED).count(),
+        "review": ProductSyncConflict.objects.filter(resolved_at__isnull=True).count()
+                  + ProductSyncJob.objects.filter(status=ProductSyncJob.Status.REVIEW).count(),
+        "low_stock": low_stock(with_stock(Product.objects.all())).count(),
+    }
     return render(request, "woosync/home.html", {
         "state": state, "configured": configured, "problem": problem,
         "running": running, "latest_run": latest_run,
@@ -66,6 +89,7 @@ def home(request):
         "unmatched_orders": WebOrder.objects.filter(
             status__in=HOLDING, items__product__isnull=True, items__quantity__gt=0
         ).distinct().count(),
+        "product_stats": product_stats,
     })
 
 
@@ -166,19 +190,40 @@ def products(request):
     if request.method == "POST":
         action = request.POST.get("action")
         ids = [int(x) for x in request.POST.getlist("sel") if x.isdigit()]
-        if action == "resend":
+        if action in ("sync", "retry") and ids:
+            products_to_sync = list(Product.objects.filter(pk__in=ids))
+            if action == "sync":
+                for product in products_to_sync:
+                    enqueue_product_job(product, "updated", allow_offline=True)
+                messages.success(request, f"Queued {len(products_to_sync)} product(s) for synchronization.")
+            else:
+                ProductSyncJob.objects.filter(
+                    product_id__in=ids, status=ProductSyncJob.Status.FAILED
+                ).update(
+                    status=ProductSyncJob.Status.PENDING,
+                    attempts=0,
+                    available_at=timezone.now(),
+                    last_error="",
+                )
+                messages.success(request, "Failed product synchronization jobs were queued for retry.")
+        elif action == "resend":
             WooLink.objects.update(last_pushed_qty=None)
             messages.success(request, "All stock will be sent again on the next sync.")
         elif action in ("enable", "disable") and ids:
             if action == "enable":
                 count = 0
-                for p in Product.objects.filter(pk__in=ids, track_stock=True):
+                for p in Product.objects.filter(pk__in=ids):
                     link, _ = WooLink.objects.get_or_create(product=p)
                     if not link.sell_online:
                         link.sell_online = True
                         link.save(update_fields=["sell_online"])
+                    enqueue_product_job(p, "created" if not link.woo_product_id else "updated")
                     count += 1
-                messages.success(request, f"{count} product(s) will be sold online. Check the Preview before switching the sync on.")
+                messages.success(
+                    request,
+                    f"{count} product(s) were queued for WooCommerce and marked for online sale. "
+                    "Check the Preview before switching the sync on.",
+                )
             else:
                 WooLink.objects.filter(product_id__in=ids).update(sell_online=False)
                 messages.success(request, "Those products are no longer sent to the website. Their website stock stays as it is.")
@@ -195,6 +240,20 @@ def products(request):
         qs = qs.filter(woo_link__sell_online=True)
     elif show == "unlinked":
         qs = qs.filter(Q(woo_link__isnull=True) | Q(woo_link__woo_product_id__isnull=True))
+    elif show == "website":
+        qs = qs.filter(woo_link__woo_product_id__isnull=False)
+    elif show == "pos-only":
+        qs = qs.filter(Q(woo_link__isnull=True) | Q(woo_link__woo_product_id__isnull=True))
+    elif show == "synced":
+        qs = qs.filter(woo_link__sync_status="synced")
+    elif show == "pending":
+        qs = qs.filter(woo_link__sync_status="pending")
+    elif show == "failed":
+        qs = qs.filter(woo_link__sync_status="failed")
+    elif show == "review":
+        qs = qs.filter(Q(woo_link__needs_review=True) | Q(sync_conflicts__resolved_at__isnull=True)).distinct()
+    elif show == "low-stock":
+        qs = low_stock(qs)
     else:
         show = "all"
 
@@ -216,14 +275,54 @@ def products(request):
             "stock": qty_fmt(p.stock) if p.track_stock else "\u2014",
             "sent": "" if link is None or link.last_pushed_qty is None else link.last_pushed_qty,
             "next": plan.get(p.pk, ""),
+            "sync_status": link.sync_status if link else "pending",
+            "sync_error": link.sync_error if link else "",
         })
 
     params = request.GET.copy()
     params.pop("page", None)
+    review_jobs = ProductSyncJob.objects.filter(
+        status=ProductSyncJob.Status.REVIEW
+    ).order_by("-created_at")[:100]
+    conflicts = ProductSyncConflict.objects.filter(
+        resolved_at__isnull=True
+    ).select_related("product").order_by("-detected_at")[:100]
     return render(request, "woosync/products.html", {
         "rows": rows, "page": page, "total": paginator.count, "q": q, "show": show,
-        "querystring": params.urlencode(),
+        "querystring": params.urlencode(), "review_jobs": review_jobs, "conflicts": conflicts,
     })
+
+
+@admin_only
+@require_POST
+def resolve_product_conflict(request, pk):
+    resolution = request.POST.get("resolution")
+    if resolution not in ("pos", "woocommerce"):
+        messages.error(request, "Choose POS or WooCommerce as the value to keep.")
+        return redirect("woosync:products")
+    conflict = get_object_or_404(ProductSyncConflict.objects.select_related("product"), pk=pk, resolved_at__isnull=True)
+    with transaction.atomic():
+        conflict = ProductSyncConflict.objects.select_for_update().get(pk=conflict.pk)
+        if conflict.resolved_at:
+            messages.info(request, "That conflict has already been resolved.")
+        else:
+            conflict.resolution = resolution
+            conflict.resolved_at = timezone.now()
+            conflict.save(update_fields=["resolution", "resolved_at"])
+            link = WooLink.objects.filter(product=conflict.product).first()
+            if resolution == "pos":
+                enqueue_product_job(
+                    conflict.product, "updated", [conflict.field_name], [conflict.field_name],
+                    allow_offline=True,
+                )
+            elif link:
+                enqueue_webhook_job(
+                    link.woo_product_id, "updated",
+                    {"id": link.woo_product_id, "force_fields": [conflict.field_name]},
+                    f"resolve:{conflict.pk}",
+                )
+            messages.success(request, f"Conflict resolved using the {resolution} value.")
+    return redirect("woosync:products")
 
 
 @admin_only
@@ -327,3 +426,32 @@ def order_recheck(request, pk):
         moved = reconcile_stock(order)
     messages.success(request, f"Stock re-checked. {moved} stock change(s) made.")
     return redirect("woosync:order_detail", pk=pk)
+
+
+@csrf_exempt
+@require_POST
+def product_webhook(request):
+    secret = (settings.WOOSYNC.get("WEBHOOK_SECRET") or "").encode("utf-8")
+    if not secret:
+        return JsonResponse({"error": "WooCommerce product webhook is not configured."}, status=503)
+    supplied = request.headers.get("X-WC-Webhook-Signature", "")
+    expected = base64.b64encode(hmac.new(secret, request.body, hashlib.sha256).digest()).decode("ascii")
+    if not hmac.compare_digest(supplied, expected):
+        return JsonResponse({"error": "Invalid webhook signature."}, status=401)
+    try:
+        payload = json.loads(request.body.decode("utf-8"))
+    except (UnicodeDecodeError, ValueError):
+        return JsonResponse({"error": "Invalid webhook JSON."}, status=400)
+    if not isinstance(payload, dict) or not isinstance(payload.get("id"), int):
+        return JsonResponse({"error": "Webhook payload must contain a product ID."}, status=400)
+    topic = request.headers.get("X-WC-Webhook-Topic", "")
+    if topic not in ("product.created", "product.updated", "product.deleted"):
+        return JsonResponse({"error": "Unsupported WooCommerce webhook topic."}, status=400)
+    job, created = enqueue_webhook_job(
+        payload["id"], topic.split(".", 1)[1], payload,
+        request.headers.get("X-WC-Webhook-Delivery-ID", ""),
+    )
+    return JsonResponse(
+        {"accepted": True, "duplicate": not created},
+        status=202,
+    )

@@ -17,7 +17,13 @@
     <select name="show" class="grid-field" onchange="this.form.submit()">
       <option value="all" {% if show == 'all' %}selected{% endif %}>All products</option>
       <option value="online" {% if show == 'online' %}selected{% endif %}>Sold online</option>
-      <option value="unlinked" {% if show == 'unlinked' %}selected{% endif %}>Not matched</option>
+      <option value="website" {% if show == 'website' %}selected{% endif %}>Website products</option>
+      <option value="pos-only" {% if show == 'pos-only' %}selected{% endif %}>POS only</option>
+      <option value="synced" {% if show == 'synced' %}selected{% endif %}>Synchronized</option>
+      <option value="pending" {% if show == 'pending' %}selected{% endif %}>Sync pending</option>
+      <option value="failed" {% if show == 'failed' %}selected{% endif %}>Sync failed</option>
+      <option value="review" {% if show == 'review' %}selected{% endif %}>Requires review</option>
+      <option value="low-stock" {% if show == 'low-stock' %}selected{% endif %}>Low stock</option>
     </select>
     <input type="text" name="q" value="{{ q }}" placeholder="Search by name or code" autocomplete="off">
     <i class="bi bi-search"></i>
@@ -29,26 +35,29 @@
     <div class="px-3 py-2 border-bottom d-flex gap-2 flex-wrap">
       <button class="btn btn-brand btn-sm" name="action" value="enable">Sell the ticked products online</button>
       <button class="btn btn-outline-secondary btn-sm" name="action" value="disable">Stop selling the ticked</button>
+      <button class="btn btn-outline-primary btn-sm" name="action" value="sync">Sync ticked products</button>
+      <button class="btn btn-outline-warning btn-sm" name="action" value="retry">Retry failed jobs</button>
       <button class="btn btn-outline-secondary btn-sm" name="action" value="resend" onclick="return confirm('Send all stock to the website again on the next sync?');">Resend all stock</button>
     </div>
     <div class="grid-wrap">
       <table class="grid">
         <thead>
-          <tr><th><input type="checkbox" id="all"></th><th>Code</th><th>Product</th><th class="num">POS stock</th><th>On the website</th><th>Online</th><th class="num">Last sent</th><th class="num">Will send</th></tr>
+          <tr><th><input type="checkbox" id="all"></th><th>Code</th><th>Product</th><th class="num">POS stock</th><th>On the website</th><th>Sync</th><th>Online</th><th class="num">Last sent</th><th class="num">Will send</th></tr>
         </thead>
         <tbody>
           {% for r in rows %}
           <tr class="{% if not r.p.is_active %}inactive{% endif %}">
-            <td><input type="checkbox" name="sel" value="{{ r.p.pk }}" class="pick" {% if not r.p.track_stock %}disabled title="Stock is not tracked for this product"{% endif %}></td>
+            <td><input type="checkbox" name="sel" value="{{ r.p.pk }}" class="pick"></td>
             <td>{{ r.p.code|default:"" }}</td>
             <td>{{ r.p.name }}{% if not r.p.is_active %} <span class="tag">Inactive</span>{% endif %}</td>
             <td class="num">{{ r.stock }}</td>
             <td style="white-space: normal;">{{ r.site }}</td>
+            <td>{% if r.sync_status == 'synced' %}<span class="st st-ok">Synced</span>{% elif r.sync_status == 'failed' %}<span class="st st-out" title="{{ r.sync_error }}">Failed</span>{% elif r.sync_status == 'review' %}<span class="st st-low">Review</span>{% else %}<span class="st st-na">Pending</span>{% endif %}</td>
             <td>{% if r.link and r.link.sell_online %}<span class="st st-ok">Online</span>{% else %}<span class="st st-na">No</span>{% endif %}</td>
             <td class="num">{{ r.sent }}</td>
             <td class="num">{{ r.next }}</td>
           </tr>
-          {% empty %}<tr><td colspan="8" class="grid-empty">No products match.</td></tr>{% endfor %}
+          {% empty %}<tr><td colspan="9" class="grid-empty">No products match.</td></tr>{% endfor %}
         </tbody>
       </table>
     </div>
@@ -62,6 +71,43 @@
   </div>
   {% endif %}
 </section>
+
+{% if review_jobs %}
+<section class="grid-panel mt-3">
+  <div class="px-3 py-2 border-bottom fw-semibold">Products requiring review</div>
+  <div class="grid-wrap">
+    <table class="grid">
+      <thead><tr><th>WooCommerce product</th><th>Reason</th><th>Detected</th></tr></thead>
+      <tbody>{% for job in review_jobs %}
+        <tr><td>#{{ job.woo_product_id }}</td><td style="white-space: normal;">{{ job.last_error }}</td><td>{{ job.created_at|date:"d-m-Y H:i" }}</td></tr>
+      {% endfor %}</tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+
+{% if conflicts %}
+<section class="grid-panel mt-3">
+  <div class="px-3 py-2 border-bottom fw-semibold">Conflicting product edits</div>
+  <div class="grid-wrap">
+    <table class="grid">
+      <thead><tr><th>POS product</th><th>Field</th><th>POS value</th><th>WooCommerce value</th><th>Keep</th></tr></thead>
+      <tbody>{% for conflict in conflicts %}
+        <tr>
+          <td>{{ conflict.product.name }} ({{ conflict.product.code }})</td>
+          <td>{{ conflict.field_name }}</td>
+          <td style="white-space: normal;">{{ conflict.pos_value }}</td>
+          <td style="white-space: normal;">{{ conflict.woo_value }}</td>
+          <td class="d-flex gap-1">
+            <form method="post" action="{% url 'woosync:resolve_conflict' conflict.pk %}">{% csrf_token %}<button class="btn btn-sm btn-outline-primary" name="resolution" value="pos">Keep POS</button></form>
+            <form method="post" action="{% url 'woosync:resolve_conflict' conflict.pk %}">{% csrf_token %}<button class="btn btn-sm btn-outline-secondary" name="resolution" value="woocommerce">Keep Woo</button></form>
+          </td>
+        </tr>
+      {% endfor %}</tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
 {% endblock %}
 
 {% block extra_js %}

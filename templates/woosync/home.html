@@ -59,6 +59,12 @@
     <div class="panel h-100"><div class="panel-body">
       <div class="fw-semibold mb-2">Products and synchronization</div>
       <p class="mb-1">{{ linked }} matched to the website &bull; {{ online }} marked Sell online &bull; {{ online_ready }} ready to send</p>
+      <div class="small text-muted mb-2">
+        POS: {{ product_stats.pos }} &bull; Website-linked: {{ product_stats.website }}
+        &bull; Synced: {{ product_stats.synced }} &bull; Pending: {{ product_stats.pending }}
+        &bull; Failed: {{ product_stats.failed }} &bull; Review: {{ product_stats.review }}
+        &bull; Low stock: {{ product_stats.low_stock }}
+      </div>
       <form method="post" action="{% url 'woosync:settings' %}" class="d-flex align-items-center gap-2 my-3">
         {% csrf_token %}
         <label class="small mb-0" for="holdback">Show the website this many units less:</label>
@@ -75,8 +81,8 @@
 </div>
 
 <div class="alert alert-light border mt-3 small mb-3">
-  While the sync is on, <strong>do not change stock inside WooCommerce</strong>. The POS is the single source of truth and overwrites it.
-  If the shop PC is off, the website keeps selling from the last stock it was sent, and new orders wait until the PC is back.
+  Simple products synchronize in both directions. Product webhook updates are queued and reconciled during the next sync.
+  If the shop PC or scheduled sync is unavailable, queued changes wait until synchronization resumes. Variable products are flagged for review and are not imported as simple products.
 </div>
 
 <section class="grid-panel">

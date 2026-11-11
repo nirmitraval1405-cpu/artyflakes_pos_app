@@ -291,6 +291,7 @@
     $("payUpiRef").value = "";
     $("payCardRef").value = "";
     $("payChequeRef").value = "";
+    $("allowCredit").checked = false;
     payInputs[preset].value = hStr(total);
     $("payError").hidden = true;
     $("payTotal").textContent = inr(total);
@@ -323,16 +324,23 @@
     } else {
       const paid = vals.cash + vals.upi + vals.card + vals.cheque;
       const change = paid - total;
+      const credit = $("allowCredit").checked;
       $("payPaid").textContent = inr(paid);
       if (paid < total) {
         $("payLeftLabel").textContent = "Due";
         $("payLeft").textContent = inr(total - paid);
+        if (credit && !state.customer) {
+          message = "Select a named customer before leaving a credit balance.";
+        } else if (credit && paid >= 0) {
+          valid = total > 0;
+        }
       } else {
         $("payLeftLabel").textContent = "Change to return";
         $("payLeft").textContent = inr(change);
       }
       if (change > vals.cash) message = "Only cash can be overpaid. UPI, card and cheque cannot be more than the bill.";
-      else valid = paid >= total && total > 0;
+      else if (paid >= total) valid = total > 0;
+      else if (!credit) message = "Add the full payment or select customer credit.";
     }
 
     if (!state.busy) {
@@ -344,6 +352,7 @@
   }
 
   Object.values(payInputs).forEach((i) => i.addEventListener("input", updatePay));
+  $("allowCredit").addEventListener("change", updatePay);
 
   document.querySelectorAll("[data-fill]").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -381,6 +390,7 @@
       })),
       bill_discount: { type: state.bill.kind || "none", value: state.bill.kind ? hStr(state.bill.value) : "0" },
       payments,
+      allow_credit: $("allowCredit").checked,
       expected_total: calc.total,
     };
   }

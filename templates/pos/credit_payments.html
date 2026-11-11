@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Credit payments · Artyflakes POS{% endblock %}
+{% block extra_css %}<link href="{% static 'css/inventory.css' %}" rel="stylesheet">{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h3>Credit payments</h3>
+    <p>Collect full or partial payments against customer balances.</p>
+  </div>
+</div>
+
+{% if messages %}
+  {% for message in messages %}<div class="alert alert-{{ message.tags|default:'info' }}">{{ message }}</div>{% endfor %}
+{% endif %}
+
+<div class="toolbar">
+  <a class="tb" href="{% url 'pos:screen' %}"><i class="bi bi-cart3"></i><span>POS</span></a>
+  <span class="count">Open balances: <strong>{{ total }}</strong></span>
+</div>
+
+<section class="grid-panel">
+  <div class="grid-wrap">
+    <table class="grid">
+      <thead>
+        <tr><th>Invoice</th><th>Date</th><th>Customer</th><th>Cashier</th><th class="num">Total</th><th class="num">Outstanding</th><th>Record payment</th></tr>
+      </thead>
+      <tbody>
+        {% for sale in page %}
+        <tr>
+          <td><a href="{% url 'pos:sale_detail' sale.pk %}"><strong>{{ sale.invoice_no }}</strong></a></td>
+          <td>{{ sale.created_at|date:"d-m-Y H:i" }}</td>
+          <td>{{ sale.customer.name }}{% if sale.customer.phone %}<div class="small text-muted">{{ sale.customer.phone }}</div>{% endif %}</td>
+          <td>{{ sale.cashier.get_full_name|default:sale.cashier.username }}</td>
+          <td class="num">₹{{ sale.total|floatformat:"2g" }}</td>
+          <td class="num"><strong>₹{{ sale.balance|floatformat:"2g" }}</strong></td>
+          <td>
+            <form method="post" action="{% url 'pos:credit_payment_collect' sale.pk %}" class="d-flex flex-wrap gap-2">
+              {% csrf_token %}
+              <input name="amount" class="form-control form-control-sm" inputmode="decimal" placeholder="Amount" required>
+              <select name="method" class="form-select form-select-sm" required>
+                {% for value, label in methods %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+              </select>
+              <input name="reference" class="form-control form-control-sm" maxlength="60" placeholder="Reference (optional)">
+              <button class="btn btn-brand btn-sm" type="submit">Record</button>
+            </form>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="grid-empty">No outstanding customer balances.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if page.has_other_pages %}
+  <div class="pager">
+    {% if page.has_previous %}<a href="?page={{ page.previous_page_number }}">&laquo; Previous</a>{% endif %}
+    <span>Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
+    {% if page.has_next %}<a href="?page={{ page.next_page_number }}">Next &raquo;</a>{% endif %}
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

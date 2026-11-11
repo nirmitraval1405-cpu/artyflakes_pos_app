@@ -2,14 +2,16 @@ from decimal import Decimal
 import tempfile
 from pathlib import Path
 
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.files.storage import default_storage
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
+from django.utils.datastructures import MultiValueDict
 
 from accounts.models import User
 
-from .forms import ProductForm
-from .models import Brand, Category, Product, StockMovement, Unit
+from .forms import CategoryForm, ProductForm
+from .models import Brand, Category, Product, ProductImage, StockMovement, Unit
 from .utils.barcode_generator import (
     create_barcode_image,
     generate_barcode,
@@ -273,6 +275,71 @@ class InventoryCatalogTests(TestCase):
         unit = Unit.objects.get(code="tray")
         self.assertFalse(unit.allow_fraction)
 
+    def test_category_create_supports_main_and_nested_subcategories(self):
+        main = Category.objects.create(name="Resin Material")
+        create_url = reverse("inventory:category_create")
+
+        response = self.client.get(create_url, {"parent": main.pk})
+        self.assertContains(response, "New subcategory")
+        self.assertEqual(int(response.context["form"]["parent"].value()), main.pk)
+
+        response = self.client.post(
+            create_url,
+            {"name": "Resin Moulds", "parent": main.pk},
+        )
+
+        self.assertRedirects(response, reverse("inventory:category_list"))
+        child = Category.objects.get(name="Resin Moulds")
+        self.assertEqual(child.parent, main)
+        self.assertEqual(str(child), "Resin Material / Resin Moulds")
+
+    def test_category_list_and_product_tree_show_subcategories_nested(self):
+        main = Category.objects.create(name="Art Material")
+        child = Category.objects.create(name="Brushes", parent=main)
+
+        response = self.client.get(reverse("inventory:category_list"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [(item.name, item.category_depth) for item in response.context["items"]],
+            [("Art Material", 0), ("Brushes", 1)],
+        )
+        self.assertContains(response, "Add subcategory")
+        product_response = self.client.get(reverse("inventory:product_list"))
+        self.assertContains(product_response, "Brushes")
+        self.assertContains(product_response, 'aria-label="Toggle Art Material subcategories"')
+        self.assertContains(product_response, 'id="category-children-')
+        self.assertContains(product_response, "category-children-inner")
+        self.assertContains(product_response, "category-chevron")
+        self.assertContains(product_response, "category-toggle")
+        child_row = next(c for c in product_response.context["categories"] if c.pk == child.pk)
+        self.assertEqual(child_row.category_depth, 1)
+
+        selected_response = self.client.get(reverse("inventory:product_list"), {"group": child.pk})
+        self.assertTrue(selected_response.context["category_tree"][0].tree_open)
+
+    def test_parent_category_cannot_be_deleted_while_it_has_subcategories(self):
+        main = Category.objects.create(name="Craft Material")
+        Category.objects.create(name="Paper", parent=main)
+
+        response = self.client.post(reverse("inventory:category_delete", args=[main.pk]))
+
+        self.assertRedirects(response, reverse("inventory:category_list"))
+        self.assertTrue(Category.objects.filter(pk=main.pk).exists())
+
+    def test_selecting_a_nested_category_still_filters_products_by_category(self):
+        main = Category.objects.create(name="Resin Material")
+        child = Category.objects.create(name="Resin Moulds", parent=main)
+        Product.objects.create(name="Main item", category=main)
+        Product.objects.create(name="Mould item", category=child)
+
+        response = self.client.get(reverse("inventory:product_list"), {"group": child.pk})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Mould item")
+        self.assertNotContains(response, "Main item")
+        self.assertTrue(response.context["category_tree"][0].tree_open)
+
     def test_unit_fraction_setting_controls_purchase_quantities(self):
         from purchase.services import PurchaseError, quantity
 
@@ -302,6 +369,47 @@ class InventoryCatalogTests(TestCase):
         product = form.save()
         self.assertEqual(product.brand, brand)
         self.assertEqual(product.unit, "roll")
+
+    def test_product_form_adds_multiple_gallery_images(self):
+        files = MultiValueDict({
+            "gallery_images": [
+                SimpleUploadedFile("front.png", b"front", content_type="image/png"),
+                SimpleUploadedFile("back.png", b"back", content_type="image/png"),
+            ]
+        })
+        form = ProductForm(
+            data={
+                "name": "Illustrated product",
+                "unit": "pcs",
+                "cost_price": "0",
+                "sale_price": "0",
+                "mrp": "0",
+                "gst_rate": "0",
+                "min_stock": "0",
+                "dimensions": "",
+                "tags_text": "",
+            },
+            files=files,
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        with tempfile.TemporaryDirectory() as media_root, override_settings(MEDIA_ROOT=media_root):
+            product = form.save()
+            self.assertEqual(
+                list(product.images.values_list("image", flat=True)),
+                ["products/gallery/front.png", "products/gallery/back.png"],
+            )
+
+    def test_category_parent_cannot_create_a_cycle(self):
+        parent = Category.objects.create(name="Parent")
+        child = Category.objects.create(name="Child", parent=parent)
+        form = CategoryForm(
+            data={"name": "Parent", "parent": child.pk},
+            instance=parent,
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("parent", form.errors)
 
     def test_in_use_catalog_items_cannot_be_deleted(self):
         category = Category.objects.create(name="Paper")

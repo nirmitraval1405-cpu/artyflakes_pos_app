@@ -115,6 +115,7 @@
         <div>{{ p.label }}{% if p.reference %} ({{ p.reference }}){% endif %}: {{ p.amount|floatformat:"2g" }}</div>
         {% endfor %}
         {% if sale.change_due > 0 %}<div>Change returned: {{ sale.change_due|floatformat:"2g" }}</div>{% endif %}
+        {% if balance_due > 0 %}<div><b>Balance due: {{ balance_due|floatformat:"2g" }}</b></div>{% endif %}
       </div>
       {% endif %}
 

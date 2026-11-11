@@ -196,4 +196,7 @@ WOOSYNC = {
     "SECRET": os.getenv("WOO_SECRET", ""),
     "TIMEOUT": 20,
     "QUERY_AUTH": os.getenv("WOO_QUERY_AUTH", "") == "1",   # only if the host strips the login header
+    "WEBHOOK_SECRET": os.getenv("WOO_WEBHOOK_SECRET", ""),
+    "MEDIA_USER": os.getenv("WOO_MEDIA_USER", ""),
+    "MEDIA_APP_PASSWORD": os.getenv("WOO_MEDIA_APP_PASSWORD", ""),
 }

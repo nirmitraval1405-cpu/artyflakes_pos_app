@@ -3,6 +3,7 @@ from decimal import Decimal
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.utils import timezone
 
 from core.models import TimeStampedModel
 from inventory.models import Product
@@ -18,6 +19,7 @@ class SyncState(models.Model):
     holdback_units = models.PositiveIntegerField(default=0)       # the website is shown this many units less
     orders_since = models.DateTimeField(null=True, blank=True)    # website orders created before this are ignored for good
     orders_cursor = models.DateTimeField(null=True, blank=True)   # the latest order change already seen
+    products_cursor = models.DateTimeField(null=True, blank=True)
     running_since = models.DateTimeField(null=True, blank=True)
     last_run_at = models.DateTimeField(null=True, blank=True)
     last_ok_at = models.DateTimeField(null=True, blank=True)
@@ -45,11 +47,58 @@ class WooLink(models.Model):
     woo_type = models.CharField(max_length=20, blank=True)         # simple, variable ...
     last_pushed_qty = models.IntegerField(null=True, blank=True)
     last_pushed_at = models.DateTimeField(null=True, blank=True)
+    last_synced_at = models.DateTimeField(null=True, blank=True)
+    woo_modified = models.DateTimeField(null=True, blank=True)
+    sync_status = models.CharField(max_length=20, default="pending")
+    sync_error = models.TextField(blank=True)
+    needs_review = models.BooleanField(default=False)
+    woo_category_ids = models.JSONField(default=list, blank=True)
+    woo_image_ids = models.JSONField(default=list, blank=True)
+    last_synced_data = models.JSONField(default=dict, blank=True)
 
     def __str__(self):
         return f"{self.product} -> {self.woo_product_id}"
 
 
+class ProductSyncJob(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        PROCESSING = "processing", "Processing"
+        FAILED = "failed", "Failed"
+        DONE = "done", "Done"
+        REVIEW = "review", "Review"
+
+    product = models.ForeignKey(
+        Product, null=True, blank=True, on_delete=models.SET_NULL, related_name="sync_jobs"
+    )
+    woo_product_id = models.PositiveBigIntegerField(null=True, blank=True)
+    direction = models.CharField(max_length=20)
+    event_type = models.CharField(max_length=30)
+    idempotency_key = models.CharField(max_length=100, unique=True)
+    payload = models.JSONField(default=dict, blank=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+    attempts = models.PositiveIntegerField(default=0)
+    available_at = models.DateTimeField(default=timezone.now)
+    last_error = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["created_at", "id"]
+        indexes = [models.Index(fields=["status", "available_at"])]
+
+
+class ProductSyncConflict(models.Model):
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="sync_conflicts")
+    field_name = models.CharField(max_length=40)
+    pos_value = models.JSONField(null=True, blank=True)
+    woo_value = models.JSONField(null=True, blank=True)
+    detected_at = models.DateTimeField(auto_now_add=True)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+    resolution = models.CharField(max_length=30, blank=True)
+
+    class Meta:
+        ordering = ["-detected_at", "-id"]
 class WebOrder(TimeStampedModel):
     """A copy of an order placed on the website."""
     woo_id = models.PositiveBigIntegerField(unique=True)
@@ -63,9 +112,12 @@ class WebOrder(TimeStampedModel):
     billing_address = models.TextField(blank=True)
     shipping_address = models.TextField(blank=True)
     payment_method = models.CharField(max_length=80, blank=True)
+    payment_method_code = models.CharField(max_length=80, blank=True)
+    transaction_id = models.CharField(max_length=100, blank=True)
     is_paid = models.BooleanField(default=False)
     total = models.DecimalField(default=0, **MONEY)
     currency = models.CharField(max_length=8, blank=True)
+    financial_data = models.JSONField(default=dict, blank=True)
     customer_note = models.CharField(max_length=500, blank=True)
     handled = models.BooleanField(default=False)
     handled_by = models.ForeignKey(

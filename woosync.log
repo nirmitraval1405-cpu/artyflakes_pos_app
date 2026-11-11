@@ -1,1 +1,1633 @@
 ﻿2026-11-11 13:12:54 OK: 0 new orders, 1 updated, 0 stock updates.
+2026-11-11 13:14:55 OK: 0 new orders, 1 updated, 0 stock updates.
+2026-11-11 13:16:55 OK: 0 new orders, 1 updated, 0 stock updates.
+2026-11-11 13:18:55 OK: 0 new orders, 1 updated, 0 stock updates.
+2026-11-11 13:20:55 OK: 0 new orders, 1 updated, 0 stock updates.
+2026-11-11 13:22:55 OK: 0 new orders, 1 updated, 0 stock updates.
+2026-11-11 13:24:56 OK: 0 new orders, 1 updated, 0 stock updates.
+2026-11-11 13:26:55 OK: 0 new orders, 1 updated, 0 stock updates.
+2026-11-11 13:28:55 OK: 0 new orders, 1 updated, 0 stock updates.
+2026-11-11 13:30:55 OK: 0 new orders, 1 updated, 0 stock updates.
+2026-11-11 13:32:56 OK: 0 new orders, 1 updated, 0 stock updates.
+2026-11-11 13:34:55 OK: 0 new orders, 1 updated, 0 stock updates.
+2026-11-11 13:36:55 OK: 0 new orders, 0 updated, 0 stock updates.
+2026-11-11 13:38:55 OK: 0 new orders, 0 updated, 0 stock updates.
+2026-11-11 13:40:56 OK: 0 new orders, 0 updated, 0 stock updates.
+2026-11-11 13:42:55 OK: 0 new orders, 0 updated, 0 stock updates.
+2026-11-11 13:44:55 OK: 0 new orders, 0 updated, 0 stock updates.
+2026-11-11 13:46:55 OK: 0 new orders, 0 updated, 0 stock updates.
+2026-11-11 13:48:55 OK: 0 new orders, 0 updated, 0 stock updates.
+2026-11-11 13:50:55 OK: 0 new orders, 0 updated, 0 stock updates.
+2026-11-11 13:52:55 OK: 0 new orders, 0 updated, 0 stock updates.
+2026-11-11 14:26:58 OK: 0 new orders, 0 updated, 0 stock updates.
+2026-11-11 14:28:57 OK: 0 new orders, 0 updated, 0 stock updates.
+2026-11-11 14:30:57 OK: 0 new orders, 0 updated, 0 stock updates.
+2026-11-11 14:32:57 OK: 0 new orders, 0 updated, 0 stock updates.
+2026-11-11 14:35:00 OK: 0 new orders, 0 updated, 0 stock updates.
+2026-11-11 14:36:57 OK: 0 new orders, 0 updated, 0 stock updates.
+2026-11-11 14:38:57 OK: 0 new orders, 0 updated, 0 stock updates.
+2026-11-11 14:40:59 OK: 0 new orders, 0 updated, 0 stock updates.
+2026-11-11 14:42:57 OK: 0 new orders, 0 updated, 0 stock updates.
+2026-11-11 14:44:57 OK: 0 new orders, 0 updated, 0 stock updates.
+2026-11-11 14:46:57 OK: 0 new orders, 0 updated, 0 stock updates.
+2026-11-11 14:48:57 OK: 0 new orders, 0 updated, 0 stock updates.
+2026-11-11 14:50:57 OK: 0 new orders, 0 updated, 0 stock updates.
+python.exe : Could not import website order 9203
+At E:\artyflakes-pos\static\js\sync_woo.ps1:11 char:1
++ & $python manage.py sync_woo 2>&1 | Out-File -Append -Encoding utf8 $ ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Could not import website order 9203:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Traceback (most recent call last):
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\psycopg\cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+psycopg.errors.UndefinedColumn: column woosync_weborder.payment_method_code does not exist
+LINE 1: ...ng_address", "woosync_weborder"."payment_method", "woosync_w...
+                                                             ^
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "E:\artyflakes-pos\woosync\sync.py", line 240, in import_orders
+    result = apply_order(payload)
+  File "E:\artyflakes-pos\woosync\sync.py", line 172, in apply_order
+    order = WebOrder.objects.select_for_update().filter(woo_id=woo_id).first()
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 1228, in first
+    for obj in queryset[:1]:
+               ~~~~~~~~^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 473, in __iter__
+    self._fetch_all()
+    ~~~~~~~~~~~~~~~^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 2287, in _fetch_all
+    self._result_cache = list(self._iterable_class(self))
+                         ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 131, in __iter__
+    results = compiler.execute_sql(
+        chunked_fetch=self.chunked_fetch, chunk_size=self.chunk_size
+    )
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\sql\compiler.py", line 1643, in execute_sql
+    cursor.execute(sql, params)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 122, in execute
+    return super().execute(sql, params)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 79, in execute
+    return self._execute_with_wrappers(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        sql, params, many=False, executor=self._execute
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 92, in _execute_with_wrappers
+    return executor(sql, params, many, context)
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 100, in _execute
+    with self.db.wrap_database_errors:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\utils.py", line 94, in __exit__
+    raise dj_exc_value.with_traceback(traceback) from exc_value
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\psycopg\cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+django.db.utils.ProgrammingError: column woosync_weborder.payment_method_code does not exist
+LINE 1: ...ng_address", "woosync_weborder"."payment_method", "woosync_w...
+                                                             ^
+CommandError: The sync reported a problem.
+2026-11-11 14:52:57 FAILED: 0 new orders, 0 updated, 0 stock updates. 1 orders failed to import. Order #9203 could not be imported.
+python.exe : Could not import website order 9203
+At E:\artyflakes-pos\static\js\sync_woo.ps1:11 char:1
++ & $python manage.py sync_woo 2>&1 | Out-File -Append -Encoding utf8 $ ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Could not import website order 9203:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Traceback (most recent call last):
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\psycopg\cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+psycopg.errors.UndefinedColumn: column woosync_weborder.payment_method_code does not exist
+LINE 1: ...ng_address", "woosync_weborder"."payment_method", "woosync_w...
+                                                             ^
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "E:\artyflakes-pos\woosync\sync.py", line 240, in import_orders
+    result = apply_order(payload)
+  File "E:\artyflakes-pos\woosync\sync.py", line 172, in apply_order
+    order = WebOrder.objects.select_for_update().filter(woo_id=woo_id).first()
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 1228, in first
+    for obj in queryset[:1]:
+               ~~~~~~~~^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 473, in __iter__
+    self._fetch_all()
+    ~~~~~~~~~~~~~~~^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 2287, in _fetch_all
+    self._result_cache = list(self._iterable_class(self))
+                         ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 131, in __iter__
+    results = compiler.execute_sql(
+        chunked_fetch=self.chunked_fetch, chunk_size=self.chunk_size
+    )
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\sql\compiler.py", line 1643, in execute_sql
+    cursor.execute(sql, params)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 122, in execute
+    return super().execute(sql, params)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 79, in execute
+    return self._execute_with_wrappers(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        sql, params, many=False, executor=self._execute
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 92, in _execute_with_wrappers
+    return executor(sql, params, many, context)
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 100, in _execute
+    with self.db.wrap_database_errors:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\utils.py", line 94, in __exit__
+    raise dj_exc_value.with_traceback(traceback) from exc_value
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\psycopg\cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+django.db.utils.ProgrammingError: column woosync_weborder.payment_method_code does not exist
+LINE 1: ...ng_address", "woosync_weborder"."payment_method", "woosync_w...
+                                                             ^
+CommandError: The sync reported a problem.
+2026-11-11 14:54:57 FAILED: 0 new orders, 0 updated, 0 stock updates. 1 orders failed to import. Order #9203 could not be imported.
+python.exe : Could not import website order 9203
+At E:\artyflakes-pos\static\js\sync_woo.ps1:11 char:1
++ & $python manage.py sync_woo 2>&1 | Out-File -Append -Encoding utf8 $ ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Could not import website order 9203:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Traceback (most recent call last):
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\psycopg\cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+psycopg.errors.UndefinedColumn: column woosync_weborder.payment_method_code does not exist
+LINE 1: ...ng_address", "woosync_weborder"."payment_method", "woosync_w...
+                                                             ^
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "E:\artyflakes-pos\woosync\sync.py", line 240, in import_orders
+    result = apply_order(payload)
+  File "E:\artyflakes-pos\woosync\sync.py", line 172, in apply_order
+    order = WebOrder.objects.select_for_update().filter(woo_id=woo_id).first()
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 1228, in first
+    for obj in queryset[:1]:
+               ~~~~~~~~^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 473, in __iter__
+    self._fetch_all()
+    ~~~~~~~~~~~~~~~^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 2287, in _fetch_all
+    self._result_cache = list(self._iterable_class(self))
+                         ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 131, in __iter__
+    results = compiler.execute_sql(
+        chunked_fetch=self.chunked_fetch, chunk_size=self.chunk_size
+    )
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\sql\compiler.py", line 1643, in execute_sql
+    cursor.execute(sql, params)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 122, in execute
+    return super().execute(sql, params)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 79, in execute
+    return self._execute_with_wrappers(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        sql, params, many=False, executor=self._execute
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 92, in _execute_with_wrappers
+    return executor(sql, params, many, context)
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 100, in _execute
+    with self.db.wrap_database_errors:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\utils.py", line 94, in __exit__
+    raise dj_exc_value.with_traceback(traceback) from exc_value
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\psycopg\cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+django.db.utils.ProgrammingError: column woosync_weborder.payment_method_code does not exist
+LINE 1: ...ng_address", "woosync_weborder"."payment_method", "woosync_w...
+                                                             ^
+CommandError: The sync reported a problem.
+2026-11-11 14:56:57 FAILED: 0 new orders, 0 updated, 0 stock updates. 1 orders failed to import. Order #9203 could not be imported.
+2026-11-11 14:58:57 OK: 0 new orders, 0 updated, 0 stock updates.
+2026-11-11 15:00:57 OK: 0 new orders, 0 updated, 0 stock updates.
+2026-11-11 15:02:57 OK: 0 new orders, 0 updated, 0 stock updates.
+2026-11-11 15:04:57 OK: 0 new orders, 0 updated, 0 stock updates.
+2026-11-11 15:06:57 OK: 0 new orders, 0 updated, 0 stock updates.
+2026-11-11 15:08:57 OK: 0 new orders, 0 updated, 0 stock updates.
+2026-11-11 15:10:57 OK: 0 new orders, 0 updated, 0 stock updates.
+2026-11-11 15:12:57 OK: 0 new orders, 0 updated, 0 stock updates.
+2026-11-11 15:14:56 OK: 0 new orders, 0 updated, 0 stock updates.
+python.exe : Website sync failed
+At E:\artyflakes-pos\static\js\sync_woo.ps1:11 char:1
++ & $python manage.py sync_woo 2>&1 | Out-File -Append -Encoding utf8 $ ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Website sync failed:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Traceback (most recent call last):
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\psycopg\cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+psycopg.errors.UndefinedColumn: column inventory_product.description does not exist
+LINE 1: ...oduct"."barcode", "inventory_product"."hsn_code", "inventory...
+                                                             ^
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "E:\artyflakes-pos\woosync\sync.py", line 387, in run_sync
+    push_stock(client, SyncState.load(), stats, allow_mass_zero)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\woosync\sync.py", line 287, in push_stock
+    plan = planned_pushes(state.holdback_units)
+  File "E:\artyflakes-pos\woosync\sync.py", line 276, in planned_pushes
+    for p in qs:
+             ^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 473, in __iter__
+    self._fetch_all()
+    ~~~~~~~~~~~~~~~^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 2287, in _fetch_all
+    self._result_cache = list(self._iterable_class(self))
+                         ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 131, in __iter__
+    results = compiler.execute_sql(
+        chunked_fetch=self.chunked_fetch, chunk_size=self.chunk_size
+    )
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\sql\compiler.py", line 1643, in execute_sql
+    cursor.execute(sql, params)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 122, in execute
+    return super().execute(sql, params)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 79, in execute
+    return self._execute_with_wrappers(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        sql, params, many=False, executor=self._execute
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 92, in _execute_with_wrappers
+    return executor(sql, params, many, context)
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 100, in _execute
+    with self.db.wrap_database_errors:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\utils.py", line 94, in __exit__
+    raise dj_exc_value.with_traceback(traceback) from exc_value
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\psycopg\cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+django.db.utils.ProgrammingError: column inventory_product.description does not exist
+LINE 1: ...oduct"."barcode", "inventory_product"."hsn_code", "inventory...
+                                                             ^
+CommandError: The sync reported a problem.
+2026-11-11 15:16:56 FAILED: 0 new orders, 0 updated, 0 stock updates. Something unexpected went wrong. The details are in the server log.
+python.exe : Traceback (most recent call last):
+At E:\artyflakes-pos\static\js\sync_woo.ps1:11 char:1
++ & $python manage.py sync_woo 2>&1 | Out-File -Append -Encoding utf8 $ ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback (most recent call last)::String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\psycopg\cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+psycopg.errors.UndefinedColumn: column woosync_syncstate.products_cursor does not exist
+LINE 1: ...ders_since", "woosync_syncstate"."orders_cursor", "woosync_s...
+                                                             ^
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "E:\artyflakes-pos\manage.py", line 22, in <module>
+    main()
+    ~~~~^^
+  File "E:\artyflakes-pos\manage.py", line 18, in main
+    execute_from_command_line(sys.argv)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\__init__.py", line 443, in 
+execute_from_command_line
+    utility.execute()
+    ~~~~~~~~~~~~~~~^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\__init__.py", line 437, in execute
+    self.fetch_command(subcommand).run_from_argv(self.argv)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\base.py", line 422, in run_from_argv
+    self.execute(*args, **cmd_options)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\base.py", line 466, in execute
+    output = self.handle(*args, **options)
+  File "E:\artyflakes-pos\woosync\management\commands\sync_woo.py", line 20, in handle
+    run = run_sync("scheduled")
+  File "E:\artyflakes-pos\woosync\sync.py", line 370, in run_sync
+    state = SyncState.objects.select_for_update().get_or_create(pk=1)[0]
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 1070, in get_or_create
+    return self.get(**kwargs), False
+           ~~~~~~~~^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 718, in get
+    num = len(clone)
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 455, in __len__
+    self._fetch_all()
+    ~~~~~~~~~~~~~~~^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 2287, in _fetch_all
+    self._result_cache = list(self._iterable_class(self))
+                         ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 131, in __iter__
+    results = compiler.execute_sql(
+        chunked_fetch=self.chunked_fetch, chunk_size=self.chunk_size
+    )
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\sql\compiler.py", line 1643, in execute_sql
+    cursor.execute(sql, params)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 122, in execute
+    return super().execute(sql, params)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 79, in execute
+    return self._execute_with_wrappers(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        sql, params, many=False, executor=self._execute
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 92, in _execute_with_wrappers
+    return executor(sql, params, many, context)
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 100, in _execute
+    with self.db.wrap_database_errors:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\utils.py", line 94, in __exit__
+    raise dj_exc_value.with_traceback(traceback) from exc_value
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\psycopg\cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+django.db.utils.ProgrammingError: column woosync_syncstate.products_cursor does not exist
+LINE 1: ...ders_since", "woosync_syncstate"."orders_cursor", "woosync_s...
+                                                             ^
+python.exe : Traceback (most recent call last):
+At E:\artyflakes-pos\static\js\sync_woo.ps1:11 char:1
++ & $python manage.py sync_woo 2>&1 | Out-File -Append -Encoding utf8 $ ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback (most recent call last)::String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\psycopg\cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+psycopg.errors.UndefinedColumn: column woosync_syncstate.products_cursor does not exist
+LINE 1: ...ders_since", "woosync_syncstate"."orders_cursor", "woosync_s...
+                                                             ^
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "E:\artyflakes-pos\manage.py", line 22, in <module>
+    main()
+    ~~~~^^
+  File "E:\artyflakes-pos\manage.py", line 18, in main
+    execute_from_command_line(sys.argv)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\__init__.py", line 443, in 
+execute_from_command_line
+    utility.execute()
+    ~~~~~~~~~~~~~~~^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\__init__.py", line 437, in execute
+    self.fetch_command(subcommand).run_from_argv(self.argv)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\base.py", line 422, in run_from_argv
+    self.execute(*args, **cmd_options)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\base.py", line 466, in execute
+    output = self.handle(*args, **options)
+  File "E:\artyflakes-pos\woosync\management\commands\sync_woo.py", line 20, in handle
+    run = run_sync("scheduled")
+  File "E:\artyflakes-pos\woosync\sync.py", line 371, in run_sync
+    state = SyncState.objects.select_for_update().get_or_create(pk=1)[0]
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 1070, in get_or_create
+    return self.get(**kwargs), False
+           ~~~~~~~~^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 718, in get
+    num = len(clone)
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 455, in __len__
+    self._fetch_all()
+    ~~~~~~~~~~~~~~~^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 2287, in _fetch_all
+    self._result_cache = list(self._iterable_class(self))
+                         ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 131, in __iter__
+    results = compiler.execute_sql(
+        chunked_fetch=self.chunked_fetch, chunk_size=self.chunk_size
+    )
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\sql\compiler.py", line 1643, in execute_sql
+    cursor.execute(sql, params)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 122, in execute
+    return super().execute(sql, params)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 79, in execute
+    return self._execute_with_wrappers(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        sql, params, many=False, executor=self._execute
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 92, in _execute_with_wrappers
+    return executor(sql, params, many, context)
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 100, in _execute
+    with self.db.wrap_database_errors:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\utils.py", line 94, in __exit__
+    raise dj_exc_value.with_traceback(traceback) from exc_value
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\psycopg\cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+django.db.utils.ProgrammingError: column woosync_syncstate.products_cursor does not exist
+LINE 1: ...ders_since", "woosync_syncstate"."orders_cursor", "woosync_s...
+                                                             ^
+python.exe : Traceback (most recent call last):
+At E:\artyflakes-pos\static\js\sync_woo.ps1:11 char:1
++ & $python manage.py sync_woo 2>&1 | Out-File -Append -Encoding utf8 $ ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback (most recent call last)::String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\psycopg\cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+psycopg.errors.UndefinedColumn: column woosync_syncstate.products_cursor does not exist
+LINE 1: ...ders_since", "woosync_syncstate"."orders_cursor", "woosync_s...
+                                                             ^
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "E:\artyflakes-pos\manage.py", line 22, in <module>
+    main()
+    ~~~~^^
+  File "E:\artyflakes-pos\manage.py", line 18, in main
+    execute_from_command_line(sys.argv)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\__init__.py", line 443, in 
+execute_from_command_line
+    utility.execute()
+    ~~~~~~~~~~~~~~~^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\__init__.py", line 437, in execute
+    self.fetch_command(subcommand).run_from_argv(self.argv)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\base.py", line 422, in run_from_argv
+    self.execute(*args, **cmd_options)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\base.py", line 466, in execute
+    output = self.handle(*args, **options)
+  File "E:\artyflakes-pos\woosync\management\commands\sync_woo.py", line 20, in handle
+    run = run_sync("scheduled")
+  File "E:\artyflakes-pos\woosync\sync.py", line 371, in run_sync
+    state = SyncState.objects.select_for_update().get_or_create(pk=1)[0]
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 1070, in get_or_create
+    return self.get(**kwargs), False
+           ~~~~~~~~^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 718, in get
+    num = len(clone)
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 455, in __len__
+    self._fetch_all()
+    ~~~~~~~~~~~~~~~^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 2287, in _fetch_all
+    self._result_cache = list(self._iterable_class(self))
+                         ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 131, in __iter__
+    results = compiler.execute_sql(
+        chunked_fetch=self.chunked_fetch, chunk_size=self.chunk_size
+    )
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\sql\compiler.py", line 1643, in execute_sql
+    cursor.execute(sql, params)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 122, in execute
+    return super().execute(sql, params)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 79, in execute
+    return self._execute_with_wrappers(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        sql, params, many=False, executor=self._execute
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 92, in _execute_with_wrappers
+    return executor(sql, params, many, context)
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 100, in _execute
+    with self.db.wrap_database_errors:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\utils.py", line 94, in __exit__
+    raise dj_exc_value.with_traceback(traceback) from exc_value
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\psycopg\cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+django.db.utils.ProgrammingError: column woosync_syncstate.products_cursor does not exist
+LINE 1: ...ders_since", "woosync_syncstate"."orders_cursor", "woosync_s...
+                                                             ^
+python.exe : Traceback (most recent call last):
+At E:\artyflakes-pos\static\js\sync_woo.ps1:11 char:1
++ & $python manage.py sync_woo 2>&1 | Out-File -Append -Encoding utf8 $ ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback (most recent call last)::String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\psycopg\cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+psycopg.errors.UndefinedColumn: column woosync_syncstate.products_cursor does not exist
+LINE 1: ...ders_since", "woosync_syncstate"."orders_cursor", "woosync_s...
+                                                             ^
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "E:\artyflakes-pos\manage.py", line 22, in <module>
+    main()
+    ~~~~^^
+  File "E:\artyflakes-pos\manage.py", line 18, in main
+    execute_from_command_line(sys.argv)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\__init__.py", line 443, in 
+execute_from_command_line
+    utility.execute()
+    ~~~~~~~~~~~~~~~^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\__init__.py", line 437, in execute
+    self.fetch_command(subcommand).run_from_argv(self.argv)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\base.py", line 422, in run_from_argv
+    self.execute(*args, **cmd_options)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\base.py", line 466, in execute
+    output = self.handle(*args, **options)
+  File "E:\artyflakes-pos\woosync\management\commands\sync_woo.py", line 20, in handle
+    run = run_sync("scheduled")
+  File "E:\artyflakes-pos\woosync\sync.py", line 379, in run_sync
+    state = SyncState.objects.select_for_update().get_or_create(pk=1)[0]
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 1070, in get_or_create
+    return self.get(**kwargs), False
+           ~~~~~~~~^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 718, in get
+    num = len(clone)
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 455, in __len__
+    self._fetch_all()
+    ~~~~~~~~~~~~~~~^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 2287, in _fetch_all
+    self._result_cache = list(self._iterable_class(self))
+                         ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 131, in __iter__
+    results = compiler.execute_sql(
+        chunked_fetch=self.chunked_fetch, chunk_size=self.chunk_size
+    )
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\sql\compiler.py", line 1643, in execute_sql
+    cursor.execute(sql, params)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 122, in execute
+    return super().execute(sql, params)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 79, in execute
+    return self._execute_with_wrappers(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        sql, params, many=False, executor=self._execute
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 92, in _execute_with_wrappers
+    return executor(sql, params, many, context)
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 100, in _execute
+    with self.db.wrap_database_errors:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\utils.py", line 94, in __exit__
+    raise dj_exc_value.with_traceback(traceback) from exc_value
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\psycopg\cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+django.db.utils.ProgrammingError: column woosync_syncstate.products_cursor does not exist
+LINE 1: ...ders_since", "woosync_syncstate"."orders_cursor", "woosync_s...
+                                                             ^
+python.exe : Traceback (most recent call last):
+At E:\artyflakes-pos\static\js\sync_woo.ps1:11 char:1
++ & $python manage.py sync_woo 2>&1 | Out-File -Append -Encoding utf8 $ ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback (most recent call last)::String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\psycopg\cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+psycopg.errors.UndefinedColumn: column woosync_syncstate.products_cursor does not exist
+LINE 1: ...ders_since", "woosync_syncstate"."orders_cursor", "woosync_s...
+                                                             ^
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "E:\artyflakes-pos\manage.py", line 22, in <module>
+    main()
+    ~~~~^^
+  File "E:\artyflakes-pos\manage.py", line 18, in main
+    execute_from_command_line(sys.argv)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\__init__.py", line 443, in 
+execute_from_command_line
+    utility.execute()
+    ~~~~~~~~~~~~~~~^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\__init__.py", line 437, in execute
+    self.fetch_command(subcommand).run_from_argv(self.argv)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\base.py", line 422, in run_from_argv
+    self.execute(*args, **cmd_options)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\base.py", line 466, in execute
+    output = self.handle(*args, **options)
+  File "E:\artyflakes-pos\woosync\management\commands\sync_woo.py", line 20, in handle
+    run = run_sync("scheduled")
+  File "E:\artyflakes-pos\woosync\sync.py", line 379, in run_sync
+    state = SyncState.objects.select_for_update().get_or_create(pk=1)[0]
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 1070, in get_or_create
+    return self.get(**kwargs), False
+           ~~~~~~~~^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 718, in get
+    num = len(clone)
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 455, in __len__
+    self._fetch_all()
+    ~~~~~~~~~~~~~~~^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 2287, in _fetch_all
+    self._result_cache = list(self._iterable_class(self))
+                         ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 131, in __iter__
+    results = compiler.execute_sql(
+        chunked_fetch=self.chunked_fetch, chunk_size=self.chunk_size
+    )
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\sql\compiler.py", line 1643, in execute_sql
+    cursor.execute(sql, params)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 122, in execute
+    return super().execute(sql, params)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 79, in execute
+    return self._execute_with_wrappers(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        sql, params, many=False, executor=self._execute
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 92, in _execute_with_wrappers
+    return executor(sql, params, many, context)
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 100, in _execute
+    with self.db.wrap_database_errors:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\utils.py", line 94, in __exit__
+    raise dj_exc_value.with_traceback(traceback) from exc_value
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\psycopg\cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+django.db.utils.ProgrammingError: column woosync_syncstate.products_cursor does not exist
+LINE 1: ...ders_since", "woosync_syncstate"."orders_cursor", "woosync_s...
+                                                             ^
+python.exe : Traceback (most recent call last):
+At E:\artyflakes-pos\static\js\sync_woo.ps1:11 char:1
++ & $python manage.py sync_woo 2>&1 | Out-File -Append -Encoding utf8 $ ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback (most recent call last)::String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  File "E:\artyflakes-pos\manage.py", line 22, in <module>
+    main()
+    ~~~~^^
+  File "E:\artyflakes-pos\manage.py", line 18, in main
+    execute_from_command_line(sys.argv)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\__init__.py", line 443, in 
+execute_from_command_line
+    utility.execute()
+    ~~~~~~~~~~~~~~~^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\__init__.py", line 417, in execute
+    django.setup()
+    ~~~~~~~~~~~~^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\__init__.py", line 24, in setup
+    apps.populate(settings.INSTALLED_APPS)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\apps\registry.py", line 124, in populate
+    app_config.ready()
+    ~~~~~~~~~~~~~~~~^^
+  File "E:\artyflakes-pos\woosync\apps.py", line 10, in ready
+    from . import signals
+  File "E:\artyflakes-pos\woosync\signals.py", line 73
+    woo_product_id=woo_id,
+    ^^^^^^^^^^^^^^^^^^^^^
+SyntaxError: keyword argument repeated: woo_product_id
+python.exe : Traceback (most recent call last):
+At E:\artyflakes-pos\static\js\sync_woo.ps1:11 char:1
++ & $python manage.py sync_woo 2>&1 | Out-File -Append -Encoding utf8 $ ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback (most recent call last)::String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\psycopg\cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+psycopg.errors.UndefinedColumn: column woosync_syncstate.products_cursor does not exist
+LINE 1: ...ders_since", "woosync_syncstate"."orders_cursor", "woosync_s...
+                                                             ^
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "E:\artyflakes-pos\manage.py", line 22, in <module>
+    main()
+    ~~~~^^
+  File "E:\artyflakes-pos\manage.py", line 18, in main
+    execute_from_command_line(sys.argv)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\__init__.py", line 443, in 
+execute_from_command_line
+    utility.execute()
+    ~~~~~~~~~~~~~~~^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\__init__.py", line 437, in execute
+    self.fetch_command(subcommand).run_from_argv(self.argv)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\base.py", line 422, in run_from_argv
+    self.execute(*args, **cmd_options)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\base.py", line 466, in execute
+    output = self.handle(*args, **options)
+  File "E:\artyflakes-pos\woosync\management\commands\sync_woo.py", line 20, in handle
+    run = run_sync("scheduled")
+  File "E:\artyflakes-pos\woosync\sync.py", line 379, in run_sync
+    state = SyncState.objects.select_for_update().get_or_create(pk=1)[0]
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 1070, in get_or_create
+    return self.get(**kwargs), False
+           ~~~~~~~~^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 718, in get
+    num = len(clone)
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 455, in __len__
+    self._fetch_all()
+    ~~~~~~~~~~~~~~~^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 2287, in _fetch_all
+    self._result_cache = list(self._iterable_class(self))
+                         ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 131, in __iter__
+    results = compiler.execute_sql(
+        chunked_fetch=self.chunked_fetch, chunk_size=self.chunk_size
+    )
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\sql\compiler.py", line 1643, in execute_sql
+    cursor.execute(sql, params)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 122, in execute
+    return super().execute(sql, params)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 79, in execute
+    return self._execute_with_wrappers(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        sql, params, many=False, executor=self._execute
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 92, in _execute_with_wrappers
+    return executor(sql, params, many, context)
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 100, in _execute
+    with self.db.wrap_database_errors:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\utils.py", line 94, in __exit__
+    raise dj_exc_value.with_traceback(traceback) from exc_value
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\psycopg\cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+django.db.utils.ProgrammingError: column woosync_syncstate.products_cursor does not exist
+LINE 1: ...ders_since", "woosync_syncstate"."orders_cursor", "woosync_s...
+                                                             ^
+python.exe : Traceback (most recent call last):
+At E:\artyflakes-pos\static\js\sync_woo.ps1:11 char:1
++ & $python manage.py sync_woo 2>&1 | Out-File -Append -Encoding utf8 $ ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback (most recent call last)::String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\psycopg\cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+psycopg.errors.UndefinedColumn: column woosync_syncstate.products_cursor does not exist
+LINE 1: ...ders_since", "woosync_syncstate"."orders_cursor", "woosync_s...
+                                                             ^
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "E:\artyflakes-pos\manage.py", line 22, in <module>
+    main()
+    ~~~~^^
+  File "E:\artyflakes-pos\manage.py", line 18, in main
+    execute_from_command_line(sys.argv)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\__init__.py", line 443, in 
+execute_from_command_line
+    utility.execute()
+    ~~~~~~~~~~~~~~~^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\__init__.py", line 437, in execute
+    self.fetch_command(subcommand).run_from_argv(self.argv)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\base.py", line 422, in run_from_argv
+    self.execute(*args, **cmd_options)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\base.py", line 466, in execute
+    output = self.handle(*args, **options)
+  File "E:\artyflakes-pos\woosync\management\commands\sync_woo.py", line 20, in handle
+    run = run_sync("scheduled")
+  File "E:\artyflakes-pos\woosync\sync.py", line 379, in run_sync
+    state = SyncState.objects.select_for_update().get_or_create(pk=1)[0]
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 1070, in get_or_create
+    return self.get(**kwargs), False
+           ~~~~~~~~^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 718, in get
+    num = len(clone)
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 455, in __len__
+    self._fetch_all()
+    ~~~~~~~~~~~~~~~^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 2287, in _fetch_all
+    self._result_cache = list(self._iterable_class(self))
+                         ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 131, in __iter__
+    results = compiler.execute_sql(
+        chunked_fetch=self.chunked_fetch, chunk_size=self.chunk_size
+    )
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\sql\compiler.py", line 1643, in execute_sql
+    cursor.execute(sql, params)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 122, in execute
+    return super().execute(sql, params)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 79, in execute
+    return self._execute_with_wrappers(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        sql, params, many=False, executor=self._execute
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 92, in _execute_with_wrappers
+    return executor(sql, params, many, context)
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 100, in _execute
+    with self.db.wrap_database_errors:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\utils.py", line 94, in __exit__
+    raise dj_exc_value.with_traceback(traceback) from exc_value
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\psycopg\cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+django.db.utils.ProgrammingError: column woosync_syncstate.products_cursor does not exist
+LINE 1: ...ders_since", "woosync_syncstate"."orders_cursor", "woosync_s...
+                                                             ^
+python.exe : Traceback (most recent call last):
+At E:\artyflakes-pos\static\js\sync_woo.ps1:11 char:1
++ & $python manage.py sync_woo 2>&1 | Out-File -Append -Encoding utf8 $ ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback (most recent call last)::String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\psycopg\cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+psycopg.errors.UndefinedColumn: column woosync_syncstate.products_cursor does not exist
+LINE 1: ...ders_since", "woosync_syncstate"."orders_cursor", "woosync_s...
+                                                             ^
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "E:\artyflakes-pos\manage.py", line 22, in <module>
+    main()
+    ~~~~^^
+  File "E:\artyflakes-pos\manage.py", line 18, in main
+    execute_from_command_line(sys.argv)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\__init__.py", line 443, in 
+execute_from_command_line
+    utility.execute()
+    ~~~~~~~~~~~~~~~^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\__init__.py", line 437, in execute
+    self.fetch_command(subcommand).run_from_argv(self.argv)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\base.py", line 422, in run_from_argv
+    self.execute(*args, **cmd_options)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\base.py", line 466, in execute
+    output = self.handle(*args, **options)
+  File "E:\artyflakes-pos\woosync\management\commands\sync_woo.py", line 20, in handle
+    run = run_sync("scheduled")
+  File "E:\artyflakes-pos\woosync\sync.py", line 379, in run_sync
+    state = SyncState.objects.select_for_update().get_or_create(pk=1)[0]
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 1070, in get_or_create
+    return self.get(**kwargs), False
+           ~~~~~~~~^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 718, in get
+    num = len(clone)
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 455, in __len__
+    self._fetch_all()
+    ~~~~~~~~~~~~~~~^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 2287, in _fetch_all
+    self._result_cache = list(self._iterable_class(self))
+                         ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 131, in __iter__
+    results = compiler.execute_sql(
+        chunked_fetch=self.chunked_fetch, chunk_size=self.chunk_size
+    )
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\sql\compiler.py", line 1643, in execute_sql
+    cursor.execute(sql, params)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 122, in execute
+    return super().execute(sql, params)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 79, in execute
+    return self._execute_with_wrappers(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        sql, params, many=False, executor=self._execute
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 92, in _execute_with_wrappers
+    return executor(sql, params, many, context)
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 100, in _execute
+    with self.db.wrap_database_errors:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\utils.py", line 94, in __exit__
+    raise dj_exc_value.with_traceback(traceback) from exc_value
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\psycopg\cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+django.db.utils.ProgrammingError: column woosync_syncstate.products_cursor does not exist
+LINE 1: ...ders_since", "woosync_syncstate"."orders_cursor", "woosync_s...
+                                                             ^
+python.exe : Traceback (most recent call last):
+At E:\artyflakes-pos\static\js\sync_woo.ps1:11 char:1
++ & $python manage.py sync_woo 2>&1 | Out-File -Append -Encoding utf8 $ ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback (most recent call last)::String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\psycopg\cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+psycopg.errors.UndefinedColumn: column woosync_syncstate.products_cursor does not exist
+LINE 1: ...ders_since", "woosync_syncstate"."orders_cursor", "woosync_s...
+                                                             ^
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "E:\artyflakes-pos\manage.py", line 22, in <module>
+    main()
+    ~~~~^^
+  File "E:\artyflakes-pos\manage.py", line 18, in main
+    execute_from_command_line(sys.argv)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\__init__.py", line 443, in 
+execute_from_command_line
+    utility.execute()
+    ~~~~~~~~~~~~~~~^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\__init__.py", line 437, in execute
+    self.fetch_command(subcommand).run_from_argv(self.argv)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\base.py", line 422, in run_from_argv
+    self.execute(*args, **cmd_options)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\base.py", line 466, in execute
+    output = self.handle(*args, **options)
+  File "E:\artyflakes-pos\woosync\management\commands\sync_woo.py", line 20, in handle
+    run = run_sync("scheduled")
+  File "E:\artyflakes-pos\woosync\sync.py", line 379, in run_sync
+    state = SyncState.objects.select_for_update().get_or_create(pk=1)[0]
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 1070, in get_or_create
+    return self.get(**kwargs), False
+           ~~~~~~~~^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 718, in get
+    num = len(clone)
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 455, in __len__
+    self._fetch_all()
+    ~~~~~~~~~~~~~~~^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 2287, in _fetch_all
+    self._result_cache = list(self._iterable_class(self))
+                         ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 131, in __iter__
+    results = compiler.execute_sql(
+        chunked_fetch=self.chunked_fetch, chunk_size=self.chunk_size
+    )
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\sql\compiler.py", line 1643, in execute_sql
+    cursor.execute(sql, params)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 122, in execute
+    return super().execute(sql, params)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 79, in execute
+    return self._execute_with_wrappers(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        sql, params, many=False, executor=self._execute
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 92, in _execute_with_wrappers
+    return executor(sql, params, many, context)
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 100, in _execute
+    with self.db.wrap_database_errors:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\utils.py", line 94, in __exit__
+    raise dj_exc_value.with_traceback(traceback) from exc_value
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\psycopg\cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+django.db.utils.ProgrammingError: column woosync_syncstate.products_cursor does not exist
+LINE 1: ...ders_since", "woosync_syncstate"."orders_cursor", "woosync_s...
+                                                             ^
+python.exe : Traceback (most recent call last):
+At E:\artyflakes-pos\static\js\sync_woo.ps1:11 char:1
++ & $python manage.py sync_woo 2>&1 | Out-File -Append -Encoding utf8 $ ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback (most recent call last)::String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\psycopg\cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+psycopg.errors.UndefinedColumn: column woosync_syncstate.products_cursor does not exist
+LINE 1: ...ders_since", "woosync_syncstate"."orders_cursor", "woosync_s...
+                                                             ^
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "E:\artyflakes-pos\manage.py", line 22, in <module>
+    main()
+    ~~~~^^
+  File "E:\artyflakes-pos\manage.py", line 18, in main
+    execute_from_command_line(sys.argv)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\__init__.py", line 443, in 
+execute_from_command_line
+    utility.execute()
+    ~~~~~~~~~~~~~~~^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\__init__.py", line 437, in execute
+    self.fetch_command(subcommand).run_from_argv(self.argv)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\base.py", line 422, in run_from_argv
+    self.execute(*args, **cmd_options)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\base.py", line 466, in execute
+    output = self.handle(*args, **options)
+  File "E:\artyflakes-pos\woosync\management\commands\sync_woo.py", line 20, in handle
+    run = run_sync("scheduled")
+  File "E:\artyflakes-pos\woosync\sync.py", line 379, in run_sync
+    state = SyncState.objects.select_for_update().get_or_create(pk=1)[0]
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 1070, in get_or_create
+    return self.get(**kwargs), False
+           ~~~~~~~~^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 718, in get
+    num = len(clone)
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 455, in __len__
+    self._fetch_all()
+    ~~~~~~~~~~~~~~~^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 2287, in _fetch_all
+    self._result_cache = list(self._iterable_class(self))
+                         ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 131, in __iter__
+    results = compiler.execute_sql(
+        chunked_fetch=self.chunked_fetch, chunk_size=self.chunk_size
+    )
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\sql\compiler.py", line 1643, in execute_sql
+    cursor.execute(sql, params)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 122, in execute
+    return super().execute(sql, params)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 79, in execute
+    return self._execute_with_wrappers(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        sql, params, many=False, executor=self._execute
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 92, in _execute_with_wrappers
+    return executor(sql, params, many, context)
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 100, in _execute
+    with self.db.wrap_database_errors:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\utils.py", line 94, in __exit__
+    raise dj_exc_value.with_traceback(traceback) from exc_value
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\psycopg\cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+django.db.utils.ProgrammingError: column woosync_syncstate.products_cursor does not exist
+LINE 1: ...ders_since", "woosync_syncstate"."orders_cursor", "woosync_s...
+                                                             ^
+python.exe : Traceback (most recent call last):
+At E:\artyflakes-pos\static\js\sync_woo.ps1:11 char:1
++ & $python manage.py sync_woo 2>&1 | Out-File -Append -Encoding utf8 $ ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback (most recent call last)::String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\psycopg\cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+psycopg.errors.UndefinedColumn: column woosync_syncstate.products_cursor does not exist
+LINE 1: ...ders_since", "woosync_syncstate"."orders_cursor", "woosync_s...
+                                                             ^
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "E:\artyflakes-pos\manage.py", line 22, in <module>
+    main()
+    ~~~~^^
+  File "E:\artyflakes-pos\manage.py", line 18, in main
+    execute_from_command_line(sys.argv)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\__init__.py", line 443, in 
+execute_from_command_line
+    utility.execute()
+    ~~~~~~~~~~~~~~~^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\__init__.py", line 437, in execute
+    self.fetch_command(subcommand).run_from_argv(self.argv)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\base.py", line 422, in run_from_argv
+    self.execute(*args, **cmd_options)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\base.py", line 466, in execute
+    output = self.handle(*args, **options)
+  File "E:\artyflakes-pos\woosync\management\commands\sync_woo.py", line 20, in handle
+    run = run_sync("scheduled")
+  File "E:\artyflakes-pos\woosync\sync.py", line 379, in run_sync
+    state = SyncState.objects.select_for_update().get_or_create(pk=1)[0]
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 1070, in get_or_create
+    return self.get(**kwargs), False
+           ~~~~~~~~^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 718, in get
+    num = len(clone)
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 455, in __len__
+    self._fetch_all()
+    ~~~~~~~~~~~~~~~^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 2287, in _fetch_all
+    self._result_cache = list(self._iterable_class(self))
+                         ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 131, in __iter__
+    results = compiler.execute_sql(
+        chunked_fetch=self.chunked_fetch, chunk_size=self.chunk_size
+    )
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\sql\compiler.py", line 1643, in execute_sql
+    cursor.execute(sql, params)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 122, in execute
+    return super().execute(sql, params)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 79, in execute
+    return self._execute_with_wrappers(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        sql, params, many=False, executor=self._execute
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 92, in _execute_with_wrappers
+    return executor(sql, params, many, context)
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 100, in _execute
+    with self.db.wrap_database_errors:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\utils.py", line 94, in __exit__
+    raise dj_exc_value.with_traceback(traceback) from exc_value
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\psycopg\cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+django.db.utils.ProgrammingError: column woosync_syncstate.products_cursor does not exist
+LINE 1: ...ders_since", "woosync_syncstate"."orders_cursor", "woosync_s...
+                                                             ^
+python.exe : Traceback (most recent call last):
+At E:\artyflakes-pos\static\js\sync_woo.ps1:11 char:1
++ & $python manage.py sync_woo 2>&1 | Out-File -Append -Encoding utf8 $ ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback (most recent call last)::String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\psycopg\cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+psycopg.errors.UndefinedColumn: column woosync_syncstate.products_cursor does not exist
+LINE 1: ...ders_since", "woosync_syncstate"."orders_cursor", "woosync_s...
+                                                             ^
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "E:\artyflakes-pos\manage.py", line 22, in <module>
+    main()
+    ~~~~^^
+  File "E:\artyflakes-pos\manage.py", line 18, in main
+    execute_from_command_line(sys.argv)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\__init__.py", line 443, in 
+execute_from_command_line
+    utility.execute()
+    ~~~~~~~~~~~~~~~^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\__init__.py", line 437, in execute
+    self.fetch_command(subcommand).run_from_argv(self.argv)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\base.py", line 422, in run_from_argv
+    self.execute(*args, **cmd_options)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\base.py", line 466, in execute
+    output = self.handle(*args, **options)
+  File "E:\artyflakes-pos\woosync\management\commands\sync_woo.py", line 20, in handle
+    run = run_sync("scheduled")
+  File "E:\artyflakes-pos\woosync\sync.py", line 379, in run_sync
+    state = SyncState.objects.select_for_update().get_or_create(pk=1)[0]
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 1070, in get_or_create
+    return self.get(**kwargs), False
+           ~~~~~~~~^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 718, in get
+    num = len(clone)
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 455, in __len__
+    self._fetch_all()
+    ~~~~~~~~~~~~~~~^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 2287, in _fetch_all
+    self._result_cache = list(self._iterable_class(self))
+                         ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 131, in __iter__
+    results = compiler.execute_sql(
+        chunked_fetch=self.chunked_fetch, chunk_size=self.chunk_size
+    )
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\sql\compiler.py", line 1643, in execute_sql
+    cursor.execute(sql, params)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 122, in execute
+    return super().execute(sql, params)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 79, in execute
+    return self._execute_with_wrappers(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        sql, params, many=False, executor=self._execute
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 92, in _execute_with_wrappers
+    return executor(sql, params, many, context)
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 100, in _execute
+    with self.db.wrap_database_errors:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\utils.py", line 94, in __exit__
+    raise dj_exc_value.with_traceback(traceback) from exc_value
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\psycopg\cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+django.db.utils.ProgrammingError: column woosync_syncstate.products_cursor does not exist
+LINE 1: ...ders_since", "woosync_syncstate"."orders_cursor", "woosync_s...
+                                                             ^
+python.exe : Traceback (most recent call last):
+At E:\artyflakes-pos\static\js\sync_woo.ps1:11 char:1
++ & $python manage.py sync_woo 2>&1 | Out-File -Append -Encoding utf8 $ ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback (most recent call last)::String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\psycopg\cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+psycopg.errors.UndefinedColumn: column woosync_syncstate.products_cursor does not exist
+LINE 1: ...ders_since", "woosync_syncstate"."orders_cursor", "woosync_s...
+                                                             ^
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "E:\artyflakes-pos\manage.py", line 22, in <module>
+    main()
+    ~~~~^^
+  File "E:\artyflakes-pos\manage.py", line 18, in main
+    execute_from_command_line(sys.argv)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\__init__.py", line 443, in 
+execute_from_command_line
+    utility.execute()
+    ~~~~~~~~~~~~~~~^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\__init__.py", line 437, in execute
+    self.fetch_command(subcommand).run_from_argv(self.argv)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\base.py", line 422, in run_from_argv
+    self.execute(*args, **cmd_options)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\base.py", line 466, in execute
+    output = self.handle(*args, **options)
+  File "E:\artyflakes-pos\woosync\management\commands\sync_woo.py", line 20, in handle
+    run = run_sync("scheduled")
+  File "E:\artyflakes-pos\woosync\sync.py", line 379, in run_sync
+    state = SyncState.objects.select_for_update().get_or_create(pk=1)[0]
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 1070, in get_or_create
+    return self.get(**kwargs), False
+           ~~~~~~~~^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 718, in get
+    num = len(clone)
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 455, in __len__
+    self._fetch_all()
+    ~~~~~~~~~~~~~~~^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 2287, in _fetch_all
+    self._result_cache = list(self._iterable_class(self))
+                         ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 131, in __iter__
+    results = compiler.execute_sql(
+        chunked_fetch=self.chunked_fetch, chunk_size=self.chunk_size
+    )
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\sql\compiler.py", line 1643, in execute_sql
+    cursor.execute(sql, params)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 122, in execute
+    return super().execute(sql, params)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 79, in execute
+    return self._execute_with_wrappers(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        sql, params, many=False, executor=self._execute
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 92, in _execute_with_wrappers
+    return executor(sql, params, many, context)
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 100, in _execute
+    with self.db.wrap_database_errors:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\utils.py", line 94, in __exit__
+    raise dj_exc_value.with_traceback(traceback) from exc_value
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\psycopg\cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+django.db.utils.ProgrammingError: column woosync_syncstate.products_cursor does not exist
+LINE 1: ...ders_since", "woosync_syncstate"."orders_cursor", "woosync_s...
+                                                             ^
+python.exe : Traceback (most recent call last):
+At E:\artyflakes-pos\static\js\sync_woo.ps1:11 char:1
++ & $python manage.py sync_woo 2>&1 | Out-File -Append -Encoding utf8 $ ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback (most recent call last)::String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\psycopg\cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+psycopg.errors.UndefinedColumn: column woosync_syncstate.products_cursor does not exist
+LINE 1: ...ders_since", "woosync_syncstate"."orders_cursor", "woosync_s...
+                                                             ^
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "E:\artyflakes-pos\manage.py", line 22, in <module>
+    main()
+    ~~~~^^
+  File "E:\artyflakes-pos\manage.py", line 18, in main
+    execute_from_command_line(sys.argv)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\__init__.py", line 443, in 
+execute_from_command_line
+    utility.execute()
+    ~~~~~~~~~~~~~~~^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\__init__.py", line 437, in execute
+    self.fetch_command(subcommand).run_from_argv(self.argv)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\base.py", line 422, in run_from_argv
+    self.execute(*args, **cmd_options)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\base.py", line 466, in execute
+    output = self.handle(*args, **options)
+  File "E:\artyflakes-pos\woosync\management\commands\sync_woo.py", line 20, in handle
+    run = run_sync("scheduled")
+  File "E:\artyflakes-pos\woosync\sync.py", line 379, in run_sync
+    state = SyncState.objects.select_for_update().get_or_create(pk=1)[0]
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 1070, in get_or_create
+    return self.get(**kwargs), False
+           ~~~~~~~~^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 718, in get
+    num = len(clone)
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 455, in __len__
+    self._fetch_all()
+    ~~~~~~~~~~~~~~~^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 2287, in _fetch_all
+    self._result_cache = list(self._iterable_class(self))
+                         ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 131, in __iter__
+    results = compiler.execute_sql(
+        chunked_fetch=self.chunked_fetch, chunk_size=self.chunk_size
+    )
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\sql\compiler.py", line 1643, in execute_sql
+    cursor.execute(sql, params)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 122, in execute
+    return super().execute(sql, params)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 79, in execute
+    return self._execute_with_wrappers(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        sql, params, many=False, executor=self._execute
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 92, in _execute_with_wrappers
+    return executor(sql, params, many, context)
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 100, in _execute
+    with self.db.wrap_database_errors:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\utils.py", line 94, in __exit__
+    raise dj_exc_value.with_traceback(traceback) from exc_value
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\psycopg\cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+django.db.utils.ProgrammingError: column woosync_syncstate.products_cursor does not exist
+LINE 1: ...ders_since", "woosync_syncstate"."orders_cursor", "woosync_s...
+                                                             ^
+python.exe : Traceback (most recent call last):
+At E:\artyflakes-pos\static\js\sync_woo.ps1:11 char:1
++ & $python manage.py sync_woo 2>&1 | Out-File -Append -Encoding utf8 $ ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback (most recent call last)::String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\psycopg\cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+psycopg.errors.UndefinedColumn: column woosync_syncstate.products_cursor does not exist
+LINE 1: ...ders_since", "woosync_syncstate"."orders_cursor", "woosync_s...
+                                                             ^
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "E:\artyflakes-pos\manage.py", line 22, in <module>
+    main()
+    ~~~~^^
+  File "E:\artyflakes-pos\manage.py", line 18, in main
+    execute_from_command_line(sys.argv)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\__init__.py", line 443, in 
+execute_from_command_line
+    utility.execute()
+    ~~~~~~~~~~~~~~~^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\__init__.py", line 437, in execute
+    self.fetch_command(subcommand).run_from_argv(self.argv)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\base.py", line 422, in run_from_argv
+    self.execute(*args, **cmd_options)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\core\management\base.py", line 466, in execute
+    output = self.handle(*args, **options)
+  File "E:\artyflakes-pos\woosync\management\commands\sync_woo.py", line 20, in handle
+    run = run_sync("scheduled")
+  File "E:\artyflakes-pos\woosync\sync.py", line 379, in run_sync
+    state = SyncState.objects.select_for_update().get_or_create(pk=1)[0]
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 1070, in get_or_create
+    return self.get(**kwargs), False
+           ~~~~~~~~^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 718, in get
+    num = len(clone)
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 455, in __len__
+    self._fetch_all()
+    ~~~~~~~~~~~~~~~^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 2287, in _fetch_all
+    self._result_cache = list(self._iterable_class(self))
+                         ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\query.py", line 131, in __iter__
+    results = compiler.execute_sql(
+        chunked_fetch=self.chunked_fetch, chunk_size=self.chunk_size
+    )
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\models\sql\compiler.py", line 1643, in execute_sql
+    cursor.execute(sql, params)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 122, in execute
+    return super().execute(sql, params)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 79, in execute
+    return self._execute_with_wrappers(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        sql, params, many=False, executor=self._execute
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 92, in _execute_with_wrappers
+    return executor(sql, params, many, context)
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 100, in _execute
+    with self.db.wrap_database_errors:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\utils.py", line 94, in __exit__
+    raise dj_exc_value.with_traceback(traceback) from exc_value
+  File "E:\artyflakes-pos\venv\Lib\site-packages\django\db\backends\utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "E:\artyflakes-pos\venv\Lib\site-packages\psycopg\cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+django.db.utils.ProgrammingError: column woosync_syncstate.products_cursor does not exist
+LINE 1: ...ders_since", "woosync_syncstate"."orders_cursor", "woosync_s...
+                                                             ^
+2026-11-11 15:50:56 OK: 0 new orders, 0 updated, 5 stock updates. 1138 products imported, 3 products updated. 38 products need review. 1133 products would go to 0 on the website, so they were NOT sent. Check the preview on the Website sync page, then press Sync now with the override if it is right.
+2026-11-11 15:52:56 OK: 0 new orders, 0 updated, 0 stock updates. 0 products imported, 5 products updated. 1133 products would go to 0 on the website, so they were NOT sent. Check the preview on the Website sync page, then press Sync now with the override if it is right.
+2026-11-11 15:54:56 OK: 0 new orders, 0 updated, 0 stock updates. 0 products imported, 5 products updated. 1133 products would go to 0 on the website, so they were NOT sent. Check the preview on the Website sync page, then press Sync now with the override if it is right.
+2026-11-11 15:56:56 OK: 0 new orders, 0 updated, 0 stock updates. 0 products imported, 5 products updated. 1133 products would go to 0 on the website, so they were NOT sent. Check the preview on the Website sync page, then press Sync now with the override if it is right.
+2026-11-11 15:58:56 OK: 0 new orders, 0 updated, 0 stock updates. 0 products imported, 5 products updated. 1133 products would go to 0 on the website, so they were NOT sent. Check the preview on the Website sync page, then press Sync now with the override if it is right.
+2026-11-11 16:00:56 OK: 0 new orders, 0 updated, 0 stock updates. 0 products imported, 5 products updated. 1133 products would go to 0 on the website, so they were NOT sent. Check the preview on the Website sync page, then press Sync now with the override if it is right.
+2026-11-11 16:02:56 OK: 0 new orders, 0 updated, 0 stock updates. 0 products imported, 5 products updated. 1133 products would go to 0 on the website, so they were NOT sent. Check the preview on the Website sync page, then press Sync now with the override if it is right.
+2026-11-11 16:04:56 OK: 0 new orders, 0 updated, 0 stock updates. 0 products imported, 5 products updated. 1133 products would go to 0 on the website, so they were NOT sent. Check the preview on the Website sync page, then press Sync now with the override if it is right.
+2026-11-11 16:06:56 OK: 0 new orders, 0 updated, 0 stock updates. 0 products imported, 5 products updated. 1133 products would go to 0 on the website, so they were NOT sent. Check the preview on the Website sync page, then press Sync now with the override if it is right.
+2026-11-11 16:08:56 OK: 0 new orders, 0 updated, 0 stock updates. 0 products imported, 5 products updated. 1133 products would go to 0 on the website, so they were NOT sent. Check the preview on the Website sync page, then press Sync now with the override if it is right.
+2026-11-11 16:10:56 OK: 0 new orders, 0 updated, 0 stock updates. 0 products imported, 5 products updated. 1133 products would go to 0 on the website, so they were NOT sent. Check the preview on the Website sync page, then press Sync now with the override if it is right.
+2026-11-11 16:12:56 OK: 0 new orders, 0 updated, 0 stock updates. 0 products imported, 5 products updated. 1133 products would go to 0 on the website, so they were NOT sent. Check the preview on the Website sync page, then press Sync now with the override if it is right.
+2026-11-11 16:14:56 OK: 0 new orders, 0 updated, 0 stock updates. 0 products imported, 5 products updated. 1133 products would go to 0 on the website, so they were NOT sent. Check the preview on the Website sync page, then press Sync now with the override if it is right.
+2026-11-11 16:16:56 OK: 0 new orders, 0 updated, 0 stock updates. 0 products imported, 5 products updated. 1133 products would go to 0 on the website, so they were NOT sent. Check the preview on the Website sync page, then press Sync now with the override if it is right.

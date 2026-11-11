@@ -79,6 +79,9 @@
   {% if sale.change_due > 0 %}
   <div class="r-row"><span>{{ L.change }}</span><span>{{ sale.change_due|floatformat:ps.money_fmt }}</span></div>
   {% endif %}
+  {% if balance_due > 0 %}
+  <div class="r-row"><strong>Balance due</strong><strong>{{ balance_due|floatformat:ps.money_fmt }}</strong></div>
+  {% endif %}
 
   {% if sale.note %}<hr><div class="r-note">{{ L.note }}: {{ sale.note }}</div>{% endif %}
   <hr>

@@ -1,0 +1,26 @@
+{% for c in category_nodes %}
+  <div class="category-node">
+    <div class="category-row">
+      <a class="tree-item category-link {% if selected_category.pk == c.pk %}active{% endif %}"
+         href="?group={{ c.pk }}" title="{{ c.name }}" aria-label="View products in {{ c.name }}"
+         {% if selected_category.pk == c.pk %}aria-current="page"{% endif %}>
+        <span>{{ c.name }}</span>
+        <span class="cnt">{{ c.n }}</span>
+      </a>
+      {% if c.tree_children %}
+        <button type="button" class="category-toggle" aria-expanded="{% if c.tree_open %}true{% else %}false{% endif %}"
+                aria-controls="category-children-{{ c.pk }}" aria-label="Toggle {{ c.name }} subcategories">
+          <span class="category-chevron" aria-hidden="true"></span>
+        </button>
+      {% endif %}
+    </div>
+    {% if c.tree_children %}
+      <div class="category-children {% if c.tree_open %}is-expanded{% endif %}" id="category-children-{{ c.pk }}"
+           {% if not c.tree_open %}hidden{% endif %}>
+        <div class="category-children-inner">
+          {% include "inventory/_category_tree.html" with category_nodes=c.tree_children %}
+        </div>
+      </div>
+    {% endif %}
+  </div>
+{% endfor %}

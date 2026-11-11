@@ -35,14 +35,14 @@
   <header class="pos-top">
     <a class="pos-title" href="{% url 'dashboard:home' %}" title="Back to dashboard">POS Billing System</a>
 
-    <a class="pos-pill pill-brand" href="{% url 'woosync:orders' %}" target="_blank" rel="noopener" title="Orders from the website"><i class="bi bi-globe2"></i> Website Orders{% if web_new %} <span class="pill-badge">{{ web_new }}</span>{% endif %}</a>
-
     <div class="pos-search">
       <i class="bi bi-search"></i>
       <input id="posSearch" type="text" placeholder="Search product by name, code or barcode..." autocomplete="off" data-url="{% url 'pos:product_search' %}">
       <button type="button" class="scan-btn" id="scanBtn" disabled title="Barcode scanners type into the search box"><i class="bi bi-upc-scan"></i> Scan Barcode</button>
       <div class="pos-results" id="posResults" hidden></div>
     </div>
+
+    <a class="pos-pill pill-brand" href="{% url 'woosync:orders' %}" target="_blank" rel="noopener" title="Orders from the website"><i class="bi bi-globe2"></i> Website Orders{% if web_new %} <span class="pill-badge">{{ web_new }}</span>{% endif %}</a>
 
     <div class="pos-user">
       <i class="bi bi-bell"></i>
@@ -168,6 +168,10 @@
       <div><span>Paid</span><strong id="payPaid">₹ 0.00</strong></div>
       <div><span id="payLeftLabel">Due</span><strong id="payLeft">₹ 0.00</strong></div>
     </div>
+    <label class="dlg-hint d-flex align-items-start gap-2 mt-3" for="allowCredit">
+      <input id="allowCredit" type="checkbox">
+      <span>Leave the remaining amount as customer credit. Select a named customer first.</span>
+    </label>
     <div class="dlg-error" id="payError" hidden></div>
 
     <div class="dlg-actions">
@@ -413,7 +417,7 @@
   {% else %}
   <button class="sp-item" disabled title="Coming soon"><i class="bi bi-box-arrow-in-down"></i> Cash In / Out</button>
   {% endif %}
-  <button class="sp-item" disabled title="Needs credit sales, which are not set up yet"><i class="bi bi-journal-text"></i> Credit payments</button>
+  <a class="sp-item" href="{% url 'pos:credit_payments' %}"><i class="bi bi-journal-text"></i> Credit payments</a>
   {% if eod_url and user.is_admin_role %}
   <a class="sp-item" href="{{ eod_url }}" target="_blank" rel="noopener"><i class="bi bi-door-open"></i> End of day</a>
   {% else %}
@@ -457,6 +461,7 @@
       <div id="dsTaxRow"><span>GST (included)</span><span id="dsTax"></span></div>
       <div class="big"><span>Total</span><strong id="dsTotal"></strong></div>
       <div><span>Paid</span><span id="dsPaid"></span></div>
+      <div id="dsDueRow" hidden><span>Customer credit due</span><strong id="dsDue"></strong></div>
     </div>
   </div>
 

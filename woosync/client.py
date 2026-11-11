@@ -1,5 +1,7 @@
 import base64
 import json
+import mimetypes
+import re
 import socket
 import ssl
 from urllib import error, parse, request
@@ -119,4 +121,58 @@ class WooClient:
         payload, _ = self._request("POST", path, body=body)
         if not isinstance(payload, dict):
             raise WooError("The website answered with unexpected data.")
+        return payload
+
+    def put(self, path, body):
+        payload, _ = self._request("PUT", path, body=body)
+        if not isinstance(payload, dict):
+            raise WooError("The website answered with unexpected data.")
+        return payload
+
+    def upload_media(self, file_path, name):
+        """Upload one local image to WordPress media and return its media object."""
+        media_user = getattr(settings, "WOOSYNC", {}).get("MEDIA_USER", "")
+        media_password = getattr(settings, "WOOSYNC", {}).get("MEDIA_APP_PASSWORD", "")
+        if not (media_user and media_password):
+            raise WooError(
+                "Uploading local product images requires WOO_MEDIA_USER and "
+                "WOO_MEDIA_APP_PASSWORD to be configured."
+            )
+        safe_name = re.sub(r"[^A-Za-z0-9._-]", "_", name.replace("\\", "/").rsplit("/", 1)[-1])
+        if not safe_name or safe_name.startswith("."):
+            safe_name = "product-image"
+        boundary = "----ArtyflakesWooSyncBoundary"
+        content_type = mimetypes.guess_type(safe_name)[0] or "application/octet-stream"
+        with open(file_path, "rb") as image_file:
+            content = image_file.read()
+        body = (
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="file"; filename="{safe_name}"\r\n'
+            f"Content-Type: {content_type}\r\n\r\n"
+        ).encode("utf-8") + content + f"\r\n--{boundary}--\r\n".encode("utf-8")
+        headers = {
+            "Accept": "application/json",
+            "Content-Type": f"multipart/form-data; boundary={boundary}",
+            "Content-Disposition": f'attachment; filename="{safe_name}"',
+            "User-Agent": "Artyflakes-POS-sync/1.0",
+        }
+        media_url = f"{self.url}/wp-json/wp/v2/media"
+        token = base64.b64encode(
+            f"{media_user}:{media_password.replace(' ', '')}".encode()
+        ).decode()
+        headers["Authorization"] = f"Basic {token}"
+        req = request.Request(
+            media_url, data=body, method="POST", headers=headers
+        )
+        try:
+            with request.urlopen(req, timeout=self.timeout) as resp:
+                payload = json.loads(resp.read().decode("utf-8"))
+        except error.HTTPError as exc:
+            raise WooError(_http_message(exc.code)) from None
+        except (error.URLError, socket.timeout, TimeoutError):
+            raise WooError("The website could not be reached while uploading product media.") from None
+        except (ValueError, UnicodeDecodeError):
+            raise WooError("The website returned invalid media data.") from None
+        if not isinstance(payload, dict) or not isinstance(payload.get("id"), int):
+            raise WooError("The website returned unexpected media data.")
         return payload

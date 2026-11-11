@@ -32,6 +32,55 @@ def _safe(value):
     return "'" + text if text[:1] in ("=", "+", "-", "@") else text
 
 
+def _ordered_category_tree(categories):
+    categories = list(categories)
+    children = {}
+    for category in categories:
+        children.setdefault(category.parent_id, []).append(category)
+
+    ordered = []
+    visited = set()
+
+    def append_children(parent_id, depth):
+        for category in children.get(parent_id, []):
+            if category.pk in visited:
+                continue
+            visited.add(category.pk)
+            category.category_depth = depth
+            ordered.append(category)
+            append_children(category.pk, depth + 1)
+
+    append_children(None, 0)
+    for category in categories:
+        if category.pk not in visited:
+            category.category_depth = 0
+            ordered.append(category)
+            append_children(category.pk, 1)
+    return ordered
+
+
+def _nested_category_tree(categories, selected_category=None):
+    categories = list(categories)
+    by_id = {category.pk: category for category in categories}
+    children = {}
+    for category in categories:
+        category.tree_children = []
+        children.setdefault(category.parent_id, []).append(category)
+
+    for category in categories:
+        category.tree_children = children.get(category.pk, [])
+
+    open_ids = set()
+    current = selected_category
+    while current:
+        open_ids.add(current.pk)
+        current = by_id.get(current.parent_id)
+    for category in categories:
+        category.tree_open = category.pk in open_ids
+
+    return children.get(None, [])
+
+
 # =====================  PRODUCTS  =====================
 @login_required
 def product_list(request):
@@ -58,6 +107,7 @@ def product_list(request):
 
     params = request.GET.copy()
     params.pop("page", None)
+    categories = list(Category.objects.annotate(n=Count("products")))
 
     context = {
         "page": page,
@@ -65,7 +115,8 @@ def product_list(request):
         "q": q,
         "group": group,
         "selected_category": selected_category,
-        "categories": Category.objects.annotate(n=Count("products")),
+        "categories": _ordered_category_tree(categories),
+        "category_tree": _nested_category_tree(categories, selected_category),
         "all_count": Product.objects.count(),
         "ungrouped_count": Product.objects.filter(category__isnull=True).count(),
         "querystring": params.urlencode(),
@@ -155,6 +206,21 @@ class CategoryCreate(FormPage, CreateView):
     saved_message = "Category added."
     extra_context = {"title": "New category", "back_url": reverse_lazy("inventory:category_list")}
 
+    def get_initial(self):
+        initial = super().get_initial()
+        parent_id = self.request.GET.get("parent", "")
+        if parent_id.isdigit():
+            parent = Category.objects.filter(pk=parent_id).first()
+            if parent:
+                initial["parent"] = parent
+        return initial
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        if context["form"]["parent"].value():
+            context["title"] = "New subcategory"
+        return context
+
 
 class CategoryUpdate(FormPage, UpdateView):
     model = Category
@@ -191,6 +257,13 @@ class CatalogList(AdminRequiredMixin, ListView):
 
 class CategoryList(CatalogList):
     kind = "category"
+
+    def get_queryset(self):
+        categories = Category.objects.annotate(
+            product_count=Count("products"),
+            child_count=Count("children"),
+        )
+        return _ordered_category_tree(categories)
 
 
 class BrandList(CatalogList):
@@ -300,6 +373,15 @@ class CategoryDelete(CatalogDelete):
     list_url = reverse_lazy("inventory:category_list")
     product_filter = staticmethod(lambda category: Product.objects.filter(category=category))
 
+    def form_valid(self, form):
+        if self.object.children.exists():
+            messages.warning(
+                self.request,
+                f'"{self.object}" has subcategories and cannot be deleted. Reassign or delete them first.',
+            )
+            return redirect(self.list_url)
+        return super().form_valid(form)
+
 
 class BrandDelete(CatalogDelete):
     model = Brand
@@ -339,19 +421,23 @@ class ProductDelete(DeletePage, DeleteView):
     model = Product
     extra_context = {
         "title": "Delete product", "back_url": LIST_URL,
-        "warning": "Products that already have stock history cannot be deleted. Mark them inactive instead.",
+        "warning": "Products with stock history or a WooCommerce link cannot be deleted. Mark them inactive instead.",
     }
 
     def has_history(self, product):
-        return product.movements.exists() or product.sale_items.exists()
+        return (
+            product.movements.exists()
+            or product.sale_items.exists()
+            or hasattr(product, "woo_link")
+        )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         if self.has_history(self.object):
             context["title"] = "Archive product"
             context["warning"] = (
-                "This product has stock or sales history and cannot be permanently deleted. "
-                "Confirm to mark it inactive. Its history will be preserved."
+                "This product has stock or sales history, or is linked to WooCommerce, so it cannot be "
+                "permanently deleted. Confirm to mark it inactive. Its records and website link will be preserved."
             )
             context["confirm_label"] = "Archive product"
         return context
@@ -412,7 +498,7 @@ def stock_list(request):
     return render(request, "inventory/stock_list.html", {
         "rows": rows, "page": page, "total": paginator.count,
         "q": q, "group": group, "flt": flt,
-        "categories": Category.objects.all(),
+        "categories": _ordered_category_tree(Category.objects.all()),
         "querystring": params.urlencode(),
         "can_edit": can_edit,
     })

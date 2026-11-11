@@ -2,7 +2,7 @@ import json
 from .gst import split_tax
 import logging
 import uuid
-from datetime import date
+from datetime import date, datetime, time, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from storeconfig.models import StoreSettings
 from django.conf import settings
@@ -11,11 +11,12 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
-from django.db.models import Count, Exists, OuterRef, Q, Sum
-from django.http import Http404, JsonResponse
+from django.db.models import Count, DecimalField, Exists, ExpressionWrapper, F, OuterRef, Q, Subquery, Sum, Value
+from django.db.models.functions import Coalesce
+from django.http import Http404, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
-from .models import CashMovement, DrawerEvent, HeldSale, Payment, Sale, SaleItem, SaleReturn, SaleReturnItem
+from .models import CashMovement, CreditPayment, DrawerEvent, HeldSale, Payment, Sale, SaleItem, SaleReturn, SaleReturnItem
 from inventory.models import Product, Unit
 from inventory.stock import with_stock
 from people.models import Contact
@@ -182,15 +183,25 @@ def _bill_context(request, sale):
         tax_summary.append({**g, "half_rate": rate / 2, "cgst": cgst, "sgst": sgst})
 
     # Cash is stored after change was handed back; show what the customer actually handed over
+    payments = list(sale.payments.all())
     pay_lines, has_cash = [], False
-    for p in sale.payments.all():
+    for p in payments:
         amount = p.amount
         if p.method == Payment.Method.CASH:
             has_cash = True
             amount += sale.change_due
         pay_lines.append({"label": p.get_method_display(), "amount": amount, "reference": p.reference})
+    credit_payments = list(sale.credit_payments.all())
+    pay_lines.extend({
+        "label": f"{payment.get_method_display()} credit collection",
+        "amount": payment.amount,
+        "reference": payment.reference,
+    } for payment in credit_payments)
     if sale.change_due > 0 and not has_cash:
         pay_lines.append({"label": "Cash", "amount": sale.change_due, "reference": ""})
+    paid_total = sum((p.amount for p in payments), Decimal("0"))
+    paid_total += sum((p.amount for p in credit_payments), Decimal("0"))
+    refunded_total = sale.returns.aggregate(total=Sum("refund_total"))["total"] or Decimal("0")
 
     return {
         "sale": sale,
@@ -198,6 +209,8 @@ def _bill_context(request, sale):
         "pay_lines": pay_lines,
         "tax_summary": tax_summary,
         "taxable_total": sale.total - sale.tax_total,
+        "paid_total": paid_total,
+        "balance_due": max(sale.total - paid_total - refunded_total, Decimal("0")),
         "cgst_total": sum((g["cgst"] for g in tax_summary), Decimal("0")),
         "sgst_total": sum((g["sgst"] for g in tax_summary), Decimal("0")),
         "walk_in": sale.customer.is_system,
@@ -305,6 +318,157 @@ def sale_list(request):
     })
 
 
+def _sales_with_credit_balance():
+    money = DecimalField(max_digits=12, decimal_places=2)
+    payment_total = (
+        Payment.objects.filter(sale=OuterRef("pk"))
+        .values("sale").annotate(total=Sum("amount")).values("total")[:1]
+    )
+    credit_total = (
+        CreditPayment.objects.filter(sale=OuterRef("pk"))
+        .values("sale").annotate(total=Sum("amount")).values("total")[:1]
+    )
+    return (
+        Sale.objects.filter(status=Sale.Status.COMPLETED)
+        .select_related("customer", "cashier")
+        .annotate(
+            collected=ExpressionWrapper(
+                Coalesce(Subquery(payment_total, output_field=money), Value(Decimal("0.00")), output_field=money)
+                + Coalesce(Subquery(credit_total, output_field=money), Value(Decimal("0.00")), output_field=money),
+                output_field=money,
+            ),
+            returned=Coalesce(
+                Subquery(
+                    SaleReturn.objects.filter(sale=OuterRef("pk"))
+                    .values("sale").annotate(total=Sum("refund_total")).values("total")[:1],
+                    output_field=money,
+                ),
+                Value(Decimal("0.00")),
+                output_field=money,
+            ),
+        )
+        .annotate(
+            balance=ExpressionWrapper(F("total") - F("collected") - F("returned"), output_field=money)
+        )
+        .filter(balance__gt=0)
+        .order_by("customer__name", "created_at", "id")
+    )
+
+
+@login_required
+def credit_payments(request):
+    qs = _sales_with_credit_balance()
+    paginator = Paginator(qs, 50)
+    page = paginator.get_page(request.GET.get("page"))
+    return render(request, "pos/credit_payments.html", {
+        "page": page,
+        "total": paginator.count,
+        "methods": Payment.Method.choices,
+    })
+
+
+@login_required
+@require_POST
+def credit_payment_collect(request, pk):
+    try:
+        amount = to_paise(request.POST.get("amount"), "Amount")
+    except CheckoutError as exc:
+        messages.error(request, str(exc))
+        return redirect("pos:credit_payments")
+    if amount <= 0:
+        messages.error(request, "Amount must be greater than zero.")
+        return redirect("pos:credit_payments")
+
+    method = request.POST.get("method")
+    if method not in Payment.Method.values:
+        messages.error(request, "Choose a valid payment method.")
+        return redirect("pos:credit_payments")
+    reference = request.POST.get("reference", "").strip()
+    if len(reference) > 60:
+        messages.error(request, "The reference must be 60 characters or fewer.")
+        return redirect("pos:credit_payments")
+
+    try:
+        with transaction.atomic():
+            sale = Sale.objects.select_for_update().filter(pk=pk).first()
+            if sale is None or sale.status != Sale.Status.COMPLETED:
+                raise CheckoutError("This completed sale was not found.", status=404)
+            paid = sale.payments.aggregate(total=Sum("amount"))["total"] or Decimal("0")
+            later_paid = sale.credit_payments.aggregate(total=Sum("amount"))["total"] or Decimal("0")
+            returned = sale.returns.aggregate(total=Sum("refund_total"))["total"] or Decimal("0")
+            balance = sale.total - paid - later_paid - returned
+            if balance <= 0:
+                raise CheckoutError("This sale has no outstanding balance.")
+            if Decimal(amount) / 100 > balance:
+                raise CheckoutError(f"Amount cannot exceed the outstanding balance of \u20b9{balance:,.2f}.")
+            CreditPayment.objects.create(
+                sale=sale,
+                user=request.user,
+                method=method,
+                amount=Decimal(amount) / 100,
+                reference=reference,
+            )
+    except CheckoutError as exc:
+        messages.error(request, str(exc))
+    else:
+        messages.success(request, f"Payment of \u20b9{Decimal(amount) / 100:,.2f} recorded for {sale.invoice_no}.")
+    return redirect("pos:credit_payments")
+
+
+@login_required
+def end_of_day(request):
+    if not request.user.is_admin_role:
+        raise PermissionDenied
+
+    raw_date = request.GET.get("date", "")
+    report_date = _parse_date(raw_date) if raw_date else timezone.localdate()
+    if report_date is None:
+        return HttpResponseBadRequest("Enter a valid report date.")
+    start = timezone.make_aware(datetime.combine(report_date, time.min))
+    end = start + timedelta(days=1)
+
+    sales = Sale.objects.filter(
+        status=Sale.Status.COMPLETED, created_at__gte=start, created_at__lt=end,
+    )
+    returns = SaleReturn.objects.filter(created_at__gte=start, created_at__lt=end)
+    receipts = Payment.objects.filter(created_at__gte=start, created_at__lt=end)
+    credit_receipts = CreditPayment.objects.filter(created_at__gte=start, created_at__lt=end)
+    movements = CashMovement.objects.filter(created_at__gte=start, created_at__lt=end)
+
+    payment_totals = {method: Decimal("0") for method, _ in Payment.Method.choices}
+    refund_totals = {method: Decimal("0") for method, _ in Payment.Method.choices}
+    for row in receipts.values("method").annotate(total=Sum("amount")):
+        payment_totals[row["method"]] += row["total"]
+    for row in credit_receipts.values("method").annotate(total=Sum("amount")):
+        payment_totals[row["method"]] += row["total"]
+    for row in returns.values("refund_method").annotate(total=Sum("refund_total")):
+        refund_totals[row["refund_method"]] = row["total"]
+
+    cash_in = movements.filter(direction=CashMovement.Direction.IN).aggregate(total=Sum("amount"))["total"] or Decimal("0")
+    cash_out = movements.filter(direction=CashMovement.Direction.OUT).aggregate(total=Sum("amount"))["total"] or Decimal("0")
+    cash_received = payment_totals.get(Payment.Method.CASH, Decimal("0"))
+    cash_refunded = refund_totals.get(Payment.Method.CASH, Decimal("0"))
+    return render(request, "pos/end_of_day.html", {
+        "report_date": report_date,
+        "sale_count": sales.count(),
+        "sales_total": sales.aggregate(total=Sum("total"))["total"] or Decimal("0"),
+        "return_count": returns.count(),
+        "refund_total": returns.aggregate(total=Sum("refund_total"))["total"] or Decimal("0"),
+        "payment_rows": [
+            {
+                "label": label,
+                "received": payment_totals[method],
+                "refunded": refund_totals[method],
+                "net": payment_totals[method] - refund_totals[method],
+            }
+            for method, label in Payment.Method.choices
+        ],
+        "cash_in": cash_in,
+        "cash_out": cash_out,
+        "net_cash": cash_received - cash_refunded + cash_in - cash_out,
+    })
+
+
 @login_required
 def sale_detail(request, pk):
     sale = _sale_for(request, pk)
@@ -321,11 +485,13 @@ def sale_detail(request, pk):
     returns = list(sale.returns.select_related("processed_by").prefetch_related("items"))
     completed = sale.status == Sale.Status.COMPLETED
     bill = _bill_context(request, sale)
+    refunded_total = sum((r.refund_total for r in returns), Decimal("0"))
 
     return render(request, "pos/sale_detail.html", {
         "sale": sale, "rows": rows, "returns": returns,
         "pay_lines": bill["pay_lines"],
-        "refunded": sum((r.refund_total for r in returns), Decimal("0")),
+        "paid_total": bill["paid_total"], "balance_due": bill["balance_due"],
+        "refunded": refunded_total,
         "can_return": admin and completed and any_left,
         "can_void": admin and completed and not returns,
         "is_admin": admin,

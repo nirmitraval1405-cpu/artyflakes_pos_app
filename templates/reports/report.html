@@ -31,7 +31,7 @@
   </select></div>
   <div><label for="reportGroup">Category</label><select id="reportGroup" name="group">
     <option value="">All</option>
-    {% for c in categories %}<option value="{{ c.pk }}"{% if selected_group == c.pk %} selected{% endif %}>{{ c.name }}</option>{% endfor %}
+    {% for c in categories %}<option value="{{ c.pk }}"{% if selected_group == c.pk %} selected{% endif %}>{{ c }}</option>{% endfor %}
   </select></div>
   {% if info.slug == "customers-invoice-list" %}
   <div><label for="reportPayment">Payment method</label><select id="reportPayment" name="payment_method">

@@ -75,6 +75,36 @@ def _address(a):
     return "\n".join(str(x).strip() for x in lines if x and str(x).strip())[:500]
 
 
+def _financial_snapshot(payload):
+    """Keep the WooCommerce accounting values needed for a later exact sale conversion."""
+    snapshot = {
+        key: payload.get(key)
+        for key in (
+            "currency", "prices_include_tax", "discount_total", "discount_tax",
+            "shipping_total", "shipping_tax", "cart_tax", "total_tax", "total",
+        )
+    }
+    row_fields = {
+        "line_items": (
+            "id", "product_id", "variation_id", "name", "sku", "quantity",
+            "subtotal", "subtotal_tax", "total", "total_tax", "taxes",
+        ),
+        "tax_lines": ("id", "rate_code", "rate_id", "label", "compound", "tax_total", "shipping_tax_total"),
+        "shipping_lines": ("id", "method_title", "method_id", "instance_id", "total", "total_tax", "taxes"),
+        "coupon_lines": ("id", "code", "discount", "discount_tax"),
+        "refunds": ("id", "reason", "total", "date_created"),
+    }
+    for key, fields in row_fields.items():
+        rows = payload.get(key) or []
+        if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
+            raise InvalidOrderPayload(f"{key} must be a list of objects")
+        snapshot[key] = [
+            {field: row[field] for field in fields if field in row}
+            for row in rows
+        ]
+    return snapshot
+
+
 def _match(woo_ids, sku):
     """Finds the POS product for a website product: by its linked website id first, then by SKU = POS code."""
     for wid in woo_ids:
@@ -109,6 +139,7 @@ def reconcile_stock(order):
             moves.append(StockMovement(
                 product_id=item.product_id, quantity=-delta,
                 movement_type=StockMovement.Type.WEB_ORDER if delta > 0 else StockMovement.Type.WEB_ORDER_RETURN,
+                source=StockMovement.Source.WOOCOMMERCE,
                 reference=f"WC-{order.number}"[:50], note=f"Website order #{order.number} ({order.status})"[:255],
             ))
         item.applied_qty = want
@@ -133,6 +164,7 @@ def apply_order(payload):
     line_items = payload.get("line_items") or []
     if not isinstance(line_items, list) or any(not isinstance(line, dict) for line in line_items):
         raise InvalidOrderPayload("line_items must be a list of objects")
+    financial_data = _financial_snapshot(payload)
 
     created = _dt(payload.get("date_created_gmt"))
     since = SyncState.load().orders_since
@@ -159,9 +191,12 @@ def apply_order(payload):
         order.billing_address = _address(billing)
         order.shipping_address = _address(shipping)
         order.payment_method = str(payload.get("payment_method_title") or payload.get("payment_method") or "")[:80]
+        order.payment_method_code = str(payload.get("payment_method") or "")[:80]
+        order.transaction_id = str(payload.get("transaction_id") or "")[:100]
         order.is_paid = bool(payload.get("date_paid_gmt"))
         order.total = _money(payload.get("total"))
         order.currency = str(payload.get("currency") or "")[:8]
+        order.financial_data = financial_data
         order.customer_note = str(payload.get("customer_note") or "")[:500]
         order.save()
 
@@ -324,6 +359,14 @@ def _summary(stats):
     parts = [f"{stats['orders_new']} new orders, {stats['orders_updated']} updated, {stats['pushed']} stock updates."]
     if stats["orders_failed"]:
         parts.append(f"{stats['orders_failed']} orders failed to import.")
+    if stats.get("products_created") or stats.get("products_updated"):
+        parts.append(
+            f"{stats['products_created']} products imported, {stats['products_updated']} products updated."
+        )
+    if stats.get("products_review"):
+        parts.append(f"{stats['products_review']} products need review.")
+    if stats.get("product_jobs_failed"):
+        parts.append(f"{stats['product_jobs_failed']} product sync jobs will retry.")
     parts += stats["warnings"]
     parts += stats["errors"][:ERROR_CAP]
     return " ".join(parts)
@@ -344,11 +387,23 @@ def run_sync(trigger="scheduled", client=None, allow_mass_zero=False):
     run = SyncRun.objects.create(trigger=trigger[:10])
     stats = {
         "orders_seen": 0, "orders_new": 0, "orders_updated": 0, "orders_failed": 0,
-        "pushed": 0, "errors": [], "warnings": [],
+        "pushed": 0, "errors": [], "warnings": [], "products_created": 0,
+        "products_updated": 0, "products_archived": 0, "products_review": 0,
+        "product_jobs_failed": 0,
     }
     try:
         client = client or WooClient()
         import_orders(client, SyncState.load(), stats)
+        if not stats["errors"]:
+            from .products import sync_product_catalog
+            product_stats = sync_product_catalog(client, SyncState.load())
+            stats["products_created"] = product_stats["created"]
+            stats["products_updated"] = product_stats["updated"]
+            stats["products_archived"] = product_stats["archived"]
+            stats["products_review"] = product_stats["review"]
+            stats["product_jobs_failed"] = product_stats["jobs_failed"]
+            if stats["product_jobs_failed"]:
+                stats["errors"].append(f"{stats['product_jobs_failed']} product sync jobs failed.")
         if not stats["errors"]:                            # never send stock when orders could not all be read
             push_stock(client, SyncState.load(), stats, allow_mass_zero)
     except WooError as exc:

@@ -44,8 +44,14 @@ class Sale(TimeStampedModel):
         COMPLETED = "completed", "Completed"
         VOIDED = "voided", "Voided"
 
+    class Source(models.TextChoices):
+        POS = "pos", "POS"
+        WOOCOMMERCE = "woocommerce", "WooCommerce"
+
     invoice_no = models.CharField(max_length=30, unique=True)
     client_token = models.CharField(max_length=40, unique=True, null=True, blank=True)  # blocks double submits
+    source = models.CharField(max_length=20, choices=Source.choices, default=Source.POS)
+    external_order_id = models.PositiveBigIntegerField(null=True, blank=True)
     customer = models.ForeignKey(Contact, on_delete=models.PROTECT, related_name="sales")
     cashier = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.COMPLETED)
@@ -70,6 +76,12 @@ class Sale(TimeStampedModel):
     class Meta:
         ordering = ["-created_at", "-id"]
         indexes = [models.Index(fields=["created_at"])]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["source", "external_order_id"],
+                name="pos_unique_external_sale",
+            ),
+        ]
 
     def __str__(self):
         return self.invoice_no
@@ -109,6 +121,7 @@ class Payment(TimeStampedModel):
         UPI = "upi", "UPI"
         CARD = "card", "Card"
         CHEQUE = "cheque", "Cheque"
+        ONLINE = "online", "Online"
 
     sale = models.ForeignKey(Sale, on_delete=models.CASCADE, related_name="payments")
     method = models.CharField(max_length=10, choices=Method.choices)
@@ -117,6 +130,21 @@ class Payment(TimeStampedModel):
 
     def __str__(self):
         return f"{self.get_method_display()} {self.amount}"
+
+
+class CreditPayment(TimeStampedModel):
+    """A later collection against a sale's outstanding customer balance."""
+    sale = models.ForeignKey(Sale, on_delete=models.PROTECT, related_name="credit_payments")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    method = models.CharField(max_length=10, choices=Payment.Method.choices)
+    amount = models.DecimalField(**MONEY)
+    reference = models.CharField(max_length=60, blank=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+
+    def __str__(self):
+        return f"{self.get_method_display()} {self.amount} for {self.sale.invoice_no}"
 
 
 class SaleReturn(TimeStampedModel):

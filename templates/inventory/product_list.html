@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
 {% block title %}Products · Artyflakes POS{% endblock %}
-{% block extra_css %}<link href="{% static 'css/inventory.css' %}" rel="stylesheet">{% endblock %}
+{% block extra_css %}<link href="{% static 'css/inventory.css' %}?v=category-tree-3" rel="stylesheet">{% endblock %}
 
 {% block content %}
 <div class="page-head">
@@ -51,17 +51,15 @@
 
   <!-- Group tree -->
   <aside class="tree">
-    <a class="tree-item {% if not group %}active{% endif %}" href="{% url 'inventory:product_list' %}">
-      <i class="bi bi-folder-fill"></i> Products <span class="cnt">{{ all_count }}</span>
+    <a class="tree-item category-link category-root {% if not group %}active{% endif %}"
+       href="{% url 'inventory:product_list' %}" {% if not group %}aria-current="page"{% endif %}>
+      <span>Products</span><span class="cnt">{{ all_count }}</span>
     </a>
-    {% for c in categories %}
-      <a class="tree-item sub {% if selected_category.pk == c.pk %}active{% endif %}" href="?group={{ c.pk }}">
-        <i class="bi bi-folder"></i> {{ c.name }} <span class="cnt">{{ c.n }}</span>
-      </a>
-    {% endfor %}
+    {% include "inventory/_category_tree.html" with category_nodes=category_tree %}
     {% if ungrouped_count %}
-      <a class="tree-item sub {% if group == 'none' %}active{% endif %}" href="?group=none">
-        <i class="bi bi-folder"></i> No group <span class="cnt">{{ ungrouped_count }}</span>
+      <a class="tree-item category-link category-root {% if group == 'none' %}active{% endif %}"
+         href="?group=none" title="No group" {% if group == 'none' %}aria-current="page"{% endif %}>
+        <span>No group</span><span class="cnt">{{ ungrouped_count }}</span>
       </a>
     {% endif %}
   </aside>
@@ -120,6 +118,24 @@
 {% block extra_js %}
 <script>
   (function () {
+    document.querySelectorAll(".category-toggle").forEach((toggle) => {
+      toggle.addEventListener("click", () => {
+        const children = document.getElementById(toggle.getAttribute("aria-controls"));
+        const expanded = toggle.getAttribute("aria-expanded") === "true";
+        toggle.setAttribute("aria-expanded", String(!expanded));
+        if (expanded) {
+          children.classList.remove("is-expanded");
+          window.setTimeout(() => {
+            if (toggle.getAttribute("aria-expanded") === "false") children.hidden = true;
+          }, 220);
+        } else {
+          children.hidden = false;
+          children.offsetHeight;
+          window.requestAnimationFrame(() => children.classList.add("is-expanded"));
+        }
+      });
+    });
+
     const rows = document.querySelectorAll("#productRows tbody tr[data-pk]");
     const btnEdit = document.getElementById("btnEdit");
     const btnDelete = document.getElementById("btnDelete");

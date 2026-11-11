@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}End of day · Artyflakes POS{% endblock %}
+{% block extra_css %}<link href="{% static 'css/inventory.css' %}" rel="stylesheet">{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h3>End of day</h3>
+    <p>Read-only daily summary. This does not close the drawer or lock the POS.</p>
+  </div>
+</div>
+
+<div class="toolbar">
+  <a class="tb" href="{% url 'pos:screen' %}"><i class="bi bi-cart3"></i><span>POS</span></a>
+  <form method="get" class="d-flex align-items-center gap-2">
+    <label for="reportDate">Report date</label>
+    <input id="reportDate" type="date" name="date" value="{{ report_date|date:'Y-m-d' }}" class="form-control">
+    <button class="btn btn-brand btn-sm" type="submit">View</button>
+  </form>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-md-3"><section class="grid-panel p-3"><div class="text-muted">Completed sales</div><strong>{{ sale_count }}</strong><div>₹{{ sales_total|floatformat:"2g" }}</div></section></div>
+  <div class="col-md-3"><section class="grid-panel p-3"><div class="text-muted">Returns</div><strong>{{ return_count }}</strong><div>₹{{ refund_total|floatformat:"2g" }}</div></section></div>
+  <div class="col-md-3"><section class="grid-panel p-3"><div class="text-muted">Cash in / out</div><strong>In ₹{{ cash_in|floatformat:"2g" }}</strong><div>Out ₹{{ cash_out|floatformat:"2g" }}</div></section></div>
+  <div class="col-md-3"><section class="grid-panel p-3"><div class="text-muted">Net cash movement</div><strong>₹{{ net_cash|floatformat:"2g" }}</strong><div class="small text-muted">Cash receipts − refunds + cash in − cash out</div></section></div>
+</div>
+
+<section class="grid-panel">
+  <div class="p-3 border-bottom"><strong>Payments received and refunds · {{ report_date|date:"d-m-Y" }}</strong></div>
+  <div class="grid-wrap">
+    <table class="grid">
+      <thead><tr><th>Method</th><th class="num">Received</th><th class="num">Refunded</th><th class="num">Net</th></tr></thead>
+      <tbody>
+        {% for row in payment_rows %}
+        <tr>
+          <td>{{ row.label }}</td>
+          <td class="num">₹{{ row.received|floatformat:"2g" }}</td>
+          <td class="num">₹{{ row.refunded|floatformat:"2g" }}</td>
+          <td class="num">₹{{ row.net|floatformat:"2g" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

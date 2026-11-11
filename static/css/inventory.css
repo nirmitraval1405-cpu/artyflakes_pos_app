@@ -50,55 +50,157 @@
 }
 
 .tree {
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: .5rem;
-    min-height: 420px;
+    min-width: 0;
+    max-height: min(72vh, 760px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    background: #fff;
+    border: 1px solid #eee8e2;
+    border-radius: 10px;
+    padding: .4rem .55rem;
 }
 
 .tree-item {
+    color: #554943;
+}
+
+.category-row {
     display: flex;
     align-items: center;
+    gap: .25rem;
+    min-height: 38px;
+    border-bottom: 1px solid #f1ece7;
+}
+
+.category-link {
+    flex: 1;
+    min-width: 0;
+    min-height: 38px;
     gap: .5rem;
-    padding: .45rem .6rem;
+    padding: .35rem .5rem;
+    text-decoration: none;
     border-radius: 6px;
-    color: var(--text);
+    color: #514840;
+    font-size: .9rem;
+    line-height: 1.25;
+    transition: background-color 140ms ease, color 140ms ease;
 }
 
-.tree-item.sub {
-    margin-left: 1rem;
+.category-link > span:first-of-type {
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-.tree-item i {
-    color: var(--secondary);
+.category-root {
+    margin-bottom: .12rem;
+    font-weight: 600;
 }
 
-.tree-item .cnt {
+.category-toggle {
+    display: grid;
+    place-items: center;
+    appearance: none;
+    width: 32px;
+    height: 32px;
+    flex: 0 0 32px;
+    margin: 0;
+    padding: 0;
+    border: 0 !important;
+    border-radius: 50%;
+    color: #7d6a5a;
+    background: transparent;
+    font: inherit;
+    line-height: 1;
+    cursor: pointer;
+    transition: background-color 140ms ease, color 140ms ease;
+}
+
+.category-toggle:hover,
+.category-toggle:focus-visible {
+    color: #5b4332;
+    background: #f5efe9;
+}
+
+.category-toggle:focus-visible {
+    outline: 2px solid #c69c6d;
+    outline-offset: 1px;
+}
+
+.category-chevron {
+    width: 7px;
+    height: 7px;
+    border-right: 1.5px solid currentColor;
+    border-bottom: 1.5px solid currentColor;
+    transform: rotate(-45deg);
+    transition: transform 160ms ease;
+}
+
+.category-toggle[aria-expanded="true"] .category-chevron {
+    transform: translateY(-2px) rotate(45deg);
+}
+
+.category-children {
+    display: grid;
+    grid-template-rows: 0fr;
+    opacity: 0;
+    transition: grid-template-rows 180ms ease, opacity 150ms ease;
+}
+
+.category-children[hidden] {
+    display: none;
+}
+
+.category-children.is-expanded {
+    grid-template-rows: 1fr;
+    opacity: 1;
+}
+
+.category-children-inner {
+    min-height: 0;
+    overflow: hidden;
+    margin-left: .65rem;
+    padding-left: .3rem;
+    border-left: 1px solid #eee8e2;
+}
+
+.tree .category-link:hover {
+    color: #493a30;
+    background: #f8f5f1;
+}
+
+.tree .category-link:focus-visible {
+    outline: 2px solid #c69c6d;
+    outline-offset: 1px;
+}
+
+.tree .category-link.active,
+.tree .category-link.active:hover {
+    color: #4f3c30;
+    background: #f3ece5;
+    box-shadow: inset 2px 0 0 #a97951;
+}
+
+.tree .category-link .cnt {
+    flex: 0 0 auto;
     margin-left: auto;
-    font-size: 11px;
-    color: var(--muted);
-    background: var(--cream);
-    padding: 0 7px;
-    border-radius: 10px;
+    padding: .1rem .4rem;
+    border-radius: 999px;
+    color: #827368;
+    background: #f4f0eb;
+    font-size: .72rem;
+    line-height: 1.35;
 }
 
-.tree-item:hover {
-    background: var(--cream);
+.tree .category-link.active .cnt {
+    color: #654d3c;
+    background: #e7d8c8;
 }
 
-.tree-item.active {
-    background: var(--primary);
-    color: #fff;
-}
-
-.tree-item.active i {
-    color: var(--accent);
-}
-
-.tree-item.active .cnt {
-    background: rgba(255, 255, 255, .2);
-    color: #fff;
+.category-node:last-child > .category-row {
+    border-bottom-color: transparent;
 }
 
 .grid-panel {
@@ -218,7 +320,34 @@
     }
 
     .tree {
-        min-height: 0;
+        max-height: min(42vh, 360px);
+    }
+}
+
+@media (max-width: 575.98px) {
+    .tree {
+        max-height: 38vh;
+        padding: .4rem;
+    }
+
+    .category-row,
+    .category-link {
+        min-height: 42px;
+    }
+
+    .category-toggle {
+        width: 38px;
+        height: 38px;
+        flex-basis: 38px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .category-link,
+    .category-toggle,
+    .category-chevron,
+    .category-children {
+        transition-duration: .01ms;
     }
 }
 

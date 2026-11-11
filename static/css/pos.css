@@ -58,7 +58,7 @@
 }
 
 .pos-search {
-    width: 100%;
+    flex: 1;
     display: flex;
     align-items: center;
     gap: .6rem;
@@ -1380,17 +1380,20 @@
         font-size: 1.2rem;
     }
 
-    .website-orders-placeholder {
-        order: 2;
-        flex: 1 1 auto;
-    }
-
     .pos-search {
-        order: 5;
+        order: 2;
         flex: 1 0 100%;
         width: 100%;
         min-height: 46px;
         padding: .35rem .55rem;
+    }
+
+    .pos-top > .pos-pill {
+        order: 3;
+    }
+
+    .pos-user {
+        order: 4;
     }
 
     .scan-btn {

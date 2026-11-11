@@ -4,7 +4,7 @@ from decimal import Decimal
 from django import forms
 from django.db.models import Q
 
-from .models import Brand, Category, Product, Unit
+from .models import Brand, Category, Product, ProductImage, Unit
 
 
 def _style(form):
@@ -21,11 +21,43 @@ def _style(form):
 class CategoryForm(forms.ModelForm):
     class Meta:
         model = Category
-        fields = ["name"]
+        fields = ["name", "description", "parent"]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["parent"].label = "Parent category"
+        self.fields["parent"].empty_label = "Main category (no parent)"
+        self.fields["parent"].help_text = (
+            "Leave this empty for a main category, or select a parent to create a subcategory."
+        )
+        self.fields["parent"].queryset = Category.objects.select_related("parent").order_by("parent__name", "name")
         _style(self)
+
+    def clean_parent(self):
+        parent = self.cleaned_data.get("parent")
+        ancestor = parent
+        seen = set()
+        while ancestor:
+            if ancestor.pk == self.instance.pk or ancestor.pk in seen:
+                raise forms.ValidationError("A category cannot be its own parent or a descendant of itself.")
+            seen.add(ancestor.pk)
+            ancestor = ancestor.parent
+        return parent
+
+
+class MultipleFileInput(forms.ClearableFileInput):
+    allow_multiple_selected = True
+
+
+class MultipleFileField(forms.FileField):
+    widget = MultipleFileInput
+
+    def clean(self, value, initial=None):
+        if not value:
+            return []
+        if isinstance(value, (list, tuple)):
+            return [forms.FileField.clean(self, item, None) for item in value]
+        return [super().clean(value, initial)]
 
 
 class BrandForm(forms.ModelForm):
@@ -57,6 +89,18 @@ class UnitForm(forms.ModelForm):
 
 
 class ProductForm(forms.ModelForm):
+    gallery_images = MultipleFileField(
+        required=False,
+        label="Additional product images",
+        help_text="Select one or more images to add to the WooCommerce gallery.",
+    )
+
+    tags_text = forms.CharField(
+        required=False,
+        label="Website tags",
+        help_text="Comma-separated WooCommerce product tags.",
+    )
+
     opening_stock = forms.DecimalField(
         required=False,
         min_value=Decimal("0"),
@@ -70,9 +114,9 @@ class ProductForm(forms.ModelForm):
     class Meta:
         model = Product
         fields = [
-            "name", "category", "brand", "barcode", "code", "unit", "track_stock",
+            "name", "description", "short_description", "image", "category", "brand", "barcode", "code", "unit", "track_stock",
             "cost_price", "sale_price", "mrp", "gst_rate", "hsn_code",
-            "min_stock", "is_active",
+            "woo_tax_class", "weight", "dimensions", "attributes", "min_stock", "is_active",
         ]
         help_texts = {
             "code": "Leave blank to auto-generate (ART-00001).",
@@ -83,6 +127,20 @@ class ProductForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["dimensions"] = forms.CharField(
+            required=False,
+            label="Dimensions (length × width × height)",
+            help_text="Enter dimensions separated by × or x.",
+            initial=" × ".join(str(self.instance.dimensions.get(key, "")) for key in ("length", "width", "height"))
+            if self.instance.pk and isinstance(self.instance.dimensions, dict) else "",
+        )
+        self.fields["tags_text"].initial = ", ".join(
+            tag.get("name", "") for tag in self.instance.woo_tags if isinstance(tag, dict) and tag.get("name")
+        ) if self.instance.pk and isinstance(self.instance.woo_tags, list) else ""
+        if self.instance.pk:
+            self.fields["gallery_images"].help_text = (
+                "Select more images to add. Existing images are shown below."
+            )
         self.fields["category"].queryset = Category.objects.filter(
             Q(is_active=True) | Q(pk=self.instance.category_id)
         ).order_by("name")
@@ -101,13 +159,46 @@ class ProductForm(forms.ModelForm):
         )
         if self.instance.pk:
             self.fields.pop("opening_stock")
-        else:
-            self.order_fields([
-                "name", "category", "brand", "barcode", "code", "unit", "track_stock",
-                "opening_stock", "cost_price", "sale_price", "mrp", "gst_rate",
-                "hsn_code", "min_stock", "is_active",
-            ])
+        self.order_fields([
+            "name", "description", "short_description", "image", "gallery_images",
+            "category", "brand", "barcode", "code", "unit", "track_stock",
+            *([] if self.instance.pk else ["opening_stock"]),
+            "cost_price", "sale_price", "mrp", "gst_rate", "hsn_code", "woo_tax_class",
+            "weight", "dimensions", "attributes", "tags_text", "min_stock", "is_active",
+        ])
         _style(self)
+
+    def clean_dimensions(self):
+        value = self.cleaned_data.get("dimensions", "")
+        parts = [part.strip() for part in value.replace("×", "x").split("x")]
+        if not value.strip():
+            return {}
+        if len(parts) != 3:
+            raise forms.ValidationError("Enter length, width, and height separated by x.")
+        return dict(zip(("length", "width", "height"), parts))
+
+    def clean_tags_text(self):
+        return [
+            {"name": name.strip()}
+            for name in self.cleaned_data.get("tags_text", "").split(",")
+            if name.strip()
+        ]
+
+    def save(self, commit=True):
+        product = super().save(commit=False)
+        product.dimensions = self.cleaned_data.get("dimensions", {})
+        product.woo_tags = self.cleaned_data.get("tags_text", [])
+        if commit:
+            product.save()
+            self.save_m2m()
+            next_order = product.images.count()
+            for offset, image in enumerate(self.cleaned_data.get("gallery_images", [])):
+                ProductImage.objects.create(
+                    product=product,
+                    image=image,
+                    sort_order=next_order + offset,
+                )
+        return product
 
     def clean(self):
         cleaned_data = super().clean()

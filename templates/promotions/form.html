@@ -94,7 +94,7 @@
             <select data-f="target-category" name="target_id" class="form-select" {% if row.target_type != "category" %}hidden disabled{% endif %}>
               <option value="">Select category</option>
               {% for c in categories %}
-                <option value="{{ c.pk }}" {% if row.target_type == "category" and c.pk|stringformat:"s" == row.target_id %}selected{% endif %}>{{ c.name }}</option>
+                <option value="{{ c.pk }}" {% if row.target_type == "category" and c.pk|stringformat:"s" == row.target_id %}selected{% endif %}>{{ c }}</option>
               {% endfor %}
             </select>
             <select data-f="target-brand" name="target_id" class="form-select" {% if row.target_type != "brand" %}hidden disabled{% endif %}>

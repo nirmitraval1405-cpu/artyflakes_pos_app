@@ -80,7 +80,9 @@
         <div class="d-flex justify-content-between gap-3"><span>{{ p.label }}{% if p.reference %} · {{ p.reference }}{% endif %}</span><strong>₹{{ p.amount|floatformat:"2g" }}</strong></div>
         {% empty %}<div class="text-muted">No payment recorded.</div>{% endfor %}
         <hr>
-        <div class="d-flex justify-content-between gap-3"><span>Amount paid</span><strong>₹{{ sale.amount_paid|floatformat:"2g" }}</strong></div>
+        <div class="d-flex justify-content-between gap-3"><span>Tendered at sale</span><strong>₹{{ sale.amount_paid|floatformat:"2g" }}</strong></div>
+        <div class="d-flex justify-content-between gap-3"><span>Total collected</span><strong>₹{{ paid_total|floatformat:"2g" }}</strong></div>
+        {% if balance_due > 0 %}<div class="d-flex justify-content-between gap-3 text-danger"><span>Outstanding balance</span><strong>₹{{ balance_due|floatformat:"2g" }}</strong></div>{% endif %}
         {% if sale.change_due > 0 %}<div class="d-flex justify-content-between gap-3"><span>Change returned</span><strong>₹{{ sale.change_due|floatformat:"2g" }}</strong></div>{% endif %}
         {% if sale.discount_total > 0 %}<div class="d-flex justify-content-between gap-3"><span>Discount</span><strong>₹{{ sale.discount_total|floatformat:"2g" }}</strong></div>{% endif %}
         {% if refunded > 0 %}<div class="d-flex justify-content-between gap-3 text-danger"><span>Refunded</span><strong>₹{{ refunded|floatformat:"2g" }}</strong></div>{% endif %}

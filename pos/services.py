@@ -141,6 +141,7 @@ def compute_bill(lines, bill_kind=None, bill_value=0):
 
 # ---------- Checkout ----------
 def _result(sale, warnings, duplicate=False):
+    paid = sale.payments.aggregate(total=Sum("amount"))["total"] or Decimal("0")
     return {
         "ok": True,
         "duplicate": duplicate,
@@ -152,6 +153,7 @@ def _result(sale, warnings, duplicate=False):
         "tax": f"{sale.tax_total:,.2f}",
         "total": f"{sale.total:.2f}",
         "paid": f"{sale.amount_paid:,.2f}",
+        "due": f"{max(sale.total - paid, Decimal('0')):.2f}",
         "change": f"{sale.change_due:,.2f}",
         "customer_phone": "" if sale.customer.is_system else sale.customer.phone,
         "lines": [
@@ -208,7 +210,8 @@ def create_sale(user, data):
     bill_kind, bill_value = parse_discount(data.get("bill_discount"), "Bill discount")
 
     pay_rows = data.get("payments")
-    if not isinstance(pay_rows, list) or not pay_rows:
+    allow_credit = data.get("allow_credit") is True
+    if not isinstance(pay_rows, list) or (not pay_rows and not allow_credit):
         raise CheckoutError("Add at least one payment.")
     payments = []
     for raw in pay_rows:
@@ -285,10 +288,10 @@ def create_sale(user, data):
                     )
 
             tendered = sum(p["amount"] for p in payments)
-            if tendered < total:
+            if tendered < total and not allow_credit:
                 raise CheckoutError(f"Payment is short by \u20b9{_money_text(total - tendered)}.")
             cash = sum(p["amount"] for p in payments if p["method"] == Payment.Method.CASH)
-            change = tendered - total
+            change = max(tendered - total, 0)
             if change > cash:
                 raise CheckoutError("Only cash can be overpaid. UPI and card cannot be more than the bill.")
 
@@ -298,6 +301,8 @@ def create_sale(user, data):
                 customer = Contact.objects.filter(pk=customer_id, is_customer=True, is_active=True).first()
                 if customer is None:
                     raise CheckoutError("That customer was not found.")
+            if tendered < total and customer.is_system:
+                raise CheckoutError("Credit sales require a named customer.")
 
             invoice_no = InvoiceCounter.next_invoice_no()
             sale = Sale.objects.create(

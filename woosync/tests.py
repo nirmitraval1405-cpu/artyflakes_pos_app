@@ -1,3 +1,6 @@
+import base64
+import hashlib
+import hmac
 import json
 import socket
 from datetime import datetime, timedelta, timezone as dt_timezone
@@ -16,9 +19,12 @@ from inventory.models import Product, StockMovement
 from inventory.stock import current_stock
 
 from .client import WooClient, WooError
-from .models import SyncRun, SyncState, WebOrder, WebOrderItem, WooLink
-from .sync import (MASS_ZERO_LIMIT, SyncBusy, SyncOff, apply_order, match_products, planned_pushes,
-                   reconcile_stock, run_sync)
+from .models import (
+    ProductSyncConflict, ProductSyncJob, SyncRun, SyncState, WebOrder, WebOrderItem, WooLink,
+)
+from .sync import (MASS_ZERO_LIMIT, InvalidOrderPayload, SyncBusy, SyncOff, apply_order, match_products,
+                   planned_pushes, reconcile_stock, run_sync)
+from .products import process_product_jobs, sync_product_from_woo
 
 UTC = dt_timezone.utc
 
@@ -68,6 +74,47 @@ class FakeClient:
         return {"update": out}
 
 
+class FakeProductClient:
+    def __init__(self):
+        self.products = {}
+        self.next_id = 500
+        self.posted = []
+
+    def get_all(self, path, params=None):
+        if path == "products/categories" or path == "products/tags":
+            return []
+        rows = list(self.products.values())
+        sku = (params or {}).get("sku")
+        return [row for row in rows if not sku or row.get("sku") == sku]
+
+    def get_page(self, path, params=None):
+        product_id = int(path.rsplit("/", 1)[1])
+        return dict(self.products[product_id]), {}
+
+    def post(self, path, body):
+        self.posted.append((path, body))
+        if path != "products":
+            self.next_id += 1
+            return {"id": self.next_id, **body}
+        self.next_id += 1
+        product = {
+            "id": self.next_id,
+            "type": "simple",
+            "date_modified_gmt": "2026-11-11T00:00:00",
+            "categories": [],
+            "tags": [],
+            "images": [],
+        }
+        product.update(body)
+        self.products[product["id"]] = product
+        return dict(product)
+
+    def put(self, path, body):
+        product_id = int(path.rsplit("/", 1)[1])
+        self.products[product_id].update(body)
+        return dict(self.products[product_id])
+
+
 class FakeResponse:
     def __init__(self, body, headers=None):
         self._body, self.headers = body, headers or {}
@@ -102,6 +149,110 @@ class Base(TestCase):
         values = {"sell_online": True, "woo_product_id": 55, "woo_type": "simple"}
         values.update(kw)
         return WooLink.objects.create(product=self.product, **values)
+
+
+class ProductSyncTests(Base):
+    def woo_product(self, **overrides):
+        data = {
+            "id": 55,
+            "type": "simple",
+            "name": "Resin",
+            "sku": "RES-1",
+            "status": "publish",
+            "regular_price": "300.00",
+            "sale_price": "250.00",
+            "description": "Product description",
+            "short_description": "Short description",
+            "tax_class": "standard",
+            "weight": "0.5",
+            "dimensions": {"length": "10", "width": "8", "height": "3"},
+            "attributes": [],
+            "categories": [],
+            "tags": [],
+            "images": [],
+            "manage_stock": True,
+            "stock_quantity": 7,
+            "date_modified_gmt": "2026-11-11T00:00:00",
+        }
+        data.update(overrides)
+        return data
+
+    def test_importing_a_simple_product_is_repeatable_and_keeps_pos_gst(self):
+        self.product.gst_rate = Decimal("18")
+        self.product.save(update_fields=["gst_rate"])
+
+        self.assertEqual(sync_product_from_woo(self.woo_product()), "updated")
+        self.assertEqual(sync_product_from_woo(self.woo_product()), "updated")
+
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.mrp, Decimal("300.00"))
+        self.assertEqual(self.product.sale_price, Decimal("250.00"))
+        self.assertEqual(self.product.gst_rate, Decimal("18"))
+        self.assertEqual(self.stock(), Decimal("7"))
+        self.assertEqual(
+            StockMovement.objects.filter(source=StockMovement.Source.WOOCOMMERCE).count(), 1
+        )
+        self.assertEqual(WooLink.objects.get(product=self.product).woo_product_id, 55)
+
+    def test_variable_products_are_queued_for_review_not_imported(self):
+        result = sync_product_from_woo(
+            self.woo_product(id=56, type="variable", sku="VAR-1")
+        )
+
+        self.assertEqual(result, "review")
+        self.assertFalse(Product.objects.filter(code="VAR-1").exists())
+        job = ProductSyncJob.objects.get(woo_product_id=56)
+        self.assertEqual(job.status, ProductSyncJob.Status.REVIEW)
+
+    def test_pos_product_create_job_publishes_a_simple_product(self):
+        WooLink.objects.create(product=self.product, sell_online=True)
+        job = ProductSyncJob.objects.create(
+            product=self.product,
+            direction="pos",
+            event_type="created",
+            idempotency_key="test-pos-create",
+            payload={"fields": ["name", "sku", "regular_price", "sale_price"]},
+        )
+        client = FakeProductClient()
+
+        counts = process_product_jobs(client)
+
+        job.refresh_from_db()
+        link = WooLink.objects.get(product=self.product)
+        self.assertEqual(counts["processed"], 1)
+        self.assertEqual(job.status, ProductSyncJob.Status.DONE)
+        self.assertEqual(link.woo_product_id, 501)
+        self.assertEqual(client.products[501]["sku"], self.product.code)
+
+    def test_two_sided_edits_create_a_review_conflict(self):
+        link = self.link(
+            last_synced_data={
+                "name": "Resin",
+                "sku": "RES-1",
+                "regular_price": "250.00",
+                "sale_price": "",
+                "description": "",
+                "short_description": "",
+                "status": "publish",
+                "tax_class": "",
+                "weight": "",
+                "dimensions": {},
+                "attributes": [],
+            }
+        )
+        self.product.name = "POS Resin"
+        self.product.save(update_fields=["name"])
+        data = self.woo_product(name="Website Resin", stock_quantity=None)
+
+        self.assertEqual(sync_product_from_woo(data), "updated")
+
+        conflict = ProductSyncConflict.objects.get(product=self.product, field_name="name")
+        self.assertEqual(conflict.pos_value, "POS Resin")
+        self.assertEqual(conflict.woo_value, "Website Resin")
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.name, "POS Resin")
+        link.refresh_from_db()
+        self.assertTrue(link.needs_review)
 
 
 class OrderTests(Base):
@@ -204,6 +355,54 @@ class OrderTests(Base):
         self.assertEqual((o.customer_name, o.phone, o.payment_method, o.total), ("Asha Shah", "9876543210", "Razorpay", Decimal("500.00")))
         self.assertTrue(o.is_paid)
         self.assertIn("12 Main Road", o.shipping_address)
+
+    def test_accounting_values_are_preserved_for_later_conversion(self):
+        payload = order()
+        payload.update({
+            "payment_method": "razorpay",
+            "transaction_id": "txn-123",
+            "prices_include_tax": False,
+            "discount_total": "50.00",
+            "discount_tax": "9.00",
+            "shipping_total": "25.00",
+            "shipping_tax": "4.50",
+            "cart_tax": "72.00",
+            "total_tax": "76.50",
+            "tax_lines": [{"rate_id": 3, "label": "CGST", "tax_total": "38.25"}],
+            "shipping_lines": [
+                {"method_title": "Flat rate", "total": "25.00", "total_tax": "4.50", "taxes": []},
+            ],
+            "coupon_lines": [{"code": "SAVE", "discount": "50.00", "discount_tax": "9.00"}],
+            "refunds": [{"id": 9, "reason": "Partial refund", "total": "-10.00"}],
+        })
+        payload["line_items"][0].update({
+            "subtotal": "500.00",
+            "subtotal_tax": "90.00",
+            "total_tax": "81.00",
+            "taxes": [{"id": 3, "total": "81.00", "subtotal": "90.00"}],
+        })
+
+        apply_order(payload)
+
+        imported = WebOrder.objects.get()
+        self.assertEqual(imported.payment_method_code, "razorpay")
+        self.assertEqual(imported.transaction_id, "txn-123")
+        self.assertEqual(imported.financial_data["prices_include_tax"], False)
+        self.assertEqual(imported.financial_data["shipping_tax"], "4.50")
+        self.assertEqual(imported.financial_data["line_items"][0]["taxes"][0]["total"], "81.00")
+        self.assertEqual(imported.financial_data["shipping_lines"][0]["total"], "25.00")
+        self.assertEqual(imported.financial_data["coupon_lines"][0]["code"], "SAVE")
+        self.assertEqual(imported.financial_data["refunds"][0]["id"], 9)
+
+    def test_malformed_accounting_rows_fail_without_creating_an_order(self):
+        payload = order()
+        payload["tax_lines"] = ["invalid"]
+
+        with self.assertRaisesRegex(InvalidOrderPayload, "tax_lines must be a list of objects"):
+            apply_order(payload)
+
+        self.assertEqual(WebOrder.objects.count(), 0)
+        self.assertEqual(self.stock(), Decimal("10"))
 
 
 class RunSyncTests(Base):
@@ -528,6 +727,40 @@ class ViewTests(Base):
         self.assertContains(response, f'href="{reverse("woosync:log")}"')
         self.assertContains(response, "Sync History")
 
+    def test_product_conflict_can_be_resolved_using_the_pos_value(self):
+        self.login("w_boss")
+        conflict = ProductSyncConflict.objects.create(
+            product=self.product,
+            field_name="name",
+            pos_value="POS Resin",
+            woo_value="Website Resin",
+        )
+        self.assertContains(self.client.get(reverse("woosync:products")), "Conflicting product edits")
+
+        response = self.client.post(
+            reverse("woosync:resolve_conflict", args=[conflict.pk]),
+            {"resolution": "pos"},
+        )
+
+        conflict.refresh_from_db()
+        job = ProductSyncJob.objects.get(product=self.product)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(conflict.resolution, "pos")
+        self.assertEqual(job.payload["force_fields"], ["name"])
+        self.assertNotContains(self.client.get(reverse("woosync:products")), "Conflicting product edits")
+
+    def test_deleting_a_linked_pos_product_archives_it_and_preserves_its_mapping(self):
+        product = Product.objects.create(name="Linked product")
+        link = WooLink.objects.create(product=product, woo_product_id=877, woo_type="simple")
+        self.login("w_boss")
+
+        response = self.client.post(reverse("inventory:product_delete", args=[product.pk]))
+
+        product.refresh_from_db()
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(product.is_active)
+        self.assertEqual(WooLink.objects.get(pk=link.pk).woo_product_id, 877)
+
     def test_sync_now_view_imports_orders_from_the_website(self):
         self.login("w_boss")
         state = SyncState.load()
@@ -619,12 +852,14 @@ class ViewTests(Base):
         self.client.post(url, {"action": "disable", "sel": [self.product.pk]})
         self.assertFalse(WooLink.objects.get(product=self.product).sell_online)
 
-    def test_products_without_stock_tracking_cannot_be_marked(self):
+    def test_products_without_stock_tracking_can_be_marked_for_online_sale(self):
         self.login("w_boss")
         self.product.track_stock = False
         self.product.save()
         self.client.post(reverse("woosync:products"), {"action": "enable", "sel": [self.product.pk]})
-        self.assertFalse(WooLink.objects.filter(product=self.product, sell_online=True).exists())
+        self.assertTrue(WooLink.objects.filter(product=self.product, sell_online=True).exists())
+        job = ProductSyncJob.objects.get(product=self.product)
+        self.assertEqual(job.event_type, "created")
 
     def test_the_holdback_is_checked(self):
         self.login("w_boss")
@@ -648,3 +883,38 @@ class ViewTests(Base):
         self.assertEqual(self.client.get(reverse("pos:screen")).context["web_new"], 1)
         self.client.post(reverse("woosync:order_handled", args=[self.order.pk]))
         self.assertEqual(self.client.get(reverse("pos:screen")).context["web_new"], 0)
+
+
+class ProductWebhookTests(TestCase):
+    def signed_request(self, body, delivery_id="delivery-1", signature_override=None):
+        secret = "test-webhook-secret"
+        signature = base64.b64encode(
+            hmac.new(secret.encode(), body, hashlib.sha256).digest()
+        ).decode()
+        return self.client.post(
+            reverse("woosync:product_webhook"),
+            data=body,
+            content_type="application/json",
+            HTTP_X_WC_WEBHOOK_SIGNATURE=signature_override or signature,
+            HTTP_X_WC_WEBHOOK_TOPIC="product.updated",
+            HTTP_X_WC_WEBHOOK_DELIVERY_ID=delivery_id,
+        )
+
+    @override_settings(WOOSYNC={"WEBHOOK_SECRET": "test-webhook-secret"})
+    def test_signed_webhook_is_queued_once_per_delivery(self):
+        body = json.dumps({"id": 733}).encode()
+
+        first = self.signed_request(body)
+        duplicate = self.signed_request(body)
+
+        self.assertEqual(first.status_code, 202)
+        self.assertFalse(first.json()["duplicate"])
+        self.assertTrue(duplicate.json()["duplicate"])
+        self.assertEqual(ProductSyncJob.objects.filter(woo_product_id=733).count(), 1)
+
+    @override_settings(WOOSYNC={"WEBHOOK_SECRET": "test-webhook-secret"})
+    def test_invalid_webhook_signature_is_rejected(self):
+        response = self.signed_request(b'{"id": 733}', signature_override="invalid")
+
+        self.assertEqual(response.status_code, 401)
+        self.assertFalse(ProductSyncJob.objects.exists())

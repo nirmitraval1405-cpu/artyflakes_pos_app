@@ -1,7 +1,7 @@
 import json
 from decimal import Decimal
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.test import TestCase
 from django.urls import reverse
 
@@ -10,8 +10,33 @@ from inventory.models import Product, StockMovement
 from inventory.stock import current_stock
 from people.models import Contact
 
-from .models import CashMovement, InvoiceCounter, Payment, Sale
+from .models import CashMovement, CreditPayment, InvoiceCounter, Payment, Sale
 from .services import compute_bill, div_round
+
+
+class WooCommerceSaleMetadataTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user("woo-sync", password="test-pass", role="admin")
+        self.customer = Contact.walk_in()
+
+    def make_sale(self, invoice_no, **fields):
+        return Sale.objects.create(
+            invoice_no=invoice_no,
+            customer=self.customer,
+            cashier=self.user,
+            **fields,
+        )
+
+    def test_existing_sales_default_to_pos_source(self):
+        sale = self.make_sale("AF-2026-0001")
+        self.assertEqual(sale.source, Sale.Source.POS)
+        self.assertIsNone(sale.external_order_id)
+
+    def test_woocommerce_order_reference_is_unique(self):
+        self.make_sale("AF-2026-0001", source=Sale.Source.WOOCOMMERCE, external_order_id=123)
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                self.make_sale("AF-2026-0002", source=Sale.Source.WOOCOMMERCE, external_order_id=123)
 
 
 class InvoiceCounterTests(TestCase):
@@ -153,11 +178,51 @@ class CheckoutTests(TestCase):
         self.assertEqual(payment.method, Payment.Method.CHEQUE)
         self.assertEqual(payment.reference, "CHQ-42")
 
+    def test_online_payment_is_recorded_as_a_distinct_method(self):
+        response = self.post(self.body(
+            payments=[{"method": "online", "amount": "500.00", "reference": "Razorpay:txn-123"}],
+        ))
+        self.assertEqual(response.status_code, 200)
+        payment = Payment.objects.get()
+        self.assertEqual(payment.method, Payment.Method.ONLINE)
+        self.assertEqual(payment.get_method_display(), "Online")
+        self.assertEqual(payment.reference, "Razorpay:txn-123")
+
     def test_short_payment_is_rejected_and_nothing_is_saved(self):
         response = self.post(self.body(payments=[{"method": "cash", "amount": "100.00"}]))
         self.assertEqual(response.status_code, 400)
         self.assertEqual(Sale.objects.count(), 0)
         self.assertEqual(current_stock(self.product), 5)
+
+    def test_credit_sale_requires_a_named_customer(self):
+        response = self.post(self.body(
+            payments=[{"method": "cash", "amount": "100.00"}],
+            allow_credit=True,
+        ))
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(Sale.objects.count(), 0)
+
+    def test_named_customer_can_have_a_partially_paid_credit_sale(self):
+        customer = Contact.objects.create(name="Asha")
+        response = self.post(self.body(
+            customer_id=customer.pk,
+            payments=[{"method": "cash", "amount": "200.00"}],
+            allow_credit=True,
+        ))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["due"], "300.00")
+        sale = Sale.objects.get()
+        self.assertEqual(sale.customer, customer)
+        detail = self.client.get(reverse("pos:sale_detail", args=[sale.pk]))
+        self.assertContains(detail, "Outstanding balance")
+        self.assertContains(self.client.get(reverse("pos:receipt", args=[sale.pk])), "Balance due")
+
+    def test_full_credit_sale_can_be_created_with_no_payment(self):
+        customer = Contact.objects.create(name="Asha")
+        response = self.post(self.body(customer_id=customer.pk, payments=[], allow_credit=True))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["due"], "500.00")
+        self.assertFalse(Payment.objects.exists())
 
     def test_upi_cannot_be_overpaid(self):
         response = self.post(self.body(payments=[{"method": "upi", "amount": "600.00"}]))
@@ -313,6 +378,91 @@ class CashMovementTests(TestCase):
         self.assertContains(response, 'class="pos-pill pill-brand"')
         self.assertContains(response, 'href="/woo/orders/" target="_blank" rel="noopener"')
         self.assertContains(response, "Website Orders")
+        html = response.content.decode()
+        self.assertLess(html.index('id="posSearch"'), html.index('class="pos-pill pill-brand"'))
+        self.assertContains(response, 'href="/credit-payments/"')
+
+
+class CreditPaymentTests(TestCase):
+    def setUp(self):
+        self.cashier = User.objects.create_user("credit-cashier", role="cashier")
+        self.client.force_login(self.cashier)
+        self.customer = Contact.objects.create(name="Asha")
+        self.sale = Sale.objects.create(
+            invoice_no="AF-2026-8001",
+            customer=self.customer,
+            cashier=self.cashier,
+            total=Decimal("500.00"),
+            amount_paid=Decimal("200.00"),
+        )
+        Payment.objects.create(sale=self.sale, method=Payment.Method.CASH, amount=Decimal("200.00"))
+
+    def collect(self, amount, method="upi", reference="UPI-1"):
+        return self.client.post(
+            reverse("pos:credit_payment_collect", args=[self.sale.pk]),
+            {"amount": amount, "method": method, "reference": reference},
+        )
+
+    def test_cashier_can_record_partial_credit_collection(self):
+        response = self.collect("100.00")
+        self.assertEqual(response.status_code, 302)
+        payment = CreditPayment.objects.get()
+        self.assertEqual(payment.amount, Decimal("100.00"))
+        self.assertEqual(payment.method, Payment.Method.UPI)
+        self.assertEqual(payment.reference, "UPI-1")
+
+        page = self.client.get(reverse("pos:credit_payments"))
+        self.assertContains(page, "200.00")
+
+    def test_collection_for_full_balance_closes_the_open_credit(self):
+        response = self.collect("300.00")
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(self.client.get(reverse("pos:credit_payments")).context["page"].object_list)
+
+    def test_collection_cannot_exceed_outstanding_balance(self):
+        response = self.collect("300.01")
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(CreditPayment.objects.exists())
+        self.assertContains(self.client.get(reverse("pos:credit_payments")), "Amount cannot exceed")
+
+    def test_credit_payment_page_lists_open_balance(self):
+        response = self.client.get(reverse("pos:credit_payments"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "AF-2026-8001")
+        self.assertContains(response, "300.00")
+
+
+class EndOfDayTests(TestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user("eod-admin", role="admin")
+        self.cashier = User.objects.create_user("eod-cashier", role="cashier")
+        customer = Contact.walk_in()
+        sale = Sale.objects.create(
+            invoice_no="AF-2026-8002", customer=customer, cashier=self.cashier,
+            total=Decimal("100.00"),
+        )
+        Payment.objects.create(sale=sale, method=Payment.Method.CASH, amount=Decimal("100.00"))
+        CashMovement.objects.create(user=self.cashier, direction=CashMovement.Direction.IN, amount=Decimal("10.00"), reason="Other")
+        CashMovement.objects.create(user=self.cashier, direction=CashMovement.Direction.OUT, amount=Decimal("4.00"), reason="Other")
+
+    def test_admin_can_view_daily_cash_summary(self):
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse("pos:end_of_day"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "100.00")
+        self.assertContains(response, "106.00")
+        self.assertContains(self.client.get(reverse("pos:screen")), 'href="/end-of-day/"')
+
+    def test_cashier_cannot_view_end_of_day(self):
+        self.client.force_login(self.cashier)
+        self.assertEqual(self.client.get(reverse("pos:end_of_day")).status_code, 403)
+
+    def test_invalid_report_date_is_rejected(self):
+        self.client.force_login(self.admin)
+        self.assertEqual(
+            self.client.get(reverse("pos:end_of_day"), {"date": "not-a-date"}).status_code,
+            400,
+        )
 
 
 class PrintSettingTests(TestCase):

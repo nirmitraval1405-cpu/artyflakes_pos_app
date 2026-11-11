@@ -51,6 +51,8 @@
     $("dsTaxRow").hidden = data.tax === "0.00";
     $("dsTotal").textContent = data.total;
     $("dsPaid").textContent = data.paid;
+    $("dsDue").textContent = data.due;
+    $("dsDueRow").hidden = !data.due || data.due === "0.00";
     $("dsInvoice").textContent = data.invoice_no;
     $("dsChange").textContent = "₹ " + data.change;
 
