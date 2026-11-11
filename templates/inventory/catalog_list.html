@@ -18,6 +18,13 @@
   {% endif %}
 </div>
 <section class="grid-panel">
+  <form class="grid-search" method="get">
+    <i class="bi bi-search"></i>
+    <input type="text" name="q" value="{{ q }}" placeholder="Search {{ title|lower }}" autocomplete="off">
+    {% if q %}
+      <a href="{% if kind == 'category' %}{% url 'inventory:category_list' %}{% elif kind == 'brand' %}{% url 'inventory:brand_list' %}{% else %}{% url 'inventory:unit_list' %}{% endif %}" class="btn btn-sm btn-outline-secondary">Clear</a>
+    {% endif %}
+  </form>
   <div class="grid-wrap">
     <table class="grid">
       <thead>
@@ -68,7 +75,7 @@
           </td>
         </tr>
         {% empty %}
-        <tr><td colspan="{% if kind == 'unit' %}6{% else %}4{% endif %}" class="grid-empty">No {{ title|lower }} found.</td></tr>
+        <tr><td colspan="{% if kind == 'unit' %}6{% else %}4{% endif %}" class="grid-empty">{% if q %}No {{ title|lower }} match your search.{% else %}No {{ title|lower }} found.{% endif %}</td></tr>
         {% endfor %}
       </tbody>
     </table>

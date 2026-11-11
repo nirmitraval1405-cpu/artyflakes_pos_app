@@ -24,7 +24,7 @@ from .models import (
 )
 from .sync import (MASS_ZERO_LIMIT, InvalidOrderPayload, SyncBusy, SyncOff, apply_order, match_products,
                    planned_pushes, reconcile_stock, run_sync)
-from .products import process_product_jobs, sync_product_from_woo
+from .products import enqueue_product_job, enqueue_webhook_job, process_product_jobs, sync_product_from_woo
 
 UTC = dt_timezone.utc
 
@@ -204,6 +204,15 @@ class ProductSyncTests(Base):
         job = ProductSyncJob.objects.get(woo_product_id=56)
         self.assertEqual(job.status, ProductSyncJob.Status.REVIEW)
 
+    def test_non_published_woo_products_are_still_imported_into_pos(self):
+        result = sync_product_from_woo(self.woo_product(id=99, status="draft", sku="DRAFT-1"), categories={}, tags={})
+
+        self.assertEqual(result, "created")
+        product = Product.objects.get(code="DRAFT-1")
+        self.assertFalse(product.is_active)
+        self.assertEqual(product.woo_status, "draft")
+        self.assertTrue(WooLink.objects.filter(product=product, woo_product_id=99).exists())
+
     def test_pos_product_create_job_publishes_a_simple_product(self):
         WooLink.objects.create(product=self.product, sell_online=True)
         job = ProductSyncJob.objects.create(
@@ -253,6 +262,25 @@ class ProductSyncTests(Base):
         self.assertEqual(self.product.name, "POS Resin")
         link.refresh_from_db()
         self.assertTrue(link.needs_review)
+
+    def test_repeated_same_pos_sync_job_is_deduplicated(self):
+        first, created = enqueue_product_job(self.product, "updated", ["name"], ["name"], allow_offline=True)
+        second, duplicate = enqueue_product_job(self.product, "updated", ["name"], ["name"], allow_offline=True)
+
+        self.assertTrue(created)
+        self.assertFalse(duplicate)
+        self.assertEqual(first.id, second.id)
+        self.assertEqual(ProductSyncJob.objects.filter(product=self.product, direction="pos", event_type="updated").count(), 1)
+
+    def test_repeated_webhook_job_is_deduplicated_without_delivery_id(self):
+        payload = {"id": 777, "name": "Repeatable product", "status": "publish", "sku": "REP-1"}
+        first, created = enqueue_webhook_job(payload["id"], "updated", payload, "")
+        second, duplicate = enqueue_webhook_job(payload["id"], "updated", payload, "")
+
+        self.assertTrue(created)
+        self.assertFalse(duplicate)
+        self.assertEqual(first.id, second.id)
+        self.assertEqual(ProductSyncJob.objects.filter(woo_product_id=777, direction="woocommerce", event_type="updated").count(), 1)
 
 
 class OrderTests(Base):

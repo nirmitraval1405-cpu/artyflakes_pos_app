@@ -1,6 +1,6 @@
 import hashlib
+import json
 import logging
-import uuid
 from datetime import datetime, timedelta, timezone as dt_timezone
 from decimal import Decimal, InvalidOperation
 
@@ -68,26 +68,45 @@ def _snapshot(product):
     }
 
 
+def _job_key(prefix, *parts):
+    body = "|".join(str(part) for part in parts)
+    digest = hashlib.sha256(body.encode("utf-8")).hexdigest()[:32]
+    return f"{prefix}:{digest}"
+
+
 def enqueue_product_job(
     product, event_type="updated", fields=None, force_fields=None, allow_offline=False
 ):
-    key = f"pos:{product.pk}:{uuid.uuid4()}"
     payload = {"fields": list(fields or PRODUCT_FIELDS)}
     if force_fields:
         payload["force_fields"] = list(force_fields)
     if allow_offline:
         payload["allow_offline"] = True
-    ProductSyncJob.objects.create(
+    key = _job_key(
+        "pos",
+        product.pk,
+        event_type,
+        json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str),
+    )
+    return ProductSyncJob.objects.get_or_create(
         product=product,
         direction="pos",
         event_type=event_type,
         idempotency_key=key,
-        payload=payload,
+        defaults={"payload": payload},
     )
 
 
 def enqueue_webhook_job(woo_id, event_type, payload, delivery_id):
-    key = f"webhook:{delivery_id}" if delivery_id else f"webhook:{event_type}:{woo_id}:{uuid.uuid4()}"
+    if delivery_id:
+        key = f"webhook:{delivery_id}"
+    else:
+        key = _job_key(
+            "webhook",
+            woo_id,
+            event_type,
+            json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str),
+        )
     return ProductSyncJob.objects.get_or_create(
         idempotency_key=key,
         defaults={
@@ -265,7 +284,7 @@ def sync_product_from_woo(data, categories=None, tags=None):
     data = dict(data)
     original_remote_snapshot = _remote_snapshot(data)
     woo_id = data["id"]
-    status = str(data.get("status") or "")
+    status = str(data.get("status") or "draft")
     if status == "trash":
         link = WooLink.objects.filter(woo_product_id=woo_id).select_related("product").first()
         if link:
@@ -280,6 +299,8 @@ def sync_product_from_woo(data, categories=None, tags=None):
     if str(data.get("type") or "simple") != "simple":
         _queue_review(woo_id, f"Unsupported WooCommerce product type: {data.get('type')}", data)
         return "review"
+    if status not in {"publish", "draft", "private", "pending"}:
+        status = "draft"
 
     sku = str(data.get("sku") or "").strip()
     link = WooLink.objects.filter(woo_product_id=woo_id).select_related("product").first()

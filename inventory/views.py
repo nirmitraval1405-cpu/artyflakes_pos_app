@@ -1,8 +1,9 @@
 import csv
+import secrets
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.files.storage import default_storage
 from django.core.paginator import Paginator
 from django.db import transaction
@@ -19,6 +20,7 @@ from .forms import (
     AddStockForm, BrandForm, CategoryForm, CountForm, DamageForm, ProductForm, UnitForm,
 )
 from .models import Brand, Category, Product, StockMovement, Unit
+from .product_import import IMPORT_FIELDS, import_product_rows, parse_product_csv
 from .stock import current_stock, low_stock, qty_fmt, stock_status, with_stock
 from .utils.barcode_generator import create_barcode_image, generate_barcode
 
@@ -143,6 +145,100 @@ def product_export(request):
 
 
 @login_required
+def product_import(request):
+    if not request.user.is_admin_role:
+        raise PermissionDenied
+
+    session_key = "inventory_product_import"
+    if request.method == "GET" and request.GET.get("new") == "1":
+        request.session.pop(session_key, None)
+    stage = request.session.get(session_key)
+    if request.method == "GET":
+        return render(request, "inventory/product_import.html", {
+            "stage": stage,
+            "fields": IMPORT_FIELDS,
+        })
+
+    action = request.POST.get("action")
+    if action == "upload":
+        upload = request.FILES.get("file")
+        if upload is None:
+            messages.error(request, "Choose a CSV file to import.")
+            return redirect("inventory:product_import")
+        if not upload.name.lower().endswith(".csv"):
+            messages.error(request, "Upload a .csv file.")
+            return redirect("inventory:product_import")
+        content = upload.read(5 * 1024 * 1024 + 1)
+        if len(content) > 5 * 1024 * 1024:
+            messages.error(request, "CSV files must be 5 MB or smaller.")
+            return redirect("inventory:product_import")
+        try:
+            text = content.decode("utf-8-sig")
+            headers, rows, mapping = parse_product_csv(text)
+        except (UnicodeDecodeError, ValueError, csv.Error) as exc:
+            messages.error(request, str(exc))
+            return redirect("inventory:product_import")
+        stage = {
+            "token": secrets.token_urlsafe(18),
+            "headers": headers,
+            "rows": rows,
+            "mapping": {str(index): value for index, value in mapping.items()},
+            "samples": rows[:3],
+            "matching_behavior": "update",
+            "columns": [
+                {
+                    "index": index,
+                    "header": header or f"Column {index + 1}",
+                    "samples": [row[index] if index < len(row) else "" for row in rows[:3]],
+                    "mapped": mapping.get(index, ""),
+                }
+                for index, header in enumerate(headers)
+            ],
+        }
+        request.session[session_key] = stage
+        return render(request, "inventory/product_import.html", {
+            "stage": stage,
+            "fields": IMPORT_FIELDS,
+        })
+
+    if action != "import" or not stage or request.POST.get("token") != stage.get("token"):
+        messages.error(request, "Your CSV import session expired. Upload the file again.")
+        return redirect("inventory:product_import")
+
+    allowed_fields = {key for key, _ in IMPORT_FIELDS}
+    mapping = {}
+    for index in range(len(stage["headers"])):
+        target = request.POST.get(f"map_{index}", "")
+        if target and target not in allowed_fields:
+            messages.error(request, "The selected column mapping is invalid.")
+            return redirect("inventory:product_import")
+        if target:
+            mapping[index] = target
+
+    try:
+        result = import_product_rows(
+            stage["rows"], mapping, request.POST.get("matching_behavior", ""), request.user
+        )
+    except ValueError as exc:
+        stage["mapping"] = {str(index): value for index, value in mapping.items()}
+        stage["matching_behavior"] = request.POST.get("matching_behavior", "update")
+        for column in stage["columns"]:
+            column["mapped"] = mapping.get(column["index"], "")
+        request.session[session_key] = stage
+        return render(request, "inventory/product_import.html", {
+            "stage": stage,
+            "fields": IMPORT_FIELDS,
+            "import_error": str(exc),
+        })
+
+    del request.session[session_key]
+    return render(request, "inventory/product_import.html", {
+        "result": result,
+        "fields": IMPORT_FIELDS,
+    })
+
+
+@login_required
 @require_POST
 def generate_product_barcode(request):
     if not request.user.is_admin_role:
@@ -236,22 +332,37 @@ class CatalogList(AdminRequiredMixin, ListView):
     kind = ""
 
     def get_queryset(self):
+        q = (self.request.GET.get("q") or "").strip()
+
         if self.kind == "category":
-            return Category.objects.annotate(product_count=Count("products"))
+            qs = Category.objects.annotate(product_count=Count("products"))
+            if q:
+                qs = qs.filter(name__icontains=q)
+            return qs
         if self.kind == "brand":
-            return Brand.objects.annotate(product_count=Count("products"))
+            qs = Brand.objects.annotate(product_count=Count("products"))
+            if q:
+                qs = qs.filter(name__icontains=q)
+            return qs
+
         counts = dict(
             Product.objects.values("unit").annotate(n=Count("pk")).values_list("unit", "n")
         )
         units = list(Unit.objects.all())
         for unit in units:
             unit.product_count = counts.get(unit.code, 0)
+        if q:
+            units = [u for u in units if q.lower() in u.name.lower() or q.lower() in u.code.lower()]
         return units
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         labels = {"category": "Categories", "brand": "Brands", "unit": "Units"}
-        context.update({"kind": self.kind, "title": labels[self.kind]})
+        context.update({
+            "kind": self.kind,
+            "title": labels[self.kind],
+            "q": (self.request.GET.get("q") or "").strip(),
+        })
         return context
 
 
@@ -259,10 +370,13 @@ class CategoryList(CatalogList):
     kind = "category"
 
     def get_queryset(self):
+        q = (self.request.GET.get("q") or "").strip()
         categories = Category.objects.annotate(
             product_count=Count("products"),
             child_count=Count("children"),
         )
+        if q:
+            categories = categories.filter(name__icontains=q)
         return _ordered_category_tree(categories)
 
 

@@ -318,6 +318,17 @@ class InventoryCatalogTests(TestCase):
         selected_response = self.client.get(reverse("inventory:product_list"), {"group": child.pk})
         self.assertTrue(selected_response.context["category_tree"][0].tree_open)
 
+    def test_category_list_search_filters_by_name(self):
+        Category.objects.create(name="Resin Material")
+        Category.objects.create(name="Resin Flowers")
+        Category.objects.create(name="Paper")
+
+        response = self.client.get(reverse("inventory:category_list"), {"q": "resin"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([item.name for item in response.context["items"]], ["Resin Material", "Resin Flowers"])
+        self.assertContains(response, "Search categories")
+
     def test_parent_category_cannot_be_deleted_while_it_has_subcategories(self):
         main = Category.objects.create(name="Craft Material")
         Category.objects.create(name="Paper", parent=main)
@@ -420,6 +431,128 @@ class InventoryCatalogTests(TestCase):
         self.assertRedirects(response, reverse("inventory:category_list"))
         self.assertTrue(Category.objects.filter(pk=category.pk).exists())
         self.assertTrue(Category.objects.get(pk=category.pk).is_active)
+
+
+class ProductImportTests(TestCase):
+    def setUp(self):
+        user = User.objects.create_superuser(username="import-admin", password="test-password")
+        self.client.force_login(user)
+        self.url = reverse("inventory:product_import")
+        self.csv = (
+            "Code,Name,Group,Brand,Barcode,Cost,Sale price,MRP,GST %,Stock\n"
+            "ART-500,Resin mould,Silicone Mould,Art Co,123456,50,80,100,18,12.5\n"
+        )
+
+    def _upload(self, content=None):
+        return self.client.post(self.url, {
+            "action": "upload",
+            "file": SimpleUploadedFile(
+                "products.csv",
+                (content or self.csv).encode("utf-8"),
+                content_type="text/csv",
+            ),
+        })
+
+    def test_import_button_opens_csv_mapping_workflow(self):
+        response = self.client.get(reverse("inventory:product_list"))
+
+        self.assertContains(response, reverse("inventory:product_import"))
+        upload_response = self.client.get(self.url)
+        self.assertContains(upload_response, "Choose a CSV file")
+
+    def test_csv_import_maps_columns_creates_product_and_stock_movement(self):
+        mapping_response = self._upload()
+
+        self.assertEqual(mapping_response.status_code, 200)
+        self.assertContains(mapping_response, "Map CSV fields to products")
+        self.assertContains(mapping_response, "GST %")
+        stage = mapping_response.context["stage"]
+        response = self.client.post(self.url, {
+            "action": "import",
+            "token": stage["token"],
+            "matching_behavior": "update",
+            **{f"map_{index}": value for index, value in enumerate(
+                ("code", "name", "category", "brand", "barcode", "cost_price", "sale_price", "mrp", "gst_rate", "stock")
+            )},
+        })
+
+        product = Product.objects.get(code="ART-500")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["result"]["created"], 1)
+        self.assertEqual(response.context["result"]["failed"], 0)
+        self.assertEqual(product.category.name, "Silicone Mould")
+        self.assertEqual(product.brand.name, "Art Co")
+        self.assertEqual(product.cost_price, Decimal("50.00"))
+        self.assertEqual(product.gst_rate, Decimal("18.00"))
+        self.assertEqual(product.movements.get().quantity, Decimal("12.500"))
+        self.assertEqual(product.movements.get().movement_type, StockMovement.Type.OPENING)
+
+    def test_import_can_update_a_matching_product_and_reconcile_stock_ledger(self):
+        product = Product.objects.create(name="Old", code="ART-500", sale_price="20", mrp="25")
+        StockMovement.objects.create(
+            product=product,
+            quantity=4,
+            movement_type=StockMovement.Type.OPENING,
+        )
+        stage = self._upload().context["stage"]
+        response = self.client.post(self.url, {
+            "action": "import",
+            "token": stage["token"],
+            "matching_behavior": "update",
+            **{f"map_{index}": value for index, value in enumerate(
+                ("code", "name", "category", "brand", "barcode", "cost_price", "sale_price", "mrp", "gst_rate", "stock")
+            )},
+        })
+
+        product.refresh_from_db()
+        self.assertEqual(response.context["result"]["updated"], 1)
+        self.assertEqual(Product.objects.count(), 1)
+        self.assertEqual(product.name, "Resin mould")
+        self.assertEqual(product.movements.count(), 2)
+        self.assertEqual(product.movements.order_by("-id").first().quantity, Decimal("8.500"))
+
+    def test_import_can_skip_existing_products(self):
+        Product.objects.create(name="Existing", code="ART-500", sale_price="20", mrp="25")
+        stage = self._upload().context["stage"]
+        response = self.client.post(self.url, {
+            "action": "import",
+            "token": stage["token"],
+            "matching_behavior": "skip",
+            **{f"map_{index}": value for index, value in enumerate(
+                ("code", "name", "category", "brand", "barcode", "cost_price", "sale_price", "mrp", "gst_rate", "stock")
+            )},
+        })
+
+        self.assertEqual(response.context["result"]["skipped"], 1)
+        self.assertEqual(Product.objects.count(), 1)
+        self.assertEqual(Product.objects.get().name, "Existing")
+
+    def test_invalid_product_row_is_reported_without_creating_product(self):
+        stage = self._upload(self.csv.replace(",80,100,", ",120,100,")).context["stage"]
+        response = self.client.post(self.url, {
+            "action": "import",
+            "token": stage["token"],
+            "matching_behavior": "update",
+            **{f"map_{index}": value for index, value in enumerate(
+                ("code", "name", "category", "brand", "barcode", "cost_price", "sale_price", "mrp", "gst_rate", "stock")
+            )},
+        })
+
+        self.assertEqual(response.context["result"]["failed"], 1)
+        self.assertFalse(Product.objects.exists())
+
+    def test_import_requires_name_mapping_and_keeps_mapping_step_open(self):
+        stage = self._upload().context["stage"]
+        response = self.client.post(self.url, {
+            "action": "import",
+            "token": stage["token"],
+            "matching_behavior": "update",
+            "map_0": "code",
+        })
+
+        self.assertContains(response, "Map a CSV column to Name")
+        self.assertIn("stage", response.context)
+        self.assertFalse(Product.objects.exists())
 
 
 class PriceTagLayoutTests(TestCase):

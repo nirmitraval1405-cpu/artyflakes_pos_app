@@ -42,7 +42,11 @@
   <span class="tb disabled" title="Coming soon"><i class="bi bi-intersect"></i><span>Merge</span></span>
   <span class="tb disabled" title="Coming soon"><i class="bi bi-sort-down"></i><span>Sorting</span></span>
   <span class="tb disabled" title="Coming soon"><i class="bi bi-graph-up"></i><span>Mov. avg. price</span></span>
-  <span class="tb disabled" title="Coming soon"><i class="bi bi-arrow-down"></i><span>Import</span></span>
+  {% if can_edit %}
+    <a class="tb" href="{% url 'inventory:product_import' %}"><i class="bi bi-arrow-down"></i><span>Import</span></a>
+  {% else %}
+    <span class="tb disabled" title="Admin only"><i class="bi bi-arrow-down"></i><span>Import</span></span>
+  {% endif %}
   <a class="tb" href="{% url 'inventory:product_export' %}"><i class="bi bi-arrow-up"></i><span>Export</span></a>
   <span class="tb disabled" title="Coming soon"><i class="bi bi-question-circle"></i><span>Help</span></span>
 </div>

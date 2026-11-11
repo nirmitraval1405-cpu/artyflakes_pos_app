@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Import products · Artyflakes POS{% endblock %}
+{% block extra_css %}<link href="{% static 'css/inventory.css' %}" rel="stylesheet">{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h3>Import products</h3>
+    <p>Inventory &bull; CSV import</p>
+  </div>
+</div>
+
+{% if result %}
+  <section class="grid-panel p-3">
+    <h5>Import complete</h5>
+    <p class="mb-2">
+      Created: <strong>{{ result.created }}</strong> ·
+      Updated: <strong>{{ result.updated }}</strong> ·
+      Skipped: <strong>{{ result.skipped }}</strong> ·
+      Failed: <strong>{{ result.failed }}</strong>
+    </p>
+    {% if result.errors %}
+      <div class="alert alert-warning mb-3">
+        <strong>Rows needing attention</strong>
+        <ul class="mb-0 mt-2">{% for error in result.errors %}<li>{{ error }}</li>{% endfor %}</ul>
+        {% if result.failed > result.errors|length %}<div class="mt-2">Only the first {{ result.errors|length }} errors are shown.</div>{% endif %}
+      </div>
+    {% endif %}
+    <a class="btn btn-primary" href="{% url 'inventory:product_import' %}">Import another file</a>
+    <a class="btn btn-outline-secondary" href="{% url 'inventory:product_list' %}">Back to products</a>
+  </section>
+{% elif not stage %}
+  <section class="grid-panel p-3">
+    <h5>Choose a CSV file</h5>
+    <p>Use a CSV file with a header row. You can map its columns to Code, Name, Group, Brand, Barcode, Cost, Sale price, MRP, GST %, and Stock on the next step.</p>
+    <p class="text-muted small">Files are limited to 5 MB and 10,000 product rows. UTF-8 CSV files are supported.</p>
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="upload">
+      <div class="mb-3">
+        <label class="form-label" for="productCsv">CSV file</label>
+        <input class="form-control" id="productCsv" type="file" name="file" accept=".csv,text/csv" required>
+      </div>
+      <button class="btn btn-primary" type="submit">Continue to column mapping</button>
+      <a class="btn btn-outline-secondary" href="{% url 'inventory:product_list' %}">Cancel</a>
+    </form>
+  </section>
+{% else %}
+  <section class="grid-panel p-3">
+    <h5>Map CSV fields to products</h5>
+    <p>Select the product field for each CSV column, or choose “Do not import”. Name is required. Blank mapped values leave existing product values unchanged.</p>
+    {% if import_error %}<div class="alert alert-danger" role="alert">{{ import_error }}</div>{% endif %}
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="import">
+      <input type="hidden" name="token" value="{{ stage.token }}">
+
+      <div class="grid-wrap mb-4">
+        <table class="grid">
+          <thead><tr><th>Column name</th><th>Sample</th><th>Map to field</th></tr></thead>
+          <tbody>
+            {% for column in stage.columns %}
+            <tr>
+              <td>{{ column.header }}</td>
+              <td>
+                {% for sample in column.samples %}
+                  {% if sample %}<div class="small text-muted">{{ sample|truncatechars:80 }}</div>{% endif %}
+                {% endfor %}
+              </td>
+              <td>
+                <select class="form-select" name="map_{{ column.index }}">
+                  <option value="">Do not import</option>
+                  {% for key, label in fields %}
+                    <option value="{{ key }}" {% if column.mapped == key %}selected{% endif %}>{{ label }}</option>
+                  {% endfor %}
+                </select>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label" for="matchingBehavior">When a row matches an existing product by Code or Barcode</label>
+        <select class="form-select" id="matchingBehavior" name="matching_behavior" required>
+          <option value="update" {% if stage.matching_behavior == "update" %}selected{% endif %}>Update the existing product; create products with no match</option>
+          <option value="skip" {% if stage.matching_behavior == "skip" %}selected{% endif %}>Skip matched products; create products with no match</option>
+        </select>
+        <div class="form-text">Stock is updated through auditable stock movements, not by changing historical movements.</div>
+      </div>
+
+      <button class="btn btn-primary" type="submit">Import {{ stage.rows|length }} products</button>
+      <a class="btn btn-outline-secondary" href="{% url 'inventory:product_import' %}?new=1">Start over</a>
+    </form>
+  </section>
+{% endif %}
+{% endblock %}
