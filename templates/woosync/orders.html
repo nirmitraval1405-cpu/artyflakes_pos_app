@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Website orders · {{ store_name }}{% endblock %}
+{% block extra_css %}<link href="{% static 'css/inventory.css' %}" rel="stylesheet">{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div><h3>Website orders</h3><p>Orders placed on the website. Each one takes its items out of the POS stock automatically.</p></div>
+</div>
+
+<div class="toolbar">
+  <a class="tb" href="{{ request.get_full_path }}"><i class="bi bi-arrow-repeat"></i><span>Refresh</span></a>
+  {% for key, label, count in tabs %}
+  <a class="tb" href="?show={{ key }}{% if q %}&q={{ q|urlencode }}{% endif %}" {% if key == show %}style="background: var(--cream); font-weight: 700;"{% endif %}>
+    <i class="bi bi-circle{% if key == show %}-fill{% endif %}"></i><span>{{ label }} ({{ count }})</span>
+  </a>
+  {% endfor %}
+</div>
+
+<section class="grid-panel">
+  <form class="grid-search" method="get">
+    <input type="hidden" name="show" value="{{ show }}">
+    <i class="bi bi-search"></i>
+    <input type="text" name="q" value="{{ q }}" placeholder="Order number, name, phone or email" autocomplete="off">
+  </form>
+  <div class="grid-wrap">
+    <table class="grid">
+      <thead><tr><th>Order</th><th>Placed</th><th>Customer</th><th>Status</th><th>Paid</th><th class="num">Items</th><th class="num">Total</th><th>Stock</th><th>Handled</th></tr></thead>
+      <tbody>
+        {% for o in page %}
+        <tr class="{% if o.status in 'cancelled refunded failed trash' %}inactive{% endif %}">
+          <td><a href="{% url 'woosync:order_detail' o.pk %}"><strong>#{{ o.number }}</strong></a></td>
+          <td>{{ o.woo_created|date:"d-m-Y H:i" }}</td>
+          <td>{{ o.customer_name }}{% if o.phone %}<div class="small text-muted">{{ o.phone }}</div>{% endif %}</td>
+          <td><span class="st {{ o.badge }}">{{ o.status }}</span></td>
+          <td>{% if o.is_paid %}Yes{% else %}No{% endif %}</td>
+          <td class="num">{{ o.n_items }}</td>
+          <td class="num">{{ o.total|floatformat:"2g" }}</td>
+          <td>{% if o.unmatched %}<span class="st st-low">{{ o.unmatched }} not matched</span>{% elif o.holds_stock %}<span class="st st-ok">Taken</span>{% else %}<span class="st st-na">Not taken</span>{% endif %}</td>
+          <td>{% if o.handled %}&#10003;{% endif %}</td>
+        </tr>
+        {% empty %}<tr><td colspan="9" class="grid-empty">No orders here.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if page.has_other_pages %}
+  <div class="pager">
+    {% if page.has_previous %}<a href="?{{ querystring }}&page={{ page.previous_page_number }}">&laquo; Previous</a>{% endif %}
+    <span>Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
+    {% if page.has_next %}<a href="?{{ querystring }}&page={{ page.next_page_number }}">Next &raquo;</a>{% endif %}
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1704,3 +1704,6 @@ body.pos-locked .pos-app {
         grid-template-columns: 1fr;
     }
 }
+
+a.pos-pill { text-decoration: none; display: inline-flex; align-items: center; gap: .4rem; }
+.pill-badge { background: #fff; color: var(--primary); border-radius: 10px; padding: 0 7px; font-size: 12px; font-weight: 700; }

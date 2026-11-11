@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Preview · {{ store_name }}{% endblock %}
+{% block extra_css %}<link href="{% static 'css/inventory.css' %}" rel="stylesheet">{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h3>What would be sent</h3>
+    <p>This only shows the changes. Nothing is sent from this page.{% if holdback %} The website is shown {{ holdback }} unit(s) less than the real stock.{% endif %}</p>
+  </div>
+  <a class="btn btn-outline-secondary btn-sm" href="{% url 'woosync:home' %}">Back to Website sync</a>
+</div>
+
+{% if guard %}
+<div class="alert alert-warning">
+  {{ drops }} products would go to <strong>0</strong> on the website. A scheduled run will not send these (the limit is {{ limit }}).
+  If it is right, use <strong>Sync now</strong> with the override on the Website sync page. If not, add opening stock to the products first.
+</div>
+{% endif %}
+
+<section class="grid-panel">
+  <div class="grid-wrap" style="min-height: 0;">
+    <table class="grid">
+      <thead><tr><th>Code</th><th>Product</th><th class="num">POS stock</th><th class="num">Website was</th><th class="num">Website will be</th></tr></thead>
+      <tbody>
+        {% for r in rows %}
+        <tr><td>{{ r.code }}</td><td>{{ r.name }}</td><td class="num">{{ r.stock }}</td>
+          <td class="num">{% if r.old is None %}&mdash;{% else %}{{ r.old }}{% endif %}</td>
+          <td class="num"><strong {% if r.drop %}style="color: var(--danger);"{% endif %}>{{ r.new }}</strong></td></tr>
+        {% empty %}<tr><td colspan="5" class="grid-empty">Nothing to send. The website already has the latest stock, or no products are marked Sell online yet.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+{% if skipped %}
+<section class="grid-panel mt-3">
+  <div class="px-3 py-2 border-bottom fw-semibold">Marked online, but skipped</div>
+  <div class="grid-wrap" style="min-height: 0;">
+    <table class="grid"><tbody>
+      {% for name, why in skipped %}<tr><td>{{ name }}</td><td style="white-space: normal;">{{ why }}</td></tr>{% endfor %}
+    </tbody></table>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

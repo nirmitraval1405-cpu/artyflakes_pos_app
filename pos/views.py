@@ -26,6 +26,7 @@ from django.utils import timezone
 from .models import Payment, Sale, SaleItem, SaleReturn, SaleReturnItem
 from .services import CheckoutError, create_return, create_sale, to_paise, void_sale
 from promotions.engine import rules_for
+from woosync.models import HOLDING, WebOrder
 from storeconfig import printing
 from storeconfig.models import PrintSettings, StoreSettings
 logger = logging.getLogger(__name__)
@@ -37,27 +38,16 @@ def _store():
 
 @login_required
 def screen(request):
-    cfg = StoreSettings.load()
-    # Admins have no discount limit, so the page shows the limit to Cashiers only
-    limit = "" if request.user.is_admin_role else f"{cfg.cashier_max_discount_percent.normalize():f}"
-    print_dialog = None
-    if request.user.is_admin_role:
-        print_dialog = {"settings": PrintSettings.load().as_dict(), "defaults": printing.LABEL_DEFAULTS}
-    return render(request, "pos/screen.html", {
-        "max_discount": limit, "store": cfg.as_store_info(),
-        "locked": bool(request.session.get("pos_locked")), "print_dialog": print_dialog,
-    })
-
-
-@login_required
-def screen(request):
     # Admins have no discount limit, so the page shows the limit to Cashiers only
     limit = "" if request.user.is_admin_role else str(getattr(settings, "POS_CASHIER_MAX_DISCOUNT_PERCENT", 10))
     print_dialog = None
     if request.user.is_admin_role:
         print_dialog = {"settings": PrintSettings.load().as_dict(), "defaults": printing.LABEL_DEFAULTS}
     return render(request, "pos/screen.html", {
-        "max_discount": limit, "store": _store(), "print_dialog": print_dialog,
+        "max_discount": limit,
+        "store": _store(),
+        "print_dialog": print_dialog,
+        "web_new": WebOrder.objects.filter(handled=False, status__in=HOLDING).count(),
     })
 
 
@@ -295,6 +285,7 @@ def sale_list(request):
         base.select_related("customer", "cashier")
         .prefetch_related("payments")
         .annotate(return_count=Count("returns", distinct=True))
+        .order_by("-created_at", "-id")
     )
     paginator = Paginator(qs, 50)
     page = paginator.get_page(request.GET.get("page"))

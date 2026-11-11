@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Website sync · {{ store_name }}{% endblock %}
+{% block extra_css %}<link href="{% static 'css/inventory.css' %}" rel="stylesheet">{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h3>Website sync</h3>
+    <p>WooCommerce &bull; stock goes to the website, website orders come into the POS</p>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'woosync:orders' %}">Website orders{% if new_orders %} ({{ new_orders }}){% endif %}</a>
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'woosync:products' %}">Products</a>
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'woosync:preview' %}">Preview</a>
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'woosync:log' %}">Log</a>
+  </div>
+</div>
+
+{% if not configured %}<div class="alert alert-warning">{{ problem }}</div>{% endif %}
+{% if state.last_run_at and not state.last_ok %}<div class="alert alert-danger"><strong>The last sync had a problem:</strong> {{ state.last_message }}</div>{% endif %}
+{% if unmatched_orders %}<div class="alert alert-warning">{{ unmatched_orders }} website order(s) have items that are not matched to a POS product, so no stock was taken for them. Fix the SKU, then open the order and press Re-check stock.</div>{% endif %}
+
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="panel h-100"><div class="panel-body">
+      <div class="fw-semibold mb-2">Synchronization status</div>
+      <p class="mb-2">Sync is <span class="st {% if state.is_enabled %}st-ok{% else %}st-na{% endif %}">{% if state.is_enabled %}ON{% else %}OFF{% endif %}</span></p>
+      <p class="mb-2">Last result:
+        {% if running %}<span class="st st-low">Running</span>
+        {% elif not state.last_run_at %}<span class="st st-na">Not run yet</span>
+        {% elif state.last_ok %}<span class="st st-ok">Success</span>
+        {% else %}<span class="st st-out">Failed</span>{% endif %}
+      </p>
+      <div class="small text-muted mb-3">
+        {% if state.last_run_at %}Last sync: {{ state.last_run_at|date:"d-m-Y H:i:s" }}.{% endif %}
+        {% if state.orders_since %}<br>First sync cutoff: {{ state.orders_since|date:"d-m-Y H:i:s" }}. Earlier orders are not imported.{% endif %}
+      </div>
+      <div class="small mb-3">
+        WooCommerce connection: {% if configured %}<strong class="text-success">Credentials configured</strong>{% else %}<strong class="text-danger">Not configured</strong>{% endif %}
+        <div class="text-muted">Use Test connection to verify live API access.</div>
+        <div>Orders in POS: <strong>{{ imported_orders }}</strong>
+          {% if latest_run %}&bull; Imported on last run: <strong>{{ latest_run.orders_new }}</strong>
+          &bull; Failed on last run: <strong>{{ latest_run.orders_failed }}</strong>{% endif %}
+        </div>
+      </div>
+      {% if state.last_run_at and not state.last_ok %}<div class="alert alert-danger py-2"><strong>Latest error:</strong> {{ state.last_message }}</div>{% endif %}
+      <div class="d-flex gap-2 flex-wrap">
+        <form method="post" action="{% url 'woosync:test' %}">{% csrf_token %}<button class="btn btn-outline-secondary btn-sm">Test connection</button></form>
+        <form method="post" action="{% url 'woosync:match' %}">{% csrf_token %}<button class="btn btn-outline-secondary btn-sm">Match products</button></form>
+        <form method="post" action="{% url 'woosync:toggle' %}" {% if not state.is_enabled %}onsubmit="return confirm('Switch the website sync ON? Stock for the products marked Sell online will be sent to the website.');"{% endif %}>
+          {% csrf_token %}<button class="btn btn-sm {% if state.is_enabled %}btn-outline-danger{% else %}btn-brand{% endif %}">{% if state.is_enabled %}Switch OFF{% else %}Switch ON{% endif %}</button>
+        </form>
+      </div>
+    </div></div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="panel h-100"><div class="panel-body">
+      <div class="fw-semibold mb-2">Products and synchronization</div>
+      <p class="mb-1">{{ linked }} matched to the website &bull; {{ online }} marked Sell online &bull; {{ online_ready }} ready to send</p>
+      <form method="post" action="{% url 'woosync:settings' %}" class="d-flex align-items-center gap-2 my-3">
+        {% csrf_token %}
+        <label class="small mb-0" for="holdback">Show the website this many units less:</label>
+        <input id="holdback" name="holdback" type="number" min="0" max="1000" value="{{ state.holdback_units }}" class="form-control form-control-sm" style="width: 90px;">
+        <button class="btn btn-outline-secondary btn-sm">Save</button>
+      </form>
+      <form method="post" action="{% url 'woosync:sync' %}" onsubmit="return confirm('Run a sync now?');">
+        {% csrf_token %}
+        <button class="btn btn-brand btn-sm" {% if not state.is_enabled %}disabled title="Switch the sync on first"{% endif %}>Sync now</button>
+        <label class="small ms-2"><input type="checkbox" name="override" value="1"> allow many products to go to zero</label>
+      </form>
+    </div></div>
+  </div>
+</div>
+
+<div class="alert alert-light border mt-3 small mb-3">
+  While the sync is on, <strong>do not change stock inside WooCommerce</strong>. The POS is the single source of truth and overwrites it.
+  If the shop PC is off, the website keeps selling from the last stock it was sent, and new orders wait until the PC is back.
+</div>
+
+<section class="grid-panel">
+  <div class="px-3 py-2 border-bottom fw-semibold">Latest runs</div>
+  <div class="grid-wrap" style="min-height: 0;">
+    <table class="grid">
+      <thead><tr><th>When</th><th>How</th><th>Result</th><th class="num">Imported</th><th class="num">Failed</th><th>Details</th></tr></thead>
+      <tbody>
+        {% for r in runs %}
+        <tr><td>{{ r.started_at|date:"d-m-Y H:i:s" }}</td><td>{{ r.trigger }}</td>
+          <td>{% if r.ok %}<span class="st st-ok">OK</span>{% else %}<span class="st st-out">Problem</span>{% endif %}</td>
+          <td class="num">{{ r.orders_new }}</td><td class="num">{{ r.orders_failed }}</td>
+          <td style="white-space: normal;">{{ r.summary }}</td></tr>
+        {% empty %}<tr><td colspan="6" class="grid-empty">No runs yet.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

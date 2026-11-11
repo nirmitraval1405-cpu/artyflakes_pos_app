@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Sync log · {{ store_name }}{% endblock %}
+{% block extra_css %}<link href="{% static 'css/inventory.css' %}" rel="stylesheet">{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div><h3>Sync log</h3><p>Every run of the website sync</p></div>
+  <a class="btn btn-outline-secondary btn-sm" href="{% url 'woosync:home' %}">Back to Website sync</a>
+</div>
+
+<section class="grid-panel">
+  <div class="grid-wrap">
+    <table class="grid">
+      <thead><tr><th>Started</th><th>Took</th><th>How</th><th>Result</th><th class="num">Orders seen</th><th class="num">New</th><th class="num">Failed</th><th class="num">Stock sent</th><th>Details</th></tr></thead>
+      <tbody>
+        {% for r in page %}
+        <tr>
+          <td>{{ r.started_at|date:"d-m-Y H:i:s" }}</td>
+          <td>{% if r.finished_at %}{{ r.finished_at|timeuntil:r.started_at }}{% endif %}</td>
+          <td>{{ r.trigger }}</td>
+          <td>{% if r.ok %}<span class="st st-ok">OK</span>{% else %}<span class="st st-out">Problem</span>{% endif %}</td>
+          <td class="num">{{ r.orders_seen }}</td><td class="num">{{ r.orders_new }}</td><td class="num">{{ r.orders_failed }}</td><td class="num">{{ r.stock_pushed }}</td>
+          <td style="white-space: normal;">{{ r.summary }}</td>
+        </tr>
+        {% empty %}<tr><td colspan="9" class="grid-empty">No runs yet.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if page.has_other_pages %}
+  <div class="pager">
+    {% if page.has_previous %}<a href="?page={{ page.previous_page_number }}">&laquo; Previous</a>{% endif %}
+    <span>Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
+    {% if page.has_next %}<a href="?page={{ page.next_page_number }}">Next &raquo;</a>{% endif %}
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

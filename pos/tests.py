@@ -307,12 +307,12 @@ class CashMovementTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'data-promo-url="/api/promotions/"')
 
-    def test_pos_header_shows_frontend_website_order_placeholder(self):
+    def test_pos_header_links_to_website_orders(self):
         response = self.client.get(reverse("pos:screen"))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'class="website-orders-placeholder"')
+        self.assertContains(response, 'class="pos-pill pill-brand"')
+        self.assertContains(response, 'href="/woo/orders/" target="_blank" rel="noopener"')
         self.assertContains(response, "Website Orders")
-        self.assertContains(response, "Frontend preview")
 
 
 class PrintSettingTests(TestCase):

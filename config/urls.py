@@ -21,6 +21,7 @@ urlpatterns = [
     path("people/", include("people.urls")),
     path("settings/", include("storeconfig.urls")),
     path("promotions/", include("promotions.urls")),
+    path("woo/", include("woosync.urls")),
 ]
 
 if settings.DEBUG:

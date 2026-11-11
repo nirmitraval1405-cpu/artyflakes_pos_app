@@ -50,34 +50,23 @@
       </div>
       {% endwith %}
 
-      <!-- Sales -->
-      {% comment %} <button class="side-link nav-toggle collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#grpSales" aria-expanded="false">
-        <i class="bi bi-cart3"></i> Sales
-        <span class="chev"><i class="bi bi-chevron-right"></i></span>
-      </button>
-      <div class="collapse" id="grpSales">
-        <div class="sub-list">
-          <a class="sub-link" href="{% url 'pos:screen' %}">POS / New Sale</a>
-          <span class="sub-link disabled">Sales List <em>Soon</em></span>
-          <span class="sub-link disabled">Sales Return <em>Soon</em></span>
-        </div>
-      </div> {% endcomment %}
+       <!-- Sales -->
       {% with sapp=request.resolver_match.app_name su=request.resolver_match.url_name %}
-      <button class="side-link nav-toggle {% if sapp != 'pos' %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#grpSales" aria-expanded="{% if sapp == 'pos' %}true{% else %}false{% endif %}">
+      <button class="side-link nav-toggle {% if sapp != 'pos' and su != 'orders' and su != 'order_detail' %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#grpSales" aria-expanded="{% if sapp == 'pos' or su == 'orders' or su == 'order_detail' %}true{% else %}false{% endif %}">
         <i class="bi bi-cart3"></i> Sales
         <span class="chev"><i class="bi bi-chevron-right"></i></span>
       </button>
-      <div class="collapse {% if sapp == 'pos' %}show{% endif %}" id="grpSales">
+      <div class="collapse {% if sapp == 'pos' or su == 'orders' or su == 'order_detail' %}show{% endif %}" id="grpSales">
         <div class="sub-list">
           <a class="sub-link" href="{% url 'pos:screen' %}">POS / New Sale</a>
           <a class="sub-link {% if su == 'sale_list' or su == 'sale_detail' %}active{% endif %}" href="{% url 'pos:sale_list' %}">Sales List</a>
+          {% if not user.is_admin_role %}<a class="sub-link {% if sapp == 'woosync' and su == 'orders' or su == 'order_detail' %}active{% endif %}" href="{% url 'woosync:orders' %}">Website Orders</a>{% endif %}
           {% if user.is_admin_role %}
           <a class="sub-link {% if su == 'return_list' or su == 'sale_return' %}active{% endif %}" href="{% url 'pos:return_list' %}">Sales Return</a>
           {% endif %}
         </div>
       </div>
       {% endwith %}
-
       <!-- Purchase -->
       {% with papp=request.resolver_match.namespace %}
       <button class="side-link nav-toggle {% if papp != 'purchase' %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#grpPurchase" aria-expanded="{% if papp == 'purchase' %}true{% else %}false{% endif %}">
@@ -136,6 +125,20 @@
       {% if user.is_admin_role %}
       <div class="nav-label">System</div>
       <a class="side-link {% if request.resolver_match.app_name == 'storeconfig' %}active{% endif %}" href="{% url 'storeconfig:store' %}"><i class="bi bi-shop"></i> Store Settings</a>
+      {% with wi=request.resolver_match.app_name wu=request.resolver_match.url_name %}
+      <div class="nav-label mt-3">Website Integration</div>
+      <button class="side-link nav-toggle {% if wi != 'woosync' %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#grpWebsite" aria-expanded="{% if wi == 'woosync' %}true{% else %}false{% endif %}">
+        <i class="bi bi-arrow-repeat"></i> Website Integration
+        <span class="chev"><i class="bi bi-chevron-right"></i></span>
+      </button>
+      <div class="collapse {% if wi == 'woosync' %}show{% endif %}" id="grpWebsite">
+        <div class="sub-list">
+          <a class="sub-link {% if wi == 'woosync' and wu != 'orders' and wu != 'order_detail' and wu != 'log' %}active{% endif %}" href="{% url 'woosync:home' %}">Website Sync</a>
+          <a class="sub-link {% if wi == 'woosync' and wu == 'orders' or wu == 'order_detail' %}active{% endif %}" href="{% url 'woosync:orders' %}">Website Orders</a>
+          <a class="sub-link {% if wi == 'woosync' and wu == 'log' %}active{% endif %}" href="{% url 'woosync:log' %}">Sync History</a>
+        </div>
+      </div>
+      {% endwith %}
       {% endif %}
     </nav>
   </aside>

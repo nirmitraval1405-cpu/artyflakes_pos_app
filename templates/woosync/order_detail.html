@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Order #{{ order.number }} · {{ store_name }}{% endblock %}
+{% block extra_css %}<link href="{% static 'css/inventory.css' %}" rel="stylesheet">{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h3>Website order #{{ order.number }} <span class="st {{ order.badge }}">{{ order.status }}</span></h3>
+    <p>Placed {{ order.woo_created|date:"d-m-Y H:i" }} &bull; {{ order.payment_method|default:"no payment method" }} &bull; {% if order.is_paid %}paid{% else %}not paid yet{% endif %}</p>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'woosync:orders' %}"><i class="bi bi-arrow-left"></i> Back</a>
+    <form method="post" action="{% url 'woosync:order_handled' order.pk %}" class="d-inline">
+      {% csrf_token %}
+      <button class="btn btn-sm {% if order.handled %}btn-outline-secondary{% else %}btn-brand{% endif %}">{% if order.handled %}Mark as not handled{% else %}Mark as handled{% endif %}</button>
+    </form>
+    {% if user.is_admin_role %}
+    <form method="post" action="{% url 'woosync:order_recheck' order.pk %}" class="d-inline">{% csrf_token %}<button class="btn btn-outline-secondary btn-sm">Re-check stock</button></form>
+    {% endif %}
+  </div>
+</div>
+
+{% if unmatched %}
+<div class="alert alert-warning">Some items are not matched to a POS product, so no stock was taken for them. Make the website SKU equal the POS product code, then {% if user.is_admin_role %}press Re-check stock{% else %}ask an admin to press Re-check stock{% endif %}.</div>
+{% endif %}
+{% if not order.holds_stock %}
+<div class="alert alert-light border">This order does not hold stock right now (status: {{ order.status }}).</div>
+{% endif %}
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <section class="grid-panel">
+      <div class="grid-wrap" style="min-height: 0;">
+        <table class="grid">
+          <thead><tr><th>Item</th><th>SKU</th><th class="num">Qty</th><th class="num">Total</th><th>POS product</th><th class="num">Stock taken</th></tr></thead>
+          <tbody>
+            {% for i in items %}
+            <tr class="{% if i.quantity == 0 %}inactive{% endif %}">
+              <td style="white-space: normal;">{{ i.name }}</td><td>{{ i.sku }}</td>
+              <td class="num">{{ i.quantity|floatformat:"-3" }}</td><td class="num">{{ i.line_total|floatformat:"2g" }}</td>
+              <td>{% if i.product %}{{ i.product.name }}{% else %}<span class="st st-low">Not matched</span>{% endif %}</td>
+              <td class="num">{{ i.applied_qty|floatformat:"-3" }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+    <div class="text-end fs-5 mt-2">Order total: <strong>₹{{ order.total|floatformat:"2g" }}</strong></div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="panel"><div class="panel-body">
+      <div class="fw-semibold">Customer</div>
+      <div>{{ order.customer_name }}</div>
+      {% if order.phone %}<div>{{ order.phone }}</div>{% endif %}
+      {% if order.email %}<div class="small">{{ order.email }}</div>{% endif %}
+      {% if order.shipping_address %}<hr><div class="fw-semibold">Ship to</div><div style="white-space: pre-line;">{{ order.shipping_address }}</div>{% endif %}
+      {% if order.billing_address and order.billing_address != order.shipping_address %}<hr><div class="fw-semibold">Billing address</div><div style="white-space: pre-line;">{{ order.billing_address }}</div>{% endif %}
+      {% if order.customer_note %}<hr><div class="fw-semibold">Customer's note</div><div>{{ order.customer_note }}</div>{% endif %}
+      {% if order.handled %}<hr><div class="small text-muted">Handled by {{ order.handled_by.get_full_name|default:order.handled_by.username }} on {{ order.handled_at|date:"d-m-Y H:i" }}</div>{% endif %}
+    </div></div>
+  </div>
+</div>
+{% endblock %}

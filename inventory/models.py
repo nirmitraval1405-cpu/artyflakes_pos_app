@@ -120,6 +120,8 @@ class StockMovement(TimeStampedModel):
         PURCHASE_RETURN = "purchase_return", "Purchase return"
         SALE = "sale", "Sale"
         SALE_RETURN = "sale_return", "Sale return"
+        WEB_ORDER = "web_order", "Website order"
+        WEB_ORDER_RETURN = "web_order_return", "Website order returned"
 
     product = models.ForeignKey(Product, on_delete=models.PROTECT, related_name="movements")
     quantity = models.DecimalField(max_digits=12, decimal_places=3)   # + stock in, - stock out

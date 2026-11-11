@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Website products · {{ store_name }}{% endblock %}
+{% block extra_css %}<link href="{% static 'css/inventory.css' %}" rel="stylesheet">{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h3>Products on the website</h3>
+    <p>Tick the products to sell online, then check the Preview. Nothing is sent until the sync is switched on.</p>
+  </div>
+  <a class="btn btn-outline-secondary btn-sm" href="{% url 'woosync:home' %}">Back to Website sync</a>
+</div>
+
+<section class="grid-panel">
+  <form class="grid-search" method="get">
+    <select name="show" class="grid-field" onchange="this.form.submit()">
+      <option value="all" {% if show == 'all' %}selected{% endif %}>All products</option>
+      <option value="online" {% if show == 'online' %}selected{% endif %}>Sold online</option>
+      <option value="unlinked" {% if show == 'unlinked' %}selected{% endif %}>Not matched</option>
+    </select>
+    <input type="text" name="q" value="{{ q }}" placeholder="Search by name or code" autocomplete="off">
+    <i class="bi bi-search"></i>
+    <span class="count">Products: <strong>{{ total }}</strong></span>
+  </form>
+
+  <form method="post" action="?{{ querystring }}">
+    {% csrf_token %}
+    <div class="px-3 py-2 border-bottom d-flex gap-2 flex-wrap">
+      <button class="btn btn-brand btn-sm" name="action" value="enable">Sell the ticked products online</button>
+      <button class="btn btn-outline-secondary btn-sm" name="action" value="disable">Stop selling the ticked</button>
+      <button class="btn btn-outline-secondary btn-sm" name="action" value="resend" onclick="return confirm('Send all stock to the website again on the next sync?');">Resend all stock</button>
+    </div>
+    <div class="grid-wrap">
+      <table class="grid">
+        <thead>
+          <tr><th><input type="checkbox" id="all"></th><th>Code</th><th>Product</th><th class="num">POS stock</th><th>On the website</th><th>Online</th><th class="num">Last sent</th><th class="num">Will send</th></tr>
+        </thead>
+        <tbody>
+          {% for r in rows %}
+          <tr class="{% if not r.p.is_active %}inactive{% endif %}">
+            <td><input type="checkbox" name="sel" value="{{ r.p.pk }}" class="pick" {% if not r.p.track_stock %}disabled title="Stock is not tracked for this product"{% endif %}></td>
+            <td>{{ r.p.code|default:"" }}</td>
+            <td>{{ r.p.name }}{% if not r.p.is_active %} <span class="tag">Inactive</span>{% endif %}</td>
+            <td class="num">{{ r.stock }}</td>
+            <td style="white-space: normal;">{{ r.site }}</td>
+            <td>{% if r.link and r.link.sell_online %}<span class="st st-ok">Online</span>{% else %}<span class="st st-na">No</span>{% endif %}</td>
+            <td class="num">{{ r.sent }}</td>
+            <td class="num">{{ r.next }}</td>
+          </tr>
+          {% empty %}<tr><td colspan="8" class="grid-empty">No products match.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </form>
+
+  {% if page.has_other_pages %}
+  <div class="pager">
+    {% if page.has_previous %}<a href="?{{ querystring }}&page={{ page.previous_page_number }}">&laquo; Previous</a>{% endif %}
+    <span>Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
+    {% if page.has_next %}<a href="?{{ querystring }}&page={{ page.next_page_number }}">Next &raquo;</a>{% endif %}
+  </div>
+  {% endif %}
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.getElementById("all").addEventListener("change", function (e) {
+    document.querySelectorAll(".pick:not(:disabled)").forEach((b) => (b.checked = e.target.checked));
+  });
+</script>
+{% endblock %}

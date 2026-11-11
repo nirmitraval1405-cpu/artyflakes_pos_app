@@ -52,7 +52,8 @@ INSTALLED_APPS = [
     'expenses',
     'backups.apps.BackupsConfig',
     'storeconfig',
-    'promotions'
+    'promotions',
+    'woosync',
 ]
 
 MIDDLEWARE = [
@@ -187,3 +188,12 @@ STORE = {
 }
 
 MESSAGE_TAGS = {message_constants.ERROR: "danger"}
+
+# WooCommerce connection. The real values live in .env, never in this file.
+WOOSYNC = {
+    "URL": os.getenv("WOO_URL", "").strip().rstrip("/"),
+    "KEY": os.getenv("WOO_KEY", ""),
+    "SECRET": os.getenv("WOO_SECRET", ""),
+    "TIMEOUT": 20,
+    "QUERY_AUTH": os.getenv("WOO_QUERY_AUTH", "") == "1",   # only if the host strips the login header
+}
