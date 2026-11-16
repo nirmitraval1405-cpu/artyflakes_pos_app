@@ -66,6 +66,20 @@ class ReportBase(TestCase):
 
 
 class FrameworkTests(ReportBase):
+    def test_product_filter_is_searchable_and_keeps_its_selected_value(self):
+        response = self.client.get(reverse("reports:index"), {"product_id": self.product.pk})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="reportProductSearch"')
+        self.assertContains(response, f'value="{self.product.name}"')
+        self.assertContains(response, f'<option value="{self.product.pk}" selected>')
+
+    def test_product_group_filter_is_searchable_and_keeps_its_selected_value(self):
+        response = self.client.get(reverse("reports:index"), {"group": self.group.pk})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="reportGroupSearch"')
+        self.assertContains(response, f'value="{self.group}"')
+        self.assertContains(response, f'<option value="{self.group.pk}" selected>')
+
     def test_every_ready_report_loads_on_an_empty_database(self):
         Sale.objects.all().delete()
         _, reports = get_sections()

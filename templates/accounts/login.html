@@ -1,25 +1,149 @@
 {% extends "base.html" %}
-{% block title %}Login · Artyflakes POS{% endblock %}
+{% load static %}
+{% block title %}Sign in · Artyflakes POS{% endblock %}
+
 {% block auth_content %}
-<div class="login-page d-flex align-items-center justify-content-center">
-  <div class="card shadow-sm login-card">
-    <div class="card-body p-4">
-      <h4 class="brand mb-1"><i class="bi bi-palette2"></i> Artyflakes POS</h4>
-      <p class="text-muted small mb-4">Sign in to continue</p>
-      <form method="post">
-        {% csrf_token %}
-        {% if form.errors %}<div class="alert alert-danger py-2">Wrong username or password.</div>{% endif %}
-        <div class="mb-3">
-          <label class="form-label">Username</label>
-          <input type="text" name="username" class="form-control" required>
+<div class="login-page">
+  <main class="login-layout">
+    <section class="login-brand-panel" aria-label="About Artyflakes POS">
+      <div class="login-brand">
+        <span class="login-brand-mark"><i class="bi bi-shop-window" aria-hidden="true"></i></span>
+        <span class="login-brand-copy">
+          <strong>Artyflakes</strong>
+          <small>POINT OF SALE</small>
+        </span>
+      </div>
+
+      <div class="login-brand-message">
+        <span class="login-kicker"><span></span> RETAIL, MADE SIMPLE</span>
+        <h1>Your store,<br><span>in good hands.</span></h1>
+        <p>Sales, inventory and daily operations in one calm, clear workspace—so you can focus on your customers.</p>
+
+        <div class="login-preview" aria-hidden="true">
+          <div class="login-preview-top">
+            <span class="login-preview-dot"></span>
+            <span class="login-preview-dot"></span>
+            <span class="login-preview-dot"></span>
+            <span class="login-preview-title">Store overview</span>
+            <i class="bi bi-three-dots"></i>
+          </div>
+          <div class="login-preview-body">
+            <div class="login-preview-sales">
+              <span>Today's sales</span>
+              <strong>₹ 32,450.00</strong>
+              <small><i class="bi bi-arrow-up-right"></i> Steady business, all day</small>
+              <div class="login-chart">
+                <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+                <span></span><span></span><span></span><span></span><span></span>
+              </div>
+            </div>
+            <div class="login-preview-receipt">
+              <span class="login-receipt-icon"><i class="bi bi-receipt-cutoff"></i></span>
+              <span>Sales tracked<br><strong>All in one place</strong></span>
+              <i class="bi bi-check-circle-fill"></i>
+            </div>
+          </div>
         </div>
-        <div class="mb-3">
-          <label class="form-label">Password</label>
-          <input type="password" name="password" class="form-control" required>
+      </div>
+
+      <div class="login-brand-footer">
+        <i class="bi bi-shield-check" aria-hidden="true"></i>
+        <span>A secure workspace for your store</span>
+      </div>
+    </section>
+
+    <section class="login-form-panel" aria-labelledby="loginHeading">
+      <div class="login-card">
+        <div class="login-form-heading">
+          <span class="login-form-kicker">YOUR WORKSPACE</span>
+          <h2 id="loginHeading">Welcome back</h2>
+          <p>Sign in to access your workspace.</p>
         </div>
-        <button class="btn btn-primary w-100">Login</button>
-      </form>
-    </div>
-  </div>
+
+        {% if request.GET.csrf_retry %}
+        <div class="login-error" role="alert">
+          <i class="bi bi-arrow-clockwise" aria-hidden="true"></i>
+          <span><strong>Your security token was refreshed.</strong> Please enter your password and try again.</span>
+        </div>
+        {% endif %}
+
+        {% if form.errors %}
+        <div class="login-error" role="alert">
+          <i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i>
+          <span><strong>We couldn't sign you in.</strong> Check your username and password, then try again.</span>
+        </div>
+        {% endif %}
+
+        <form method="post" id="loginForm">
+          {% csrf_token %}
+          {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+
+          <div class="login-field">
+            <label for="loginUsername">Username</label>
+            <input id="loginUsername" type="text" name="username"
+                   value="{{ form.username.value|default_if_none:'' }}"
+                   placeholder="Enter your username" autocomplete="username"
+                   autocapitalize="none" spellcheck="false" required autofocus>
+          </div>
+
+          <div class="login-field">
+            <label for="loginPassword">Password</label>
+            <div class="login-password-wrap">
+              <input id="loginPassword" type="password" name="password"
+                     placeholder="Enter your password" autocomplete="current-password" required>
+              <button class="login-password-toggle" type="button" id="togglePassword"
+                      aria-label="Show password" aria-pressed="false">
+                <i class="bi bi-eye" aria-hidden="true"></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="login-options">
+            <label class="login-remember" for="rememberMe">
+              <input id="rememberMe" type="checkbox" name="remember_me"
+                     {% if request.POST.remember_me %}checked{% endif %}>
+              <span>Keep me signed in</span>
+            </label>
+          </div>
+
+          <button class="login-submit" id="loginSubmit" type="submit">
+            <span id="loginSubmitLabel">Sign in</span>
+            <span id="loginSubmitLoading" hidden><span class="login-spinner" aria-hidden="true"></span> Signing in...</span>
+            <i class="bi bi-arrow-right" aria-hidden="true"></i>
+          </button>
+        </form>
+
+        <p class="login-help"><i class="bi bi-lock-fill" aria-hidden="true"></i> Your sign-in is protected and encrypted.</p>
+      </div>
+    </section>
+  </main>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  (() => {
+    const form = document.getElementById("loginForm");
+    const password = document.getElementById("loginPassword");
+    const toggle = document.getElementById("togglePassword");
+    const submit = document.getElementById("loginSubmit");
+    const submitLabel = document.getElementById("loginSubmitLabel");
+    const submitLoading = document.getElementById("loginSubmitLoading");
+
+    toggle.addEventListener("click", () => {
+      const visible = password.type === "password";
+      password.type = visible ? "text" : "password";
+      toggle.setAttribute("aria-label", visible ? "Hide password" : "Show password");
+      toggle.setAttribute("aria-pressed", String(visible));
+      toggle.querySelector("i").className = visible ? "bi bi-eye-slash" : "bi bi-eye";
+    });
+
+    form.addEventListener("submit", () => {
+      submit.disabled = true;
+      submit.setAttribute("aria-busy", "true");
+      submitLabel.hidden = true;
+      submitLoading.hidden = false;
+    });
+  })();
+</script>
 {% endblock %}

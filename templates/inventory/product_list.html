@@ -1,9 +1,10 @@
 {% extends "base.html" %}
 {% load static %}
 {% block title %}Products · Artyflakes POS{% endblock %}
-{% block extra_css %}<link href="{% static 'css/inventory.css' %}?v=category-tree-3" rel="stylesheet">{% endblock %}
+{% block extra_css %}<link href="{% static 'css/inventory.css' %}?v=category-tree-3" rel="stylesheet"><link href="{% static 'css/mobile-redesign.css' %}" rel="stylesheet">{% endblock %}
 
 {% block content %}
+<div class="products-page">
 <div class="page-head">
   <div>
     <h3>Products</h3>
@@ -116,6 +117,7 @@
     </div>
     {% endif %}
   </section>
+</div>
 </div>
 {% endblock %}
 

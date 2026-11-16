@@ -251,6 +251,11 @@
     min-width: 0;
 }
 
+.item-info > div:last-child {
+    flex: 1;
+    min-width: 0;
+}
+
 .item-img {
     width: 44px;
     height: 44px;
@@ -409,6 +414,10 @@
 
 .key b {
     font-weight: 700;
+}
+
+.key-hint {
+    display: inline;
 }
 
 .key:not(:disabled):hover {
@@ -1370,6 +1379,10 @@
 }
 
 @media (max-width: 800px) {
+    .key-hint {
+        display: none;
+    }
+
     .pos-top {
         gap: .5rem;
         padding: .65rem;

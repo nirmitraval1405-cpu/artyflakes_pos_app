@@ -395,6 +395,7 @@
 }
 
 .quick-edit-fields > label,
+.quick-edit-fields > .quick-edit-threshold > label,
 .quick-edit-readonly {
     display: grid;
     min-width: 0;
@@ -406,6 +407,13 @@
     color: var(--muted);
     font-size: 12px;
     line-height: 1.4;
+}
+
+.quick-edit-threshold {
+    display: grid;
+    min-width: 0;
+    gap: .55rem;
+    align-content: start;
 }
 
 .quick-edit-fields input[type="number"] {
@@ -449,6 +457,11 @@
     justify-content: flex-end;
     gap: .5rem;
     margin-top: .9rem;
+}
+
+.quick-edit-threshold .quick-edit-actions {
+    justify-content: flex-start;
+    margin-top: 0;
 }
 
 .quick-edit-panel[data-saving="true"] [data-save]::before {
@@ -519,6 +532,55 @@
         width: 38px;
         height: 38px;
         flex-basis: 38px;
+    }
+}
+
+@media (max-width: 1199.98px) {
+    .quick-edit-row {
+        position: fixed;
+        z-index: 1060;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        display: block;
+        width: auto;
+        max-height: 88vh;
+        max-height: 88dvh;
+        overflow-y: auto;
+        border-radius: 14px 14px 0 0;
+        background: var(--card-bg);
+        box-shadow: 0 -8px 30px rgb(80 64 65 / 18%);
+        overscroll-behavior: contain;
+    }
+
+    .quick-edit-row::before {
+        position: fixed;
+        z-index: -1;
+        inset: 0;
+        background: rgb(40 32 32 / 38%);
+        content: "";
+    }
+
+    .quick-edit-row td {
+        display: block;
+        width: 100%;
+        background: transparent;
+    }
+
+    .quick-edit-panel {
+        padding: 1.1rem;
+        border-top: 3px solid var(--secondary);
+        border-left: 0;
+    }
+
+    .quick-edit-fields {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 420px) {
+    .quick-edit-fields {
+        grid-template-columns: minmax(0, 1fr);
     }
 }
 

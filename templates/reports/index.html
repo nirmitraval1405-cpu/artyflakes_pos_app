@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
 {% block title %}Reports · {{ store_name }}{% endblock %}
-{% block extra_css %}<link href="{% static 'css/reports.css' %}" rel="stylesheet">{% endblock %}
+{% block extra_css %}<link href="{% static 'css/reports.css' %}?v=3" rel="stylesheet">{% endblock %}
 
 {% block content %}
 <div class="rp-layout">
@@ -52,17 +52,31 @@
         {% for u in users %}<option value="{{ u.pk }}"{% if selected_user == u.pk %} selected{% endif %}>{{ u.get_full_name|default:u.username }}</option>{% endfor %}
       </select>
 
-      <label>Product</label>
-      <select name="product_id">
+      <label for="reportProductSearch">Product</label>
+      <div class="rp-search-picker" data-all-label="All products">
+        <input id="reportProductSearch" class="rp-search-input" type="search"
+               role="combobox" aria-autocomplete="list" aria-expanded="false"
+               aria-controls="reportProductOptions" autocomplete="off"
+               placeholder="Search products..." value="{{ selected_product_name }}">
+        <div class="rp-search-options" id="reportProductOptions" role="listbox" hidden></div>
+        <select class="rp-search-select" id="reportProductSelect" name="product_id" hidden>
         <option value="">All</option>
         {% for p in products %}<option value="{{ p.pk }}"{% if selected_product == p.pk %} selected{% endif %}>{{ p.name }}</option>{% endfor %}
-      </select>
+        </select>
+      </div>
 
-      <label>Product group</label>
-      <select name="group">
+      <label for="reportGroupSearch">Product group</label>
+      <div class="rp-search-picker" data-all-label="All product groups">
+        <input id="reportGroupSearch" class="rp-search-input" type="search"
+               role="combobox" aria-autocomplete="list" aria-expanded="false"
+               aria-controls="reportGroupOptions" autocomplete="off"
+               placeholder="Search product groups..." value="{{ selected_group_name }}">
+        <div class="rp-search-options" id="reportGroupOptions" role="listbox" hidden></div>
+        <select class="rp-search-select" id="reportGroupSelect" name="group" hidden>
         <option value="">All</option>
         {% for c in categories %}<option value="{{ c.pk }}"{% if selected_group == c.pk %} selected{% endif %}>{{ c }}</option>{% endfor %}
-      </select>
+        </select>
+      </div>
 
       <label>Payment method</label>
       <select name="payment_method">
@@ -132,6 +146,102 @@
       if (extra) extra.split("&").forEach((pair) => { const [k, v] = pair.split("="); params.set(k, v); });
       window.location.href = viewUrl.replace("SLUG", selected) + "?" + params.toString();
     }
+
+    document.querySelectorAll(".rp-search-picker").forEach((picker) => {
+      const search = picker.querySelector(".rp-search-input");
+      const select = picker.querySelector(".rp-search-select");
+      const optionsBox = picker.querySelector(".rp-search-options");
+      const maxOptions = 15;
+
+      function closeOptions() {
+        optionsBox.hidden = true;
+        search.setAttribute("aria-expanded", "false");
+      }
+
+      function chooseOption(value, label) {
+        select.value = value;
+        search.value = label;
+        search.focus();
+        closeOptions();
+      }
+
+      function showOptions() {
+        const query = search.value.trim().toLocaleLowerCase();
+        const matches = Array.from(select.options).slice(1).filter((option) =>
+          option.textContent.toLocaleLowerCase().includes(query)
+        );
+        optionsBox.replaceChildren();
+
+        function addOption(value, label, isSelected) {
+          const option = document.createElement("button");
+          option.type = "button";
+          option.className = "rp-search-option";
+          option.setAttribute("role", "option");
+          option.setAttribute("aria-selected", isSelected ? "true" : "false");
+          option.dataset.value = value;
+          option.textContent = label;
+          option.addEventListener("mousedown", (event) => event.preventDefault());
+          option.addEventListener("click", () => chooseOption(value, value ? label : ""));
+          optionsBox.appendChild(option);
+        }
+
+        addOption("", picker.dataset.allLabel, !select.value);
+        matches.slice(0, maxOptions).forEach((option) =>
+          addOption(option.value, option.textContent, option.value === select.value)
+        );
+        if (matches.length > maxOptions) {
+          const more = document.createElement("div");
+          more.className = "rp-search-more";
+          more.textContent = "Keep typing to narrow the results.";
+          optionsBox.appendChild(more);
+        } else if (!matches.length) {
+          const empty = document.createElement("div");
+          empty.className = "rp-search-more";
+          empty.textContent = "No matching results.";
+          optionsBox.appendChild(empty);
+        }
+
+        optionsBox.hidden = false;
+        search.setAttribute("aria-expanded", "true");
+      }
+
+      search.addEventListener("focus", showOptions);
+      search.addEventListener("input", () => {
+        select.value = "";
+        showOptions();
+      });
+      search.addEventListener("blur", () => setTimeout(() => {
+        if (!picker.contains(document.activeElement)) closeOptions();
+      }, 100));
+      search.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+          closeOptions();
+        } else if (event.key === "ArrowDown" && !optionsBox.hidden) {
+          event.preventDefault();
+          optionsBox.querySelector("button").focus();
+        } else if (event.key === "Enter" && !optionsBox.hidden) {
+          event.preventDefault();
+          if (!search.value.trim()) {
+            optionsBox.querySelector("[data-value='']").click();
+          } else {
+            const firstMatch = optionsBox.querySelector("[data-value]:not([data-value=''])");
+            if (firstMatch) firstMatch.click();
+          }
+        }
+      });
+      optionsBox.addEventListener("keydown", (event) => {
+        const choices = Array.from(optionsBox.querySelectorAll("button"));
+        const currentIndex = choices.indexOf(document.activeElement);
+        if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+          event.preventDefault();
+          const direction = event.key === "ArrowDown" ? 1 : -1;
+          choices[(currentIndex + direction + choices.length) % choices.length].focus();
+        } else if (event.key === "Escape") {
+          search.focus();
+          closeOptions();
+        }
+      });
+    });
 
     document.getElementById("btnShow").addEventListener("click", () => go(""));
     document.getElementById("btnPrint").addEventListener("click", () => go("print=1"));

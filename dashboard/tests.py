@@ -103,6 +103,14 @@ class DashboardTests(TestCase):
         self.assertNotContains(response, "Phase 7")
         self.assertNotContains(response, "Phase 8")
 
+    def test_topbar_search_is_enabled_for_available_menu_features(self):
+        self.client.login(username="boss9", password="pw12345!")
+        response = self.client.get(reverse("dashboard:home"))
+        self.assertContains(response, 'id="topbarFeatureSearch"')
+        self.assertContains(response, 'placeholder="Search menu features..."')
+        self.assertNotContains(response, 'placeholder="Search (available after Products)"')
+        self.assertContains(response, "Store Settings")
+
     def test_sales_and_profit_are_calculated_without_gst(self):
         self.client.login(username="boss9", password="pw12345!")
         self.sell()                                         # 2 x 250 = 500, GST 76.27, cost 200

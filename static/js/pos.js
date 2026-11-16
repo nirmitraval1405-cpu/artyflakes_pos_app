@@ -252,7 +252,7 @@
 
   // ---------- Dialogs ----------
   const backdrop = $("dlgBackdrop");
-  const dialogs = ["dlgPay", "dlgDisc", "dlgCust", "dlgDone", "dlgPrice", "dlgHeld", "dlgDrawer", "dlgRefund", "dlgPrint"].map($);
+  const dialogs = ["dlgPay", "dlgDisc", "dlgCust", "dlgDone", "dlgPrice", "dlgHeld", "dlgDrawer", "dlgRefund", "dlgCash", "dlgQuantity", "dlgPrint"].map($);
 
   function openDialog(id) {
     dialogs.forEach((d) => (d.hidden = d.id !== id));
@@ -681,10 +681,39 @@
   function focusSearch() { searchInput.focus(); searchInput.select(); }
 
   function focusQuantity() {
-    if (!state.items.length) return;
-    state.selected = state.selected || state.items[state.items.length - 1].id;
+    if (!state.items.length) { showNote("Add items to the bill first."); return; }
+    const item = state.items.find((i) => i.id === state.selected) || state.items[state.items.length - 1];
+    state.selected = item.id;
     render();
+    $("quantityValue").value = fmtQty(item.qty);
+    $("quantityError").hidden = true;
+    $("quantityError").textContent = "";
+    openDialog("dlgQuantity");
+    $("quantityValue").focus();
+    $("quantityValue").select();
   }
+
+  function applyQuantity() {
+    const item = state.items.find((i) => i.id === state.selected);
+    if (!item) { closeDialogs(); return; }
+
+    const value = $("quantityValue").value.trim();
+    const quantity = Number(value);
+    if (!/^(?:\d+(?:\.\d{1,3})?|\.\d{1,3})$/.test(value) || !Number.isFinite(quantity) || quantity <= 0) {
+      $("quantityError").textContent = "Enter a quantity greater than zero with up to 3 decimal places.";
+      $("quantityError").hidden = false;
+      return;
+    }
+    item.qty = quantity;
+    touch();
+    render();
+    closeDialogs();
+  }
+
+  $("quantityApply").addEventListener("click", applyQuantity);
+  $("dlgQuantity").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); applyQuantity(); }
+  });
 
   function newSale() {
     if (state.items.length && !confirm("Start a new sale? The current bill will be cleared.")) return;

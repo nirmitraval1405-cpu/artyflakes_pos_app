@@ -11,6 +11,7 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
   <link href="{% static 'css/app.css' %}" rel="stylesheet">
   <link href="{% static 'css/pos.css' %}" rel="stylesheet">
+  <link href="{% static 'css/mobile-redesign.css' %}" rel="stylesheet">
 </head>
 <body class="pos-body">
 <div class="pos-app"
@@ -73,7 +74,7 @@
       <div class="cart-body" id="cartBody">
         <div class="cart-empty" id="cartEmpty">
           <strong>No items</strong>
-          <span>Add products to the bill using barcode, code or search (F3)</span>
+          <span>Add products to the bill using barcode, code or search <span class="key-hint">(F3)</span></span>
           <small id="searchNote"></small>
         </div>
       </div>
@@ -95,9 +96,9 @@
     <!-- Right: buttons -->
     <aside class="pos-keys">
       <div class="key-row cols-3">
-        <button class="key k-blue" data-action="search"><i class="bi bi-search"></i><span><b>F3</b> Search</span></button>
-        <button class="key k-blue" data-action="quantity"><i class="bi bi-123"></i><span><b>F4</b> Quantity</span></button>
-        <button class="key k-blue" data-action="new"><i class="bi bi-file-earmark-plus"></i><span><b>F8</b> New Sale</span></button>
+        <button class="key k-blue" data-action="search"><i class="bi bi-search"></i><span><b class="key-hint">F3</b> Search</span></button>
+        <button class="key k-blue" data-action="quantity"><i class="bi bi-123"></i><span><b class="key-hint">F4</b> Quantity</span></button>
+        <button class="key k-blue" data-action="new"><i class="bi bi-file-earmark-plus"></i><span><b class="key-hint">F8</b> New Sale</span></button>
       </div>
       <div class="key-row cols-3">
         <button class="key k-green" data-action="cash"><i class="bi bi-cash-stack"></i><span>Cash</span></button>
@@ -106,18 +107,18 @@
       </div>
       <div class="key-row cols-4">
         <button class="key k-gold" data-x="drawer"><i class="bi bi-inbox"></i><span>Cash Drawer</span></button>
-        <button class="key k-blue" data-action="discount"><i class="bi bi-percent"></i><span><b>F2</b> Discount</span></button>
+        <button class="key k-blue" data-action="discount"><i class="bi bi-percent"></i><span><b class="key-hint">F2</b> Discount</span></button>
         <button class="key k-blue" data-x="price"><i class="bi bi-tag"></i><span>Price</span></button>
         <button class="key k-blue" data-action="customer"><i class="bi bi-person"></i><span>Customer</span></button>
       </div>
       <div class="key-row cols-4">
-        <button class="key k-lilac" data-x="hold"><i class="bi bi-floppy"></i><span><b>F9</b> Save Sale</span></button>
+        <button class="key k-lilac" data-x="hold"><i class="bi bi-floppy"></i><span><b class="key-hint">F9</b> Save Sale</span></button>
         <button class="key k-pink" data-x="refund"><i class="bi bi-arrow-counterclockwise"></i><span>Refund</span></button>
-        <button class="key k-pay span-2" data-action="pay"><i class="bi bi-credit-card-2-front"></i><span><b>F10</b> Payment</span></button>
+        <button class="key k-pay span-2" data-action="pay"><i class="bi bi-credit-card-2-front"></i><span><b class="key-hint">F10</b> Payment</span></button>
       </div>
       <div class="key-row cols-4">
         <button class="key k-blue" data-x="lock"><i class="bi bi-lock"></i><span>Lock</span></button>
-        <button class="key k-blue" disabled title="Coming soon"><i class="bi bi-arrow-left-right"></i><span><b>F7</b> Transfer</span></button>
+        <button class="key k-blue" disabled title="Coming soon"><i class="bi bi-arrow-left-right"></i><span><b class="key-hint">F7</b> Transfer</span></button>
         <button class="key k-pink" data-action="void"><i class="bi bi-x-circle"></i><span>Void Order</span></button>
         <button class="key k-blue" data-action="menu"><i class="bi bi-three-dots"></i><span>More</span></button>
       </div>
@@ -283,6 +284,18 @@
     <div class="dlg-actions">
       <button type="button" class="btn btn-outline-secondary" data-close>Cancel</button>
       <button type="button" class="btn btn-brand" id="cashGo">Save</button>
+    </div>
+  </div>
+
+  <!-- Quantity -->
+  <div class="dlg" id="dlgQuantity" hidden role="dialog" aria-modal="true" aria-label="Set quantity">
+    <h5>Set quantity</h5>
+    <label class="dlg-label" for="quantityValue">Quantity</label>
+    <input id="quantityValue" class="form-control" type="number" min="0.001" step="0.001" inputmode="decimal" autocomplete="off">
+    <div class="dlg-error" id="quantityError" hidden></div>
+    <div class="dlg-actions">
+      <button type="button" class="btn btn-outline-secondary" data-close>Cancel</button>
+      <button type="button" class="btn btn-brand" id="quantityApply">Apply</button>
     </div>
   </div>
 

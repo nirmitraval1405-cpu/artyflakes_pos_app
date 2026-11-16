@@ -4,9 +4,12 @@
 {% block content %}
 <style>
   .promo-row { display: grid; grid-template-columns: 130px minmax(220px, 3fr) 150px 130px minmax(200px, 2fr) 80px; gap: .6rem; align-items: end; padding: .6rem 0; border-bottom: 1px solid var(--border); }
+  .promo-row > div { min-width: 0; }
+  .promo-row select, .promo-row input[type=number] { width: 100%; min-width: 0; }
   .promo-row .qcond { display: flex; align-items: center; gap: .5rem; }
   .promo-row .qcond input[type=number] { min-width: 0; }
-  @media (max-width: 991.98px) { .promo-row { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 1199.98px) { .promo-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 479.98px) { .promo-row { grid-template-columns: minmax(0, 1fr); } }
 </style>
 
 <div class="page-head">

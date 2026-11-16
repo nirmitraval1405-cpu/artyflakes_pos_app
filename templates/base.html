@@ -7,7 +7,7 @@
   <title>{% block title %}Artyflakes POS{% endblock %}</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
-  <link href="{% static 'css/app.css' %}" rel="stylesheet">
+  <link href="{% static 'css/app.css' %}?v=3" rel="stylesheet">
   {% block extra_css %}{% endblock %}
 </head>
 <body>
@@ -147,16 +147,19 @@
     <header class="topbar">
       <button class="icon-btn d-lg-none" id="sidebarToggle" type="button" aria-label="Open navigation menu" aria-controls="sidebar" aria-expanded="false"><i class="bi bi-list"></i></button>
 
-      <div class="topbar-search d-none d-md-flex">
-        <i class="bi bi-search"></i>
-        <input type="text" placeholder="Search (available after Products)" disabled>
+      <div class="topbar-search d-none d-md-flex" id="topbarSearch">
+        <i class="bi bi-search" aria-hidden="true"></i>
+        <input id="topbarFeatureSearch" type="search" placeholder="Search menu features..." autocomplete="off"
+               role="combobox" aria-label="Search menu features" aria-autocomplete="list"
+               aria-expanded="false" aria-controls="topbarSearchResults">
+        <div class="topbar-search-results" id="topbarSearchResults" role="listbox" hidden></div>
       </div>
 
       <div class="topbar-right">
-                <a class="store-chip d-none d-md-inline-flex" href="{% url 'pos:screen' %}" title="Open POS"><i class="bi bi-shop"></i> {{ store_name|default:"Artyflakes" }}</a>
+                <a class="store-chip mobile-store-chip d-md-inline-flex" href="{% url 'pos:screen' %}" title="Open POS"><i class="bi bi-shop"></i><span>{{ store_name|default:"Artyflakes" }}</span></a>
         <button class="icon-btn" id="fullscreenBtn" title="Full screen"><i class="bi bi-arrows-fullscreen"></i></button>
         {% if user.is_admin_role %}
-        <a class="icon-btn" href="{% url 'admin:index' %}" title="Admin panel"><i class="bi bi-gear"></i></a>
+        <a class="icon-btn" href="{% url 'storeconfig:store' %}" title="Store settings"><i class="bi bi-gear"></i></a>
         {% endif %}
 
         <div class="dropdown">
@@ -195,7 +198,7 @@
 {% endif %}
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script src="{% static 'js/app.js' %}"></script>
+<script src="{% static 'js/app.js' %}?v=2"></script>
 {% block extra_js %}{% endblock %}
 </body>
 </html> 

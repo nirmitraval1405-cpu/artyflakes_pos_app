@@ -36,9 +36,14 @@ class ReportIndex(AdminRequiredMixin, TemplateView):
         ready_reports = get_sections()[1]
         if selected not in ready_reports or not ready_reports[selected]["ready"]:
             selected = ""
+        selected_group = Category.objects.filter(pk=p.group).first() if p.group else None
         ctx.update(
             sections=get_sections()[0],
             products=Product.objects.only("id", "name").order_by("name"),
+            selected_product_name=(
+                Product.objects.filter(pk=p.product).values_list("name", flat=True).first()
+                if p.product else ""
+            ),
             categories=Category.objects.all(),
             customers=contacts.filter(is_customer=True),
             walk_in_customer=Contact.objects.filter(is_system=True, is_customer=True).first(),
@@ -51,6 +56,7 @@ class ReportIndex(AdminRequiredMixin, TemplateView):
             selected_user=p.user,
             selected_product=p.product,
             selected_group=p.group,
+            selected_group_name=str(selected_group) if selected_group else "",
             selected_payment_method=p.payment_method or "",
             payment_methods=Payment.Method.choices,
         )

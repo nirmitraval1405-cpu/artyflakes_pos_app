@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
 {% block title %}Stock · Artyflakes POS{% endblock %}
-{% block extra_css %}<link href="{% static 'css/inventory.css' %}" rel="stylesheet">{% endblock %}
+{% block extra_css %}<link href="{% static 'css/inventory.css' %}" rel="stylesheet"><link href="{% static 'css/mobile-redesign.css' %}" rel="stylesheet">{% endblock %}
 
 {% block content %}
 <div class="page-head">
@@ -11,7 +11,7 @@
   </div>
 </div>
 
-<div class="toolbar">
+<div class="toolbar stock-toolbar">
   <a class="tb" href="{{ request.get_full_path }}"><i class="bi bi-arrow-repeat"></i><span>Refresh</span></a>
   {% if can_edit %}
     <a class="tb" id="btnAdd" href="{% url 'inventory:stock_add' %}"><i class="bi bi-box-arrow-in-down"></i><span>Add stock</span></a>
@@ -42,10 +42,11 @@
     <table class="grid" id="stockRows">
       <thead>
         <tr>
-          <th>Code</th><th>Name</th><th>Group</th><th>Unit</th>
+          <th>Code</th>
+          {% if can_edit %}<th>Actions</th>{% endif %}
+          <th>Name</th><th>Group</th><th>Unit</th>
           <th class="num">Stock</th><th class="num">Low stock level</th><th>Status</th>
           {% if can_edit %}<th class="num">Stock value (cost)</th>{% endif %}
-          {% if can_edit %}<th>Actions</th>{% endif %}
         </tr>
       </thead>
       <tbody>
@@ -54,20 +55,20 @@
             data-stock="{{ r.stock_raw }}" data-track-stock="{{ r.track_stock|yesno:'true,false' }}"
             data-min-stock="{{ r.min_stock_raw }}" data-quick-edit-url="{% url 'inventory:quick_stock_edit' r.pk %}">
           <td>{{ r.code }}</td>
-          <td>{{ r.name }}</td>
-          <td>{{ r.group }}</td>
-          <td>{{ r.unit }}</td>
-          <td class="num stock-quantity"><strong>{{ r.stock }}</strong></td>
-          <td class="num stock-minimum">{{ r.min_stock }}</td>
-          <td class="stock-status"><span class="st st-{{ r.kind }}">{{ r.label }}</span></td>
           {% if can_edit %}
-            <td class="num stock-value">{{ r.value }}</td>
             <td class="stock-action-cell">
               <button type="button" class="stock-quick-edit" aria-expanded="false">
                 <i class="bi bi-pencil" aria-hidden="true"></i><span>Quick Edit</span>
               </button>
             </td>
           {% endif %}
+          <td>{{ r.name }}</td>
+          <td>{{ r.group }}</td>
+          <td>{{ r.unit }}</td>
+          <td class="num stock-quantity"><strong>{{ r.stock }}</strong></td>
+          <td class="num stock-minimum">{{ r.min_stock }}</td>
+          <td class="stock-status"><span class="st st-{{ r.kind }}">{{ r.label }}</span></td>
+          {% if can_edit %}<td class="num stock-value">{{ r.value }}</td>{% endif %}
         </tr>
         {% empty %}
         <tr><td colspan="{% if can_edit %}9{% else %}7{% endif %}" class="grid-empty">
@@ -101,9 +102,15 @@
           <label>Current stock quantity
             <input name="stock" type="number" min="0" step="0.001" inputmode="decimal" required>
           </label>
-          <label>Low stock threshold
-            <input name="min_stock" type="number" min="0" step="1" required>
-          </label>
+          <div class="quick-edit-threshold">
+            <label>Low stock threshold
+              <input name="min_stock" type="number" min="0" step="1" required>
+            </label>
+            <div class="quick-edit-actions">
+              <button type="button" class="btn btn-sm btn-outline-secondary" data-cancel>Cancel</button>
+              <button type="submit" class="btn btn-sm btn-brand" data-save>Save Changes</button>
+            </div>
+          </div>
           <label class="quick-edit-toggle">
             <input name="track_stock" type="checkbox">
             <span>Enable stock management</span>
@@ -111,10 +118,6 @@
           <div class="quick-edit-readonly"><span>Stock status</span><span class="quick-edit-status"></span></div>
         </div>
         <div class="quick-edit-error" role="alert" hidden></div>
-        <div class="quick-edit-actions">
-          <button type="button" class="btn btn-sm btn-outline-secondary" data-cancel>Cancel</button>
-          <button type="submit" class="btn btn-sm btn-brand" data-save>Save Changes</button>
-        </div>
       </form>
     </td>
   </tr>

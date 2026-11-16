@@ -161,6 +161,12 @@ class StoreSettingsPageTests(TestCase):
         self.client.login(username="sc_boss", password="pw12345!")
         self.assertContains(self.client.get(reverse("pos:sale_list")), "Store Settings")
 
+    def test_topbar_settings_button_opens_store_settings(self):
+        self.client.login(username="sc_boss", password="pw12345!")
+        response = self.client.get(reverse("pos:sale_list"))
+        self.assertContains(response, f'href="{self.url}" title="Store settings"')
+        self.assertNotContains(response, 'title="Admin panel"')
+
     def test_store_name_reaches_every_page_and_login_still_works(self):
         s = StoreSettings.load()
         s.name = "Craft Hut"
