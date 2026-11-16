@@ -505,9 +505,11 @@ def _pos_payload(client, product, link, fields=None):
         payload["tags"] = _ensure_tags(client, product)
     if "images" in fields:
         payload["images"] = _image_payload(client, product, link)
-    if "stock" in fields and product.track_stock:
-        from inventory.stock import current_stock
-        payload.update(manage_stock=True, stock_quantity=max(0, int(current_stock(product))))
+    if "stock" in fields:
+        payload["manage_stock"] = product.track_stock
+        if product.track_stock:
+            from inventory.stock import current_stock
+            payload["stock_quantity"] = max(0, int(current_stock(product)))
     return payload
 
 

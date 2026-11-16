@@ -16,6 +16,7 @@ LOCAL_FIELDS = {
     "description": "description",
     "short_description": "short_description",
     "is_active": "status",
+    "track_stock": "stock",
     "woo_tax_class": "tax_class",
     "weight": "weight",
     "dimensions": "dimensions",

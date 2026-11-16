@@ -24,7 +24,10 @@ from .models import (
 )
 from .sync import (MASS_ZERO_LIMIT, InvalidOrderPayload, SyncBusy, SyncOff, apply_order, match_products,
                    planned_pushes, reconcile_stock, run_sync)
-from .products import enqueue_product_job, enqueue_webhook_job, process_product_jobs, sync_product_from_woo
+from .products import (
+    _pos_payload, enqueue_product_job, enqueue_webhook_job, process_product_jobs,
+    sync_product_from_woo,
+)
 
 UTC = dt_timezone.utc
 
@@ -511,6 +514,14 @@ class RunSyncTests(Base):
 
 
 class PushTests(Base):
+    def test_disabling_stock_tracking_is_sent_to_woocommerce(self):
+        link = self.link()
+        self.product.track_stock = False
+
+        payload = _pos_payload(FakeClient(), self.product, link, fields=["stock"])
+
+        self.assertEqual(payload, {"manage_stock": False})
+
     def test_only_changed_stock_is_sent_and_it_is_sent_again_when_it_changes(self):
         link = self.link()
         self.enable()

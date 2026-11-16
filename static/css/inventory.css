@@ -300,6 +300,178 @@
     white-space: normal !important;
 }
 
+.stock-quick-edit {
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: .4rem;
+    min-width: 96px;
+    min-height: 34px;
+    padding: .35rem .65rem;
+    border: 1px solid #e7dcda;
+    border-radius: 6px;
+    background: #fffaf8;
+    color: var(--primary);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+    vertical-align: middle;
+    transition: background-color 140ms ease, border-color 140ms ease,
+        box-shadow 140ms ease, transform 100ms ease;
+}
+
+.stock-quick-edit i {
+    font-size: 12px;
+}
+
+.stock-quick-edit:hover:not(:disabled) {
+    border-color: #d7c6c1;
+    background: #f8efec;
+    box-shadow: 0 2px 5px rgb(80 64 65 / 8%);
+}
+
+.stock-quick-edit:active:not(:disabled) {
+    background: #f2e6e2;
+    box-shadow: none;
+    transform: translateY(1px);
+}
+
+.stock-quick-edit:focus {
+    outline: none;
+}
+
+.stock-quick-edit:focus-visible {
+    outline: 2px solid var(--secondary);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 3px rgb(198 156 109 / 16%);
+}
+
+.stock-quick-edit:disabled,
+.stock-quick-edit[aria-disabled="true"] {
+    border-color: var(--border);
+    background: #f4f1ef;
+    color: var(--muted);
+    box-shadow: none;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.stock-quick-edit[aria-expanded="true"] {
+    border-color: #d7c6c1;
+    background: #f8efec;
+    color: var(--primary);
+}
+
+.stock-action-cell {
+    vertical-align: middle;
+}
+
+.quick-edit-row td {
+    padding: 0 !important;
+    white-space: normal !important;
+    background: #fbf8f4;
+}
+
+.quick-edit-panel {
+    padding: 1.25rem 1.5rem;
+    border-left: 3px solid var(--secondary);
+    border-bottom: 1px solid var(--border);
+    background: #fffdfb;
+}
+
+.quick-edit-heading {
+    margin-bottom: 1rem;
+    color: var(--primary);
+    font-weight: 600;
+}
+
+.quick-edit-fields {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr));
+    gap: .85rem 1rem;
+}
+
+.quick-edit-fields > label,
+.quick-edit-readonly {
+    display: grid;
+    min-width: 0;
+    gap: .45rem;
+    padding: .7rem .8rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--card-bg);
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.quick-edit-fields input[type="number"] {
+    width: 100%;
+    min-height: 38px;
+    padding: .45rem .6rem;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    background: #fff;
+    color: var(--text);
+}
+
+.quick-edit-fields input:disabled {
+    background: #f0eeeb;
+}
+
+.quick-edit-readonly strong {
+    display: block;
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 500;
+    overflow-wrap: anywhere;
+}
+
+.quick-edit-toggle {
+    display: flex !important;
+    align-items: center;
+    gap: .5rem !important;
+    min-height: 36px;
+    color: var(--text) !important;
+}
+
+.quick-edit-error {
+    margin-top: .75rem;
+    color: #b02a37;
+    font-size: 13px;
+}
+
+.quick-edit-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: .5rem;
+    margin-top: .9rem;
+}
+
+.quick-edit-panel[data-saving="true"] [data-save]::before {
+    display: inline-block;
+    width: .8rem;
+    height: .8rem;
+    margin-right: .4rem;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    content: "";
+    vertical-align: -.1rem;
+    animation: quick-edit-spin .7s linear infinite;
+}
+
+@keyframes quick-edit-spin {
+    to { transform: rotate(360deg); }
+}
+
+#stockNotice {
+    margin: .75rem;
+}
+
 .pager {
     display: flex;
     justify-content: center;
@@ -325,6 +497,14 @@
 }
 
 @media (max-width: 575.98px) {
+    .quick-edit-panel {
+        padding: 1rem;
+    }
+
+    .quick-edit-fields {
+        grid-template-columns: 1fr;
+    }
+
     .tree {
         max-height: 38vh;
         padding: .4rem;
@@ -348,6 +528,10 @@
     .category-chevron,
     .category-children {
         transition-duration: .01ms;
+    }
+
+    .quick-edit-panel[data-saving="true"] [data-save]::before {
+        animation-duration: .01ms;
     }
 }
 

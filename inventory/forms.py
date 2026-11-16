@@ -253,6 +253,20 @@ class CountForm(_StockForm):
     )
 
 
+class QuickStockEditForm(forms.Form):
+    stock = forms.DecimalField(
+        required=False, min_value=Decimal("0"), max_digits=12, decimal_places=3,
+    )
+    min_stock = forms.IntegerField(min_value=0, max_value=2147483647)
+    track_stock = forms.BooleanField(required=False)
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if cleaned_data.get("track_stock") and cleaned_data.get("stock") is None:
+            self.add_error("stock", "Enter a stock quantity when stock management is enabled.")
+        return cleaned_data
+
+
 class DamageForm(_StockForm):
     quantity = forms.DecimalField(
         min_value=Decimal("0.001"), max_digits=12, decimal_places=3,

@@ -32,6 +32,7 @@ urlpatterns = [
     path("groups/<int:pk>/delete/", views.CategoryDelete.as_view(), name="group_delete"),
 
     path("stock/", views.stock_list, name="stock_list"),
+    path("stock/<int:pk>/quick-edit/", views.quick_stock_edit, name="quick_stock_edit"),
     path("stock/export/", views.stock_export, name="stock_export"),
     path("stock/add/", views.StockEntry.as_view(kind="add"), name="stock_add"),
     path("stock/count/", views.StockEntry.as_view(kind="count"), name="stock_count"),

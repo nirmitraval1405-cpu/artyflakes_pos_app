@@ -23,6 +23,7 @@
 </div>
 
 <section class="grid-panel">
+  <div id="stockNotice" class="alert" role="status" aria-live="polite" hidden></div>
   <form class="grid-search" method="get">
     <select name="filter" class="grid-field" onchange="this.form.submit()">
       <option value="" {% if not flt %}selected{% endif %}>All stock</option>
@@ -34,7 +35,7 @@
     </select>
     <input type="text" name="q" value="{{ q }}" placeholder="Search by name, code or barcode" autocomplete="off">
     <i class="bi bi-search"></i>
-    <span class="count">Products: <strong>{{ total }}</strong></span>
+    <span class="count">Products: <strong id="stockTotal">{{ total }}</strong></span>
   </form>
 
   <div class="grid-wrap">
@@ -44,22 +45,32 @@
           <th>Code</th><th>Name</th><th>Group</th><th>Unit</th>
           <th class="num">Stock</th><th class="num">Low stock level</th><th>Status</th>
           {% if can_edit %}<th class="num">Stock value (cost)</th>{% endif %}
+          {% if can_edit %}<th>Actions</th>{% endif %}
         </tr>
       </thead>
       <tbody>
         {% for r in rows %}
-        <tr data-pk="{{ r.pk }}">
+        <tr data-pk="{{ r.pk }}" data-name="{{ r.name }}" data-code="{{ r.code }}"
+            data-stock="{{ r.stock_raw }}" data-track-stock="{{ r.track_stock|yesno:'true,false' }}"
+            data-min-stock="{{ r.min_stock_raw }}" data-quick-edit-url="{% url 'inventory:quick_stock_edit' r.pk %}">
           <td>{{ r.code }}</td>
           <td>{{ r.name }}</td>
           <td>{{ r.group }}</td>
           <td>{{ r.unit }}</td>
-          <td class="num"><strong>{{ r.stock }}</strong></td>
-          <td class="num">{{ r.min_stock }}</td>
-          <td><span class="st st-{{ r.kind }}">{{ r.label }}</span></td>
-          {% if can_edit %}<td class="num">{{ r.value }}</td>{% endif %}
+          <td class="num stock-quantity"><strong>{{ r.stock }}</strong></td>
+          <td class="num stock-minimum">{{ r.min_stock }}</td>
+          <td class="stock-status"><span class="st st-{{ r.kind }}">{{ r.label }}</span></td>
+          {% if can_edit %}
+            <td class="num stock-value">{{ r.value }}</td>
+            <td class="stock-action-cell">
+              <button type="button" class="stock-quick-edit" aria-expanded="false">
+                <i class="bi bi-pencil" aria-hidden="true"></i><span>Quick Edit</span>
+              </button>
+            </td>
+          {% endif %}
         </tr>
         {% empty %}
-        <tr><td colspan="{% if can_edit %}8{% else %}7{% endif %}" class="grid-empty">
+        <tr><td colspan="{% if can_edit %}9{% else %}7{% endif %}" class="grid-empty">
           {% if flt == 'low' %}Nothing is running low. 
           {% elif q or group %}No products match this search.
           {% else %}No products yet. Add products first, then add their stock here.{% endif %}
@@ -77,22 +88,223 @@
   </div>
   {% endif %}
 </section>
+
+{% if can_edit %}
+<template id="quickStockEditor">
+  <tr class="quick-edit-row">
+    <td colspan="9">
+      <form class="quick-edit-panel">
+        <div class="quick-edit-heading">Quick stock edit</div>
+        <div class="quick-edit-fields">
+          <div class="quick-edit-readonly"><span>Product</span><strong data-product-name></strong></div>
+          <div class="quick-edit-readonly"><span>SKU / Product code</span><strong data-product-code></strong></div>
+          <label>Current stock quantity
+            <input name="stock" type="number" min="0" step="0.001" inputmode="decimal" required>
+          </label>
+          <label>Low stock threshold
+            <input name="min_stock" type="number" min="0" step="1" required>
+          </label>
+          <label class="quick-edit-toggle">
+            <input name="track_stock" type="checkbox">
+            <span>Enable stock management</span>
+          </label>
+          <div class="quick-edit-readonly"><span>Stock status</span><span class="quick-edit-status"></span></div>
+        </div>
+        <div class="quick-edit-error" role="alert" hidden></div>
+        <div class="quick-edit-actions">
+          <button type="button" class="btn btn-sm btn-outline-secondary" data-cancel>Cancel</button>
+          <button type="submit" class="btn btn-sm btn-brand" data-save>Save Changes</button>
+        </div>
+      </form>
+    </td>
+  </tr>
+</template>
+{% endif %}
 {% endblock %}
 
 {% block extra_js %}
 <script>
   (function () {
-    const rows = document.querySelectorAll("#stockRows tbody tr[data-pk]");
+    const body = document.querySelector("#stockRows tbody");
+    const rows = body.querySelectorAll("tr[data-pk]");
     const links = ["btnAdd", "btnCount", "btnDamage"].map((id) => document.getElementById(id)).filter(Boolean);
     const bases = links.map((l) => l.getAttribute("href"));
+    const notice = document.getElementById("stockNotice");
+    const editorTemplate = document.getElementById("quickStockEditor");
+    let activeRow = null;
 
-    // Selecting a row makes the three buttons open with that product already chosen
-    rows.forEach((row) => {
-      row.addEventListener("click", () => {
-        rows.forEach((r) => r.classList.remove("selected"));
-        row.classList.add("selected");
-        links.forEach((l, i) => (l.href = bases[i] + "?product=" + row.dataset.pk));
+    function selectRow(row) {
+      rows.forEach((r) => r.classList.toggle("selected", r === row));
+      links.forEach((link, index) => {
+        link.href = bases[index] + "?product=" + row.dataset.pk;
       });
+    }
+
+    function closeEditor() {
+      if (!activeRow) return;
+      activeRow.querySelector(".stock-quick-edit").setAttribute("aria-expanded", "false");
+      if (activeRow.nextElementSibling && activeRow.nextElementSibling.classList.contains("quick-edit-row")) {
+        activeRow.nextElementSibling.remove();
+      }
+      activeRow = null;
+    }
+
+    function setNotice(message, kind) {
+      notice.textContent = message;
+      notice.className = "alert alert-" + kind;
+      notice.hidden = false;
+    }
+
+    function statusFor(tracked, quantity, threshold) {
+      if (!tracked) return ["na", "Not tracked"];
+      if (quantity <= 0) return ["out", "Out of stock"];
+      if (threshold > 0 && quantity <= threshold) return ["low", "Low"];
+      return ["ok", "OK"];
+    }
+
+    function updatePreview(panel) {
+      const tracked = panel.elements.track_stock.checked;
+      const quantity = Number(panel.elements.stock.value);
+      const threshold = Number(panel.elements.min_stock.value);
+      panel.elements.stock.disabled = !tracked;
+      panel.elements.min_stock.disabled = !tracked;
+      const [kind, label] = statusFor(tracked, quantity, threshold);
+      const status = panel.querySelector(".quick-edit-status");
+      status.className = "st st-" + kind + " quick-edit-status";
+      status.textContent = label;
+    }
+
+    function openEditor(row) {
+      if (activeRow === row) {
+        closeEditor();
+        return;
+      }
+      closeEditor();
+      selectRow(row);
+
+      const editorRow = editorTemplate.content.firstElementChild.cloneNode(true);
+      const form = editorRow.querySelector("form");
+      form.dataset.url = row.dataset.quickEditUrl;
+      form.querySelector("[data-product-name]").textContent = row.dataset.name;
+      form.querySelector("[data-product-code]").textContent = row.dataset.code || "—";
+      form.elements.stock.value = row.dataset.stock;
+      form.elements.min_stock.value = row.dataset.minStock;
+      form.elements.track_stock.checked = row.dataset.trackStock === "true";
+      activeRow = row;
+      row.querySelector(".stock-quick-edit").setAttribute("aria-expanded", "true");
+      row.after(editorRow);
+
+      form.elements.track_stock.addEventListener("change", () => updatePreview(form));
+      form.elements.stock.addEventListener("input", () => updatePreview(form));
+      form.elements.min_stock.addEventListener("input", () => updatePreview(form));
+      form.querySelector("[data-cancel]").addEventListener("click", closeEditor);
+      updatePreview(form);
+    }
+
+    function csrfToken() {
+      const match = document.cookie.match(/(?:^|; )csrftoken=([^;]*)/);
+      return match ? decodeURIComponent(match[1]) : "";
+    }
+
+    body.addEventListener("click", (event) => {
+      const quickEdit = event.target.closest(".stock-quick-edit");
+      const row = event.target.closest("tr[data-pk]");
+      if (!row) return;
+      if (quickEdit) {
+        event.stopPropagation();
+        openEditor(row);
+        return;
+      }
+      if (!event.target.closest(".quick-edit-row")) selectRow(row);
+    });
+
+    body.addEventListener("submit", async (event) => {
+      const form = event.target.closest(".quick-edit-panel");
+      if (!form) return;
+      event.preventDefault();
+      if (form.dataset.saving === "true") return;
+
+      const quantity = form.elements.stock.value.trim();
+      const minimum = form.elements.min_stock.value.trim();
+      if (form.elements.track_stock.checked && (!quantity || Number(quantity) < 0 || !Number.isFinite(Number(quantity)))) {
+        form.querySelector(".quick-edit-error").textContent = "Enter a valid stock quantity of zero or more.";
+        form.querySelector(".quick-edit-error").hidden = false;
+        return;
+      }
+      if (!minimum || !Number.isInteger(Number(minimum)) || Number(minimum) < 0) {
+        form.querySelector(".quick-edit-error").textContent = "Enter a valid low stock threshold of zero or more.";
+        form.querySelector(".quick-edit-error").hidden = false;
+        return;
+      }
+
+      const row = activeRow;
+      const save = form.querySelector("[data-save]");
+      const cancel = form.querySelector("[data-cancel]");
+      const error = form.querySelector(".quick-edit-error");
+      form.dataset.saving = "true";
+      save.disabled = true;
+      cancel.disabled = true;
+      save.textContent = "Saving…";
+      error.hidden = true;
+      try {
+        const response = await fetch(form.dataset.url, {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken() },
+          body: JSON.stringify({
+            stock: form.elements.track_stock.checked ? quantity : null,
+            min_stock: minimum,
+            track_stock: form.elements.track_stock.checked,
+          }),
+        });
+        let data;
+        try {
+          data = await response.json();
+        } catch (parseError) {
+          throw new Error("The server returned an invalid response.");
+        }
+        if (!response.ok || !data.ok) throw new Error(data.error || "Could not save stock changes.");
+
+        row.dataset.stock = data.stock_raw;
+        row.dataset.trackStock = String(data.track_stock);
+        row.dataset.minStock = data.min_stock_raw;
+        row.querySelector(".stock-quantity strong").textContent = data.stock;
+        row.querySelector(".stock-minimum").textContent = data.min_stock;
+        row.querySelector(".stock-status .st").className = "st st-" + data.kind;
+        row.querySelector(".stock-status .st").textContent = data.label;
+        row.querySelector(".stock-value").textContent = data.value;
+        closeEditor();
+        setNotice("Stock updated successfully.", "success");
+        if (new URLSearchParams(window.location.search).get("filter") === "low" && data.kind !== "low" && data.kind !== "out") {
+          row.remove();
+          const total = document.getElementById("stockTotal");
+          total.textContent = Math.max(0, Number(total.textContent) - 1);
+          if (!body.querySelector("tr[data-pk]")) {
+            const emptyRow = document.createElement("tr");
+            const emptyCell = document.createElement("td");
+            emptyCell.colSpan = 9;
+            emptyCell.className = "grid-empty";
+            emptyCell.textContent = "Nothing is running low.";
+            emptyRow.appendChild(emptyCell);
+            body.appendChild(emptyRow);
+          }
+        }
+      } catch (saveError) {
+        error.textContent = saveError.message || "Could not save stock changes.";
+        error.hidden = false;
+        setNotice(error.textContent, "danger");
+      } finally {
+        if (form.isConnected) {
+          form.dataset.saving = "false";
+          save.disabled = false;
+          cancel.disabled = false;
+          save.textContent = "Save Changes";
+        }
+      }
+    });
+
+    rows.forEach((row) => {
+      row.addEventListener("click", () => selectRow(row));
     });
   })();
 </script>

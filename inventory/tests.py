@@ -1,4 +1,5 @@
 from decimal import Decimal
+import json
 import tempfile
 from pathlib import Path
 
@@ -196,6 +197,88 @@ class BarcodeEndpointTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(product.name, "After edit")
         self.assertEqual(product.barcode, "EDIT-123")
+
+
+class QuickStockEditTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="stock-admin",
+            password="test-password",
+            role=User.Role.ADMIN,
+        )
+        self.client.force_login(self.user)
+        self.product = Product.objects.create(name="Quick edit product", cost_price=Decimal("2.50"))
+        StockMovement.objects.create(
+            product=self.product,
+            quantity=5,
+            movement_type=StockMovement.Type.OPENING,
+        )
+        self.url = reverse("inventory:quick_stock_edit", args=[self.product.pk])
+
+    def save_stock(self, **payload):
+        return self.client.post(
+            self.url,
+            data=json.dumps(payload),
+            content_type="application/json",
+        )
+
+    def test_saves_quantity_and_threshold_as_a_ledger_adjustment(self):
+        response = self.save_stock(stock="7.250", min_stock=8, track_stock=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["stock"], "7.25")
+        self.assertEqual(response.json()["label"], "Low")
+        self.assertEqual(
+            self.product.movements.order_by("-id").first().quantity,
+            Decimal("2.250"),
+        )
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.min_stock, 8)
+        self.assertEqual(self.product.name, "Quick edit product")
+
+    def test_zero_quantity_returns_out_of_stock_status(self):
+        response = self.save_stock(stock="0", min_stock=2, track_stock=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["kind"], "out")
+        self.assertEqual(response.json()["label"], "Out of stock")
+        self.assertEqual(self.product.movements.order_by("-id").first().quantity, Decimal("-5"))
+
+    def test_disabling_tracking_does_not_change_the_stock_ledger(self):
+        response = self.save_stock(stock=None, min_stock=2, track_stock=False)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.json()["track_stock"])
+        self.assertEqual(response.json()["stock"], "—")
+        self.assertEqual(self.product.movements.count(), 1)
+        self.product.refresh_from_db()
+        self.assertFalse(self.product.track_stock)
+
+    def test_stock_list_exposes_quick_edit_and_csrf_for_admins(self):
+        response = self.client.get(reverse("inventory:stock_list"))
+
+        self.assertContains(response, "Quick Edit")
+        self.assertContains(response, 'id="quickStockEditor"')
+        self.assertIn("csrftoken", response.cookies)
+
+    def test_rejects_negative_quantity_without_writing(self):
+        response = self.save_stock(stock="-1", min_stock=0, track_stock=True)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(self.product.movements.count(), 1)
+
+    def test_requires_admin_permission(self):
+        cashier = User.objects.create_user(
+            username="stock-cashier",
+            password="test-password",
+            role=User.Role.CASHIER,
+        )
+        self.client.force_login(cashier)
+
+        response = self.save_stock(stock="5", min_stock=0, track_stock=True)
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(self.product.movements.count(), 1)
 
 
 class ProductDeleteTests(TestCase):

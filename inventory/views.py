@@ -1,4 +1,5 @@
 import csv
+import json
 import secrets
 
 from django.contrib import messages
@@ -11,13 +12,15 @@ from django.db.models import Count, ProtectedError, Q
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
+from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_POST
 from django.views.generic import CreateView, DeleteView, FormView, ListView, UpdateView, View
 
 from core.permissions import AdminRequiredMixin
 
 from .forms import (
-    AddStockForm, BrandForm, CategoryForm, CountForm, DamageForm, ProductForm, UnitForm,
+    AddStockForm, BrandForm, CategoryForm, CountForm, DamageForm, ProductForm,
+    QuickStockEditForm, UnitForm,
 )
 from .models import Brand, Category, Product, StockMovement, Unit
 from .product_import import IMPORT_FIELDS, import_product_rows, parse_product_csv
@@ -573,6 +576,7 @@ class ProductDelete(DeletePage, DeleteView):
 
 # =====================  STOCK  =====================
 @login_required
+@ensure_csrf_cookie
 def stock_list(request):
     q = request.GET.get("q", "").strip()
     group = request.GET.get("group", "")
@@ -600,7 +604,10 @@ def stock_list(request):
             "group": p.category.name if p.category else "",
             "unit": p.unit,
             "stock": qty_fmt(p.stock) if p.track_stock else "\u2014",
+            "stock_raw": p.stock,
+            "track_stock": p.track_stock,
             "min_stock": p.min_stock if p.track_stock else "\u2014",
+            "min_stock_raw": p.min_stock,
             "kind": kind,
             "label": label,
             "value": f"{p.cost_price * p.stock:,.2f}" if p.track_stock else "\u2014",
@@ -615,6 +622,62 @@ def stock_list(request):
         "categories": _ordered_category_tree(Category.objects.all()),
         "querystring": params.urlencode(),
         "can_edit": can_edit,
+    })
+
+
+@login_required
+@require_POST
+def quick_stock_edit(request, pk):
+    if not request.user.is_admin_role:
+        return JsonResponse({"ok": False, "error": "You do not have permission to edit stock."}, status=403)
+
+    try:
+        payload = json.loads(request.body)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return JsonResponse({"ok": False, "error": "Invalid request data."}, status=400)
+    if not isinstance(payload, dict):
+        return JsonResponse({"ok": False, "error": "Invalid request data."}, status=400)
+    if "track_stock" not in payload or not isinstance(payload["track_stock"], bool):
+        return JsonResponse({"ok": False, "error": "Choose whether stock management is enabled."}, status=400)
+
+    form = QuickStockEditForm(payload)
+    if not form.is_valid():
+        return JsonResponse({"ok": False, "error": "Enter a valid non-negative quantity and low stock level."}, status=400)
+
+    with transaction.atomic():
+        product = Product.objects.select_for_update().filter(pk=pk, is_active=True).first()
+        if product is None:
+            return JsonResponse({"ok": False, "error": "Product not found."}, status=404)
+        current = current_stock(product)
+        data = form.cleaned_data
+        product.track_stock = data["track_stock"]
+        product.min_stock = data["min_stock"]
+        product.save(update_fields=["track_stock", "min_stock", "updated_at"])
+
+        if product.track_stock:
+            delta = data["stock"] - current
+            if delta:
+                StockMovement.objects.create(
+                    product=product,
+                    quantity=delta,
+                    movement_type=StockMovement.Type.ADJUSTMENT,
+                    note="Quick stock edit",
+                    created_by=request.user,
+                )
+                current = data["stock"]
+
+    product.stock = current
+    kind, label = stock_status(product)
+    return JsonResponse({
+        "ok": True,
+        "stock": qty_fmt(current) if product.track_stock else "\u2014",
+        "stock_raw": qty_fmt(current),
+        "min_stock": product.min_stock if product.track_stock else "\u2014",
+        "min_stock_raw": product.min_stock,
+        "track_stock": product.track_stock,
+        "kind": kind,
+        "label": label,
+        "value": f"{product.cost_price * current:,.2f}" if product.track_stock else "\u2014",
     })
 
 
