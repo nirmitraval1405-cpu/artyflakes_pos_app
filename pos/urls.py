@@ -18,6 +18,7 @@ urlpatterns = [
     path("credit-payments/<int:pk>/collect/", views.credit_payment_collect, name="credit_payment_collect"),
     path("end-of-day/", views.end_of_day, name="end_of_day"),
     path("sales/<int:pk>/", views.sale_detail, name="sale_detail"),
+    path("sales/<int:pk>/delete/", views.sale_delete, name="sale_delete"),
     path("sales/<int:pk>/void/", views.sale_void, name="sale_void"),
     path("sales/<int:pk>/return/", views.sale_return, name="sale_return"),
     path("returns/", views.return_list, name="return_list"),

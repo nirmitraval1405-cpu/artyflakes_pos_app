@@ -7,6 +7,11 @@ from inventory.models import Product
 from people.models import Contact
 
 MONEY = {"max_digits": 12, "decimal_places": 2}
+DISCOUNT_TYPES = (
+    ("none", "No discount"),
+    ("percent", "Percentage"),
+    ("amount", "Amount"),
+)
 
 
 class InvoiceCounter(models.Model):
@@ -59,6 +64,8 @@ class Sale(TimeStampedModel):
     # Prices include GST. subtotal = sum of price x qty, before any discount.
     subtotal = models.DecimalField(default=0, **MONEY)
     bill_discount = models.DecimalField(default=0, **MONEY)   # the part entered at bill level
+    bill_discount_type = models.CharField(max_length=8, choices=DISCOUNT_TYPES, default="none")
+    bill_discount_value = models.DecimalField(default=0, **MONEY)
     discount_total = models.DecimalField(default=0, **MONEY)  # line discounts + bill discount
     tax_total = models.DecimalField(default=0, **MONEY)       # GST contained in the total
     total = models.DecimalField(default=0, **MONEY)           # what the customer pays
@@ -103,6 +110,9 @@ class SaleItem(models.Model):
     cost_price = models.DecimalField(default=0, **MONEY)   # for profit reports later
     gst_rate = models.DecimalField(max_digits=5, decimal_places=2, default=0)
     discount = models.DecimalField(default=0, **MONEY)     # total discount on this line, incl. share of bill discount
+    discount_type = models.CharField(max_length=8, choices=DISCOUNT_TYPES, default="none")
+    discount_value = models.DecimalField(default=0, **MONEY)
+    bill_discount_share = models.DecimalField(null=True, blank=True, **MONEY)
     tax_amount = models.DecimalField(default=0, **MONEY)   # GST contained in line_total
     line_total = models.DecimalField(default=0, **MONEY)   # unit_price x quantity - discount
     promo_discount = models.DecimalField(default=0, **MONEY)       # the promotion part of `discount`

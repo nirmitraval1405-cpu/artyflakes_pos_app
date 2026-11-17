@@ -7,7 +7,7 @@ from purchase.models import Purchase
 
 
 import json
-from datetime import date
+from datetime import date, datetime, time
 from decimal import Decimal
 
 from django.test import TestCase
@@ -18,6 +18,7 @@ from accounts.models import User
 from expenses.models import ExpenseCategory
 from expenses.services import create_expense, void_expense
 from inventory.models import Product, StockMovement
+from pos.models import Sale
 
 from .views import _change, inr, period_bounds
 
@@ -218,6 +219,32 @@ class DashboardTests(TestCase):
         self.sell()
         for key in ("today", "week", "days30", "month", "year", "nonsense"):
             self.assertEqual(self.client.get(reverse("dashboard:home"), {"range": key}).status_code, 200)
+
+    def test_selected_date_filters_dashboard_metrics_and_chart(self):
+        self.client.force_login(User.objects.get(username="boss9"))
+        sale = self.sell()
+        selected = timezone.localdate() - timedelta(days=2)
+        Sale.objects.filter(pk=sale.pk).update(
+            created_at=timezone.make_aware(datetime.combine(selected, time(11)))
+        )
+
+        response = self.client.get(
+            reverse("dashboard:home"),
+            {"date": selected.isoformat(), "range": "year"},
+        )
+
+        cards = {
+            c["label"]: c
+            for c in response.context["primary_cards"] + response.context["secondary_cards"]
+        }
+        chart = response.context["chart_data"]["sales_statistics"]
+        self.assertEqual(cards["Total Sales"]["display"], "\u20b9500.00")
+        self.assertEqual(cards["Bills Made"]["display"], "1")
+        self.assertEqual(response.context["range_label"], "Selected date")
+        self.assertTrue(response.context["date_filter_active"])
+        self.assertEqual(len(chart["labels"]), 24)
+        self.assertEqual(chart["revenue"][11], "500.00")
+        self.assertContains(response, f'value="{selected:%Y-%m-%d}"')
 
     def test_named_customer_is_first_time_then_returning(self):
         from people.models import Contact

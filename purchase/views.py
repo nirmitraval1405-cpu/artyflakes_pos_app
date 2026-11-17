@@ -19,7 +19,7 @@ from people.models import Contact
 
 from .forms import PurchaseHeaderForm
 from .models import Purchase, PurchasePayment
-from .services import PurchaseError, add_payment, cancel_purchase, create_purchase, parse_date, parse_lines
+from .services import PurchaseError, add_payment, cancel_purchase, create_purchase, delete_purchase, parse_date, parse_lines
 
 LIST_URL = reverse_lazy("purchase:list")
 
@@ -192,6 +192,23 @@ def purchase_cancel(request, pk):
     for text in warnings:
         messages.warning(request, text)
     return redirect("purchase:detail", pk=pk)
+
+
+@login_required
+@require_POST
+def purchase_delete(request, pk):
+    if not request.user.is_admin_role:
+        return redirect("pos:screen")
+    try:
+        purchase_no, warnings = delete_purchase(request.user, pk)
+    except PurchaseError as exc:
+        messages.error(request, str(exc))
+        return redirect("purchase:list")
+
+    messages.success(request, f"Purchase {purchase_no} was deleted, its stock was reversed, and its payment records were removed.")
+    for text in warnings:
+        messages.warning(request, text)
+    return redirect("purchase:list")
 
 
 @login_required

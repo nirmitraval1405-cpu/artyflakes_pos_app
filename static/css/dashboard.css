@@ -26,6 +26,8 @@
 }
 
 .dashboard-page .date-chip {
+    display: flex;
+    align-items: center;
     border-color: var(--border);
     border-radius: 8px;
     padding: .45rem .7rem;
@@ -33,6 +35,27 @@
     font-size: .8rem;
     font-weight: 600;
     box-shadow: none;
+}
+
+.dashboard-page .date-filter {
+    display: flex;
+    align-items: center;
+    gap: .35rem;
+    margin: 0;
+}
+
+.dashboard-page .date-chip input {
+    width: 130px;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+}
+
+.dashboard-page .date-chip input:focus-visible {
+    outline: 2px solid var(--secondary);
+    outline-offset: 2px;
 }
 
 .dashboard-page .range-tabs {

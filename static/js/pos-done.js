@@ -94,13 +94,35 @@
   }
 
   function waText() {
-    const out = ["*" + STORE + "*", "Invoice: " + sale.invoice_no, "Date: " + sale.created, ""];
-    (sale.lines || []).forEach((l) => out.push(l.name + " x " + l.qty + " = ₹" + l.amount));
-    out.push("");
-    if (sale.discount !== "0.00") out.push("Discount: ₹" + sale.discount);
-    out.push("*Total: ₹" + sale.total + "*");
-    if (sale.tax !== "0.00") out.push("(includes GST ₹" + sale.tax + ")");
-    if (FOOTER) { out.push(""); out.push(FOOTER); }
+    const store = sale.store || {};
+    const out = ["*" + (store.name || STORE) + "*"];
+    if (store.address) out.push(store.address);
+    if (store.gstin) out.push("Tax/GST No.: " + store.gstin);
+    if (store.phone) out.push("Phone: " + store.phone);
+    if (store.email) out.push("Email: " + store.email);
+    out.push("www.Artyflakes.com", "", "Receipt No.: " + (sale.receipt_number || sale.invoice_no));
+    out.push("Date & Time: " + (sale.receipt_created || sale.created));
+    out.push("User: " + (sale.cashier_name || ""), "", "----------------------------------------");
+    (sale.lines || []).forEach((l) => {
+      out.push(l.name);
+      out.push(
+        "`" + l.qty + "x ₹" + (l.base_rate || l.price)
+          + (l.discount_label ? " (" + l.discount_label + ")" : "")
+          + "  =  ₹" + l.amount + "`",
+      );
+    });
+    out.push("----------------------------------------", "Items count: " + (sale.total_items_count || sale.items_count || (sale.lines || []).length));
+    if (sale.cart_discount_amount !== "0.00") {
+      out.push("Cart discount (" + sale.cart_discount_label + "): -₹" + sale.cart_discount_amount);
+    }
+    out.push("Subtotal: ₹" + (sale.receipt_subtotal || sale.subtotal));
+    if (sale.tax !== "0.00") out.push((sale.tax_label || "Tax (GST included)") + ": ₹" + sale.tax);
+    out.push("*TOTAL: ₹" + sale.total + "*");
+    (sale.payment_lines || []).forEach((p) => out.push(p.label + ": ₹" + p.amount));
+    out.push("Paid amount: ₹" + sale.paid_amount, "Change: ₹" + sale.change);
+    if (sale.due !== "0.00") out.push("Balance due: ₹" + sale.due);
+    if (store.footer || FOOTER) out.push("", store.footer || FOOTER);
+    out.push("", "Our Website", "www.Artyflakes.com", "Artyflakes Brand", "Manage By Hitesh Sales");
     return out.join("\n");
   }
 

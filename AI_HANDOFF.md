@@ -83,6 +83,27 @@ Some checks were run before later additions, so rerun the focused suites after c
 .\venv\Scripts\python.exe manage.py makemigrations --check --dry-run
 ```
 
+## Recent POS UI, navigation, and login work
+
+- Corrected the top-bar settings link to open the existing Store Settings page instead of Django admin.
+- Prevented long product names from overlapping the POS quantity control.
+- Added the F4 quantity dialog and connected Cash In / Out to the existing cash movement flow.
+- Replaced the Reports product and product-group dropdowns with themed searchable suggestions.
+- Activated top-bar search for the current user's rendered menu links, including submenu entries.
+- Enabled POS camera barcode scanning from the mobile-friendly Scan Barcode button. The scanner loads a pinned HTML5 QR Code/ZXing browser library on demand, requests the rear camera, supports common retail barcode formats, and sends decoded values through exact product lookup. A secure HTTPS context and camera permission are required on phones.
+- Redesigned the staff login as a responsive branded sign-in page with password visibility, submit loading/disabled states, generic credential errors, and a “Keep me signed in” option. The option uses a 14-day session; unchecked sessions expire when the browser closes.
+- Preserved Django authentication, CSRF enforcement, and safe `next` redirects. A CSRF mismatch on the login POST now redirects to a freshly tokenized login page with a retry notice; the rejected POST is never processed. Other CSRF failures continue through Django's default handler.
+
+Related implementation and regression coverage includes `accounts/views.py`, `accounts/urls.py`, `accounts/tests.py`, `config/settings.py`, `templates/accounts/login.html`, `templates/base.html`, `static/css/app.css`, `static/css/pos.css`, `static/js/pos.js`, `static/js/app.js`, `reports/views.py`, and `templates/reports/index.html`.
+
+Verification performed during this work:
+
+- The five login tests and `python manage.py check` pass.
+- Browser checks confirmed password visibility, submit loading/disabled state, and recovery from an invalid CSRF token without disabling CSRF protection.
+- Responsive login checks at 375, 390, 430, 768, 1280, 1366, 1440, and 1920 pixels found no horizontal overflow.
+- POS screen/cash movement and barcode search tests passed (10 combined); `node --check static/js/pos.js` passed, and the scanner library CDN URL returned HTTP 200.
+- The Reports test suite (32 tests), other cash movement tests, JavaScript syntax checks, and menu-search checks passed at their respective change points.
+
 ## Suggested next steps
 
 1. Inspect `git status --short` and `git diff` before editing. The repo contains multiple uncommitted changes from this work.

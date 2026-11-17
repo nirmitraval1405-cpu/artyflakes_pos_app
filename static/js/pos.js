@@ -17,6 +17,7 @@
   const body = $("cartBody");
   const empty = $("cartEmpty");
   const searchInput = $("posSearch");
+  const scanButton = $("scanBtn");
   const resultsBox = $("posResults");
   const noteBar = $("posNote");
   const SEARCH_URL = searchInput.dataset.url;
@@ -252,7 +253,7 @@
 
   // ---------- Dialogs ----------
   const backdrop = $("dlgBackdrop");
-  const dialogs = ["dlgPay", "dlgDisc", "dlgCust", "dlgDone", "dlgPrice", "dlgHeld", "dlgDrawer", "dlgRefund", "dlgCash", "dlgQuantity", "dlgPrint"].map($);
+  const dialogs = ["dlgPay", "dlgDisc", "dlgCust", "dlgDone", "dlgPrice", "dlgHeld", "dlgDrawer", "dlgRefund", "dlgCash", "dlgQuantity", "dlgPrint", "dlgScanBarcode"].map($);
 
   function openDialog(id) {
     dialogs.forEach((d) => (d.hidden = d.id !== id));
@@ -265,7 +266,9 @@
   }
 
   function closeDialogs() {
+    const scannerWasOpen = !$("dlgScanBarcode").hidden;
     hideDialogs();
+    if (scannerWasOpen) stopBarcodeScanner();
     searchInput.focus();
   }
 
@@ -619,15 +622,17 @@
       const res = await fetch(SEARCH_URL + "?q=" + encodeURIComponent(q), { credentials: "same-origin" });
       if (!res.ok) throw new Error("bad status");
       const data = await res.json();
-      if (id !== reqId) return;
+      if (id !== reqId) return false;
       hits = data.results;
       active = 0;
       lastQuery = q;
       renderResults();
+      return true;
     } catch (err) {
-      if (id !== reqId) return;
+      if (id !== reqId) return false;
       showNote("Search failed. Check that the server is running and try again.");
       closeResults();
+      return false;
     }
   }
 
@@ -644,6 +649,195 @@
     closeResults();
     searchInput.focus();
   }
+
+  let barcodeScanner = null;
+  let barcodeScannerLoad = null;
+  let barcodeScannerSession = 0;
+  let barcodeScannerStarting = false;
+  let barcodeScanHandled = false;
+
+  function loadBarcodeScannerLibrary() {
+    if (window.Html5Qrcode && window.Html5QrcodeSupportedFormats) return Promise.resolve();
+    if (!barcodeScannerLoad) {
+      barcodeScannerLoad = new Promise((resolve, reject) => {
+        const script = document.createElement("script");
+        script.src = "https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js";
+        script.async = true;
+        script.integrity = "sha384-c9d8RFSL+u3exBOJ4Yp3HUJXS4znl9f+z66d1y54ig+ea249SpqR+w1wyvXz/lk+";
+        script.crossOrigin = "anonymous";
+        script.referrerPolicy = "no-referrer";
+        script.onload = () => {
+          if (window.Html5Qrcode && window.Html5QrcodeSupportedFormats) {
+            resolve();
+          } else {
+            barcodeScannerLoad = null;
+            const error = new Error("Barcode scanning support could not be initialized.");
+            error.code = "SCANNER_LIBRARY";
+            reject(error);
+          }
+        };
+        script.onerror = () => {
+          script.remove();
+          barcodeScannerLoad = null;
+          const error = new Error("Could not load barcode scanning support. Check your internet connection and try again.");
+          error.code = "SCANNER_LIBRARY";
+          reject(error);
+        };
+        document.head.appendChild(script);
+      });
+    }
+    return barcodeScannerLoad;
+  }
+
+  function barcodeCameraError(error) {
+    if (error && error.code === "SCANNER_LIBRARY") return error.message;
+    if (error && (error.name === "NotAllowedError" || error.name === "PermissionDeniedError")) {
+      return "Camera permission was denied. Allow camera access in your browser and try again.";
+    }
+    if (error && (error.name === "NotFoundError" || error.name === "DevicesNotFoundError")) {
+      return "No camera was found on this device.";
+    }
+    if (error && (error.name === "NotReadableError" || error.name === "TrackStartError")) {
+      return "The camera is busy in another app. Close it there and try again.";
+    }
+    return "Unable to open the camera. Check camera permissions and try again.";
+  }
+
+  async function disposeBarcodeScanner(scanner) {
+    let failed = false;
+    try {
+      if (scanner.isScanning) await scanner.stop();
+    } catch (error) {
+      failed = true;
+      console.error("Could not stop the barcode camera", error);
+    }
+    try {
+      scanner.clear();
+    } catch (error) {
+      failed = true;
+      console.error("Could not clear the barcode camera preview", error);
+    }
+    if (failed) showNote("The camera could not be closed cleanly. Close this page to release it.");
+  }
+
+  function stopBarcodeScanner() {
+    barcodeScannerSession += 1;
+    const scanner = barcodeScanner;
+    barcodeScanner = null;
+    if (!scanner || barcodeScannerStarting) return;
+    void disposeBarcodeScanner(scanner);
+  }
+
+  async function searchScannedBarcode(barcode) {
+    clearTimeout(timer);
+    searchInput.value = barcode;
+    hits = [];
+    lastQuery = null;
+    closeResults();
+
+    const searched = await runSearch(barcode);
+    if (!searched || searchInput.value.trim() !== barcode) return;
+
+    const exact = hits.find((product) => product.exact);
+    if (exact) {
+      pick(exact);
+    } else if (hits.length) {
+      active = 0;
+      renderResults();
+      showNote("Barcode scanned. Select the matching product from the results.");
+    } else {
+      showNote(`No product found for barcode "${barcode}".`);
+    }
+  }
+
+  async function acceptScannedBarcode(value, session) {
+    const barcode = String(value || "").trim();
+    if (!barcode || session !== barcodeScannerSession || barcodeScanHandled) return;
+
+    barcodeScanHandled = true;
+    $("barcodeScanStatus").textContent = "Barcode detected. Looking up the product...";
+    const scanner = barcodeScanner;
+    barcodeScanner = null;
+    barcodeScannerSession += 1;
+    hideDialogs();
+    searchInput.focus();
+
+    if (scanner && !barcodeScannerStarting) await disposeBarcodeScanner(scanner);
+    await searchScannedBarcode(barcode);
+  }
+
+  async function startBarcodeScanner() {
+    if (barcodeScannerStarting) {
+      showNote("The camera is still starting. Please wait.");
+      return;
+    }
+    if (!window.isSecureContext) {
+      showNote("Camera scanning requires HTTPS on your phone. Open the POS over a secure connection.");
+      return;
+    }
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      showNote("This browser does not allow camera access. Use a current mobile browser or enter the barcode manually.");
+      return;
+    }
+
+    closeResults();
+    openDialog("dlgScanBarcode");
+    $("barcodeScanStatus").textContent = "Loading barcode scanner...";
+    barcodeScanHandled = false;
+    const session = ++barcodeScannerSession;
+    let scanner = null;
+
+    try {
+      await loadBarcodeScannerLibrary();
+      if (session !== barcodeScannerSession) return;
+
+      const formats = window.Html5QrcodeSupportedFormats;
+      const scannerFormats = [
+        formats.EAN_13,
+        formats.EAN_8,
+        formats.UPC_A,
+        formats.UPC_E,
+        formats.CODE_128,
+        formats.CODE_39,
+        formats.CODE_93,
+        formats.ITF,
+        formats.CODABAR,
+      ];
+      scanner = new window.Html5Qrcode("barcodeReader", {
+        formatsToSupport: scannerFormats,
+        verbose: false,
+      });
+      barcodeScanner = scanner;
+      $("barcodeScanStatus").textContent = "Requesting camera access...";
+      barcodeScannerStarting = true;
+      try {
+        const scanWidth = Math.min(320, Math.max(180, window.innerWidth - 96));
+        await scanner.start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: { width: scanWidth, height: 120 }, aspectRatio: 1.7778 },
+          (decodedText) => { void acceptScannedBarcode(decodedText, session); },
+          () => {},
+        );
+      } finally {
+        barcodeScannerStarting = false;
+      }
+
+      if (session !== barcodeScannerSession) {
+        if (barcodeScanner === scanner) barcodeScanner = null;
+        await disposeBarcodeScanner(scanner);
+        return;
+      }
+      $("barcodeScanStatus").textContent = "Camera ready. Center the barcode in the frame.";
+    } catch (error) {
+      barcodeScannerStarting = false;
+      if (scanner && barcodeScanner === scanner) barcodeScanner = null;
+      if (scanner) await disposeBarcodeScanner(scanner);
+      if (session === barcodeScannerSession) $("barcodeScanStatus").textContent = barcodeCameraError(error);
+      console.error("Barcode camera startup failed", error);
+    }
+  }
+
+  scanButton.addEventListener("click", startBarcodeScanner);
 
   searchInput.addEventListener("input", () => {
     clearTimeout(timer);

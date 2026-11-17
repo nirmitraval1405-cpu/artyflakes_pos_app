@@ -51,7 +51,7 @@
       <thead>
         <tr>
           <th>Invoice</th><th>Date</th><th>Customer</th><th>Cashier</th><th>Paid by</th>
-          <th class="num">Total</th><th>Status</th>
+          <th class="num">Total</th><th>Status</th>{% if can_manage %}<th>Actions</th>{% endif %}
         </tr>
       </thead>
       <tbody>
@@ -68,9 +68,21 @@
             {% else %}<span class="st st-ok">Completed</span>{% endif %}
             {% if s.return_count %}<span class="tag">Returns: {{ s.return_count }}</span>{% endif %}
           </td>
+          {% if can_manage %}
+          <td>
+            {% if not s.return_count %}
+            <form method="post" action="{% url 'pos:sale_delete' s.pk %}" class="d-inline">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-sm btn-outline-danger">
+                <i class="bi bi-trash" aria-hidden="true"></i> Delete
+              </button>
+            </form>
+            {% endif %}
+          </td>
+          {% endif %}
         </tr>
         {% empty %}
-        <tr><td colspan="7" class="grid-empty">No bills match these filters.</td></tr>
+        <tr><td colspan="{% if can_manage %}8{% else %}7{% endif %}" class="grid-empty">No bills match these filters.</td></tr>
         {% endfor %}
       </tbody>
     </table>

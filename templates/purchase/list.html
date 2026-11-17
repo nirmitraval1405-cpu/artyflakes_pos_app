@@ -90,6 +90,12 @@
             <td>
               <div class="d-flex gap-2">
                 <a href="{% url 'purchase:detail' purchase.pk %}" class="btn btn-sm btn-outline-secondary">View</a>
+                <form method="post" action="{% url 'purchase:delete' purchase.pk %}">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-sm btn-outline-danger">
+                    <i class="bi bi-trash" aria-hidden="true"></i> Delete
+                  </button>
+                </form>
               </div>
             </td>
           </tr>

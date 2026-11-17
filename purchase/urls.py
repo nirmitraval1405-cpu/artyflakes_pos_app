@@ -11,4 +11,5 @@ urlpatterns = [
     path("<int:pk>/", views.purchase_detail, name="detail"),
     path("<int:pk>/payment/", views.PurchasePaymentCreate.as_view(), name="payment"),
     path("<int:pk>/cancel/", views.purchase_cancel, name="cancel"),
+    path("<int:pk>/delete/", views.purchase_delete, name="delete"),
 ]

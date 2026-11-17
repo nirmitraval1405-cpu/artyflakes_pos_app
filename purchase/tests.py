@@ -10,8 +10,8 @@ from inventory.models import Product, StockMovement
 from inventory.stock import current_stock
 from people.models import Contact
 
-from .models import Purchase
-from .services import PurchaseError, add_payment, cancel_purchase, create_purchase, parse_lines
+from .models import Purchase, PurchasePayment
+from .services import PurchaseError, add_payment, cancel_purchase, create_purchase, delete_purchase, parse_lines
 
 
 def post_of(rows):
@@ -144,6 +144,45 @@ class PurchaseServiceTests(TestCase):
         text = " ".join(warnings)
         self.assertIn("Resin", text)
         self.assertIn("already paid", text)
+
+    def test_delete_removes_purchase_and_payments_and_reverses_stock(self):
+        purchase, _ = self.buy(
+            [{"product": self.resin.pk, "qty": "10", "cost": "100"}],
+            pay="200",
+        )
+        add_payment(self.admin, purchase.pk, {"amount": "100", "method": "upi"})
+        purchase_no = purchase.purchase_no
+
+        deleted_no, warnings = delete_purchase(self.admin, purchase.pk)
+
+        self.assertEqual(deleted_no, purchase_no)
+        self.assertFalse(Purchase.objects.filter(pk=purchase.pk).exists())
+        self.assertFalse(PurchasePayment.objects.filter(purchase_id=purchase.pk).exists())
+        self.assertEqual(current_stock(self.resin), Decimal("0"))
+        self.assertEqual(
+            StockMovement.objects.get(
+                reference=purchase_no,
+                movement_type=StockMovement.Type.PURCHASE_RETURN,
+            ).quantity,
+            Decimal("-10"),
+        )
+        self.assertTrue(any("recover the money outside the system" in warning for warning in warnings))
+
+    def test_deleting_a_cancelled_purchase_does_not_reverse_stock_twice(self):
+        purchase, _ = self.buy([{"product": self.resin.pk, "qty": "10"}])
+        cancel_purchase(self.admin, purchase.pk, "Wrong supplier")
+
+        delete_purchase(self.admin, purchase.pk)
+
+        self.assertFalse(Purchase.objects.filter(pk=purchase.pk).exists())
+        self.assertEqual(current_stock(self.resin), Decimal("0"))
+        self.assertEqual(
+            StockMovement.objects.filter(
+                reference=purchase.purchase_no,
+                movement_type=StockMovement.Type.PURCHASE_RETURN,
+            ).count(),
+            1,
+        )
         
 class PurchaseFormTests(TestCase):
     def setUp(self):
@@ -189,3 +228,15 @@ class PurchaseFormTests(TestCase):
         self.client.logout()
         self.client.login(username="p_cash2", password="pw12345!")
         self.assertEqual(self.client.get(self.url).status_code, 403)
+
+    def test_purchase_list_has_a_delete_action(self):
+        self.client.post(self.url, self.data())
+        purchase = Purchase.objects.get()
+        delete_url = reverse("purchase:delete", args=[purchase.pk])
+        self.assertContains(self.client.get(reverse("purchase:list")), delete_url)
+
+        response = self.client.post(delete_url)
+
+        self.assertRedirects(response, reverse("purchase:list"))
+        self.assertFalse(Purchase.objects.filter(pk=purchase.pk).exists())
+        self.assertEqual(current_stock(self.resin), Decimal("0"))

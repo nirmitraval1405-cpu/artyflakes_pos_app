@@ -720,3 +720,155 @@
 .st-na  { background: var(--cream);      color: var(--muted); }
 .qty-in  { color: #5e6f4b; font-weight: 600; }
 .qty-out { color: #a85a5a; font-weight: 600; }
+
+/* ---------- Product barcode scanner ---------- */
+.product-barcode-scan-status {
+    min-height: 1.5em;
+    margin-bottom: .75rem;
+    color: var(--muted);
+}
+
+.product-barcode-reader {
+    min-height: 180px;
+    overflow: hidden;
+    border-radius: 8px;
+    background: #211b1b;
+}
+
+.product-barcode-reader video {
+    display: block;
+    width: 100% !important;
+    max-height: 58vh;
+    object-fit: cover;
+}
+
+.product-barcode-reader.is-detected {
+    outline: 3px solid #5e9f68;
+    outline-offset: -3px;
+}
+
+.product-barcode-detected {
+    margin-top: .75rem;
+    color: #367344;
+    font-weight: 600;
+}
+
+.product-barcode-camera-select {
+    width: auto;
+    max-width: 13rem;
+}
+
+.product-barcode-scan-success {
+    animation: product-barcode-scan-success 900ms ease-out;
+}
+
+@keyframes product-barcode-scan-success {
+    0%, 45% { box-shadow: 0 0 0 .25rem rgb(94 159 104 / 30%); }
+    100% { box-shadow: none; }
+}
+
+@media (max-width: 575.98px) {
+    .product-barcode-reader {
+        min-height: 150px;
+    }
+
+    .product-barcode-reader video {
+        max-height: 52dvh;
+    }
+
+    #productBarcodeScanner .modal-footer {
+        flex-wrap: wrap;
+    }
+
+    .product-barcode-camera-select {
+        flex: 1 1 100%;
+        max-width: none;
+    }
+}
+
+@media (max-width: 575.98px) {
+    .website-orders-list .grid-wrap,
+    .website-order-detail .grid-wrap {
+        min-height: 0;
+        overflow: visible;
+    }
+
+    .website-orders-table,
+    .website-order-items {
+        display: block;
+        border-collapse: separate;
+    }
+
+    .website-orders-table thead,
+    .website-order-items thead {
+        display: none;
+    }
+
+    .website-orders-table tbody,
+    .website-order-items tbody {
+        display: grid;
+        gap: .7rem;
+        padding: .7rem;
+    }
+
+    .website-orders-table tbody tr,
+    .website-order-items tbody tr {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: .4rem .65rem;
+        min-width: 0;
+        padding: .7rem;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: #fff;
+        box-shadow: 0 3px 10px rgb(80 64 65 / 5%);
+    }
+
+    .website-orders-table td,
+    .website-order-items td {
+        display: flex;
+        flex-direction: column;
+        gap: .1rem;
+        min-width: 0;
+        padding: .3rem .15rem;
+        border: 0;
+        white-space: normal;
+        text-align: left;
+        overflow-wrap: anywhere;
+    }
+
+    .website-orders-table td::before,
+    .website-order-items td::before {
+        color: var(--muted);
+        font-size: .64rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: .035em;
+        content: attr(data-label);
+    }
+
+    .website-orders-table td:nth-child(1),
+    .website-orders-table td:nth-child(3),
+    .website-orders-table td:nth-child(8),
+    .website-order-items td:nth-child(1),
+    .website-order-items td:nth-child(5) {
+        grid-column: 1 / -1;
+    }
+
+    .website-orders-table td:nth-child(1),
+    .website-order-items td:nth-child(1) {
+        color: var(--primary);
+        font-weight: 650;
+    }
+
+    .website-orders-table td.grid-empty {
+        display: block;
+        grid-column: 1 / -1;
+        padding: 1.5rem .75rem !important;
+        text-align: center;
+    }
+
+    .website-orders-table td.grid-empty::before {
+        content: none;
+    }
+}

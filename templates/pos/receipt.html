@@ -27,18 +27,22 @@
   {% if sale.status == 'voided' %}<div class="void-banner">VOIDED</div>{% endif %}
 
   <div class="r-center">
-    <h1>{{ store.name }}</h1>
+    <h1>{{ store.name|default:"Artyflakes" }}</h1>
     {% if store.tagline %}<div>{{ store.tagline }}</div>{% endif %}
     {% if store.address %}<div>{{ store.address|linebreaksbr }}</div>{% endif %}
-    {% if store.phone %}<div>Ph: {{ store.phone }}</div>{% endif %}
-    {% if store.gstin %}<div>GSTIN: {{ store.gstin }}</div>{% endif %}
+    {% if store.gstin %}<div>Tax/GST No.: {{ store.gstin }}</div>{% endif %}
+    {% if store.phone %}<div>Phone: {{ store.phone }}</div>{% endif %}
+    {% if store.email %}<div>Email: {{ store.email }}</div>{% endif %}
+    <div>www.Artyflakes.com</div>
   </div>
   <hr>
 
-  <div class="r-row"><span>{{ L.invoice }}</span><strong>{% if ps.r_short_no %}{{ short_no }}{% else %}{{ sale.invoice_no }}{% endif %}</strong></div>
+  <div class="r-meta">
+    <div><strong>Receipt No.: {% if ps.r_short_no %}{{ short_no }}{% else %}{{ sale.invoice_no }}{% endif %}</strong></div>
+    <div>Date &amp; Time: {{ sale.created_at|date:"d.m.Y. H:i:s" }}</div>
+    <div>User: {{ cashier_name }}</div>
+  </div>
   {% if ps.r_order_no and order_no %}<div class="r-row"><span>{{ L.order_no }}</span><span>{{ order_no }}</span></div>{% endif %}
-  <div class="r-row"><span>{{ L.date }}</span><span>{{ sale.created_at|date:"d-m-Y H:i" }}</span></div>
-  <div class="r-row"><span>{{ L.cashier }}</span><span>{{ cashier_name }}</span></div>
   {% if not walk_in %}
     {% if ps.r_cust_name %}<div class="r-row"><span>{{ L.customer }}</span><span>{{ sale.customer.name }}</span></div>{% endif %}
     {% if ps.r_cust_code and sale.customer.code %}<div class="r-row"><span>Code</span><span>{{ sale.customer.code }}</span></div>{% endif %}
@@ -50,42 +54,40 @@
   {% for it in items %}
   <div class="r-name">{{ it.name }}</div>
   <div class="r-line">
-    <span>{{ it.qty|floatformat:"-3" }}{% if ps.r_unit and it.unit %} {{ it.unit }}{% endif %} x {{ it.price|floatformat:ps.money_fmt }}{% if it.discount > 0 %} (-{{ it.discount|floatformat:ps.money_fmt }}){% endif %}{% if ps.r_item_gst and it.gst_rate > 0 %} GST {{ it.gst_rate|floatformat:"-2" }}%{% endif %}</span>
-    <span>{{ it.total|floatformat:ps.money_fmt }}</span>
+    <span>{{ it.qty|floatformat:"-3" }}x ₹{{ it.base_rate|floatformat:ps.money_fmt }}{% if it.discount_label %} ({{ it.discount_label }}){% endif %}</span>
+    <strong>₹{{ it.total|floatformat:ps.money_fmt }}</strong>
   </div>
   {% endfor %}
   <hr>
 
-  {% if ps.r_summary == "count" %}
-  <div class="r-row r-small"><span>{{ L.n_items }}</span><span>{{ items_count }}</span></div>
-  {% elif ps.r_summary == "qty" %}
-  <div class="r-row r-small"><span>{{ L.n_qty }}</span><span>{{ qty_total|floatformat:"-3" }}</span></div>
+  <div class="r-row"><span>Items count:</span><span>{{ total_items_count|floatformat:"-3" }}</span></div>
+  <div class="r-spacer"></div>
+  {% if sale.bill_discount > 0 %}
+  <div class="r-row"><span>Cart discount ({{ cart_discount_label }}):</span><span>-₹{{ sale.bill_discount|floatformat:ps.money_fmt }}</span></div>
   {% endif %}
-  <div class="r-row"><span>{{ L.subtotal }}</span><span>{{ sale.subtotal|floatformat:ps.money_fmt }}</span></div>
-  {% if sale.discount_total > 0 %}
-  <div class="r-row"><span>{{ L.discount }}</span><span>-{{ sale.discount_total|floatformat:ps.money_fmt }}</span></div>
+  <div class="r-row"><span>Subtotal:</span><span>₹{{ receipt_subtotal|floatformat:ps.money_fmt }}</span></div>
+  {% if sale.tax_total > 0 %}
+  <div class="r-row r-small"><span>{{ tax_label }}:</span><span>₹{{ sale.tax_total|floatformat:ps.money_fmt }}</span></div>
   {% endif %}
-  <div class="r-row r-total"><span>{{ L.total }}</span><span>{{ sale.total|floatformat:ps.money_fmt }}</span></div>
-  {% if ps.r_tax_totals and sale.tax_total > 0 %}
-  <div class="r-row r-small"><span>{{ L.gst_included }}</span><span>{{ sale.tax_total|floatformat:ps.money_fmt }}</span></div>
-  <div class="r-row r-small"><span>CGST</span><span>{{ cgst_total|floatformat:ps.money_fmt }}</span></div>
-  <div class="r-row r-small"><span>SGST</span><span>{{ sgst_total|floatformat:ps.money_fmt }}</span></div>
-  {% endif %}
-  <hr>
-
+  <div class="r-row r-total"><strong>TOTAL:</strong><strong>₹{{ sale.total|floatformat:ps.money_fmt }}</strong></div>
   {% for p in pay_lines %}
-  <div class="r-row"><span>{{ p.label }}{% if p.reference %} ({{ p.reference }}){% endif %}</span><span>{{ p.amount|floatformat:ps.money_fmt }}</span></div>
+  <div class="r-row"><span>{{ p.label }}:{% if p.reference %} ({{ p.reference }}){% endif %}</span><span>₹{{ p.amount|floatformat:ps.money_fmt }}</span></div>
   {% endfor %}
-  {% if sale.change_due > 0 %}
-  <div class="r-row"><span>{{ L.change }}</span><span>{{ sale.change_due|floatformat:ps.money_fmt }}</span></div>
-  {% endif %}
+  <div class="r-row"><span>Paid amount:</span><span>₹{{ paid_total|floatformat:ps.money_fmt }}</span></div>
+  <div class="r-row"><span>Change:</span><span>₹{{ sale.change_due|floatformat:ps.money_fmt }}</span></div>
   {% if balance_due > 0 %}
-  <div class="r-row"><strong>Balance due</strong><strong>{{ balance_due|floatformat:ps.money_fmt }}</strong></div>
+  <div class="r-row"><strong>Balance due:</strong><strong>₹{{ balance_due|floatformat:ps.money_fmt }}</strong></div>
   {% endif %}
 
   {% if sale.note %}<hr><div class="r-note">{{ L.note }}: {{ sale.note }}</div>{% endif %}
   <hr>
-  <div class="r-center r-small">{{ store.footer }}</div>
+  <div class="r-center r-small">
+    {% if store.footer %}<div>{{ store.footer|linebreaksbr }}</div>{% endif %}
+    <div>Our Website</div>
+    <div>www.Artyflakes.com</div>
+    <div>Artyflakes Brand</div>
+    <div>Manage By Hitesh Sales</div>
+  </div>
 </div>
 
 <script>

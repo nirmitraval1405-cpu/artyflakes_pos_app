@@ -15,16 +15,22 @@
     <h3>Welcome, {{ user.get_full_name|default:user.username }}</h3>
     <p>Here is an overview of your store.</p>
   </div>
-  <div class="date-chip"><i class="bi bi-calendar3 me-1"></i> {{ today|date:"d/m/Y" }}</div>
+  <form class="date-filter" method="get" aria-label="Filter dashboard by date">
+    <label class="date-chip">
+      <i class="bi bi-calendar3 me-1" aria-hidden="true"></i>
+      <input type="date" name="date" value="{{ selected_date|date:'Y-m-d' }}" aria-label="Select dashboard date">
+    </label>
+  </form>
 </div>
 
 <div class="d-flex align-items-center flex-wrap mb-1">
   <div class="range-tabs" id="dashboardRangeTabs" data-chart-url="{% url 'dashboard:sales_statistics' %}">
     {% for key, label in ranges %}
-      <a class="{% if key == range_key %}active{% endif %}" {% if key == range_key %}aria-current="page"{% endif %} data-range="{{ key }}" href="?range={{ key }}">{{ label }}</a>
+      <a class="{% if not date_filter_active and key == range_key %}active{% endif %}" {% if not date_filter_active and key == range_key %}aria-current="page"{% endif %} data-range="{{ key }}" href="?range={{ key }}">{{ label }}</a>
     {% endfor %}
   </div>
-  {% if range_key != "today" %}<span class="period-note">{{ period_text }}</span>{% endif %}
+  {% if date_filter_active %}<span class="period-note">Selected date: {{ period_text }}</span>
+  {% elif range_key != "today" %}<span class="period-note">{{ period_text }}</span>{% endif %}
 </div>
 
 <!-- Primary cards -->
@@ -245,6 +251,8 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
 <script>
   (function () {
+    const dateInput = document.querySelector(".date-filter input[type='date']");
+    if (dateInput) dateInput.addEventListener("change", () => dateInput.form.submit());
     if (typeof Chart === "undefined") return;
     const data = JSON.parse(document.getElementById("dashData").textContent);
     const styles = getComputedStyle(document.querySelector(".dashboard-page"));

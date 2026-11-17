@@ -1,4 +1,5 @@
 import json
+import re
 from decimal import Decimal
 
 from django.db import IntegrityError, transaction
@@ -10,7 +11,7 @@ from inventory.models import Product, StockMovement
 from inventory.stock import current_stock
 from people.models import Contact
 
-from .models import CashMovement, CreditPayment, InvoiceCounter, Payment, Sale
+from .models import CashMovement, CreditPayment, InvoiceCounter, Payment, Sale, SaleReturn
 from .services import compute_bill, div_round
 
 
@@ -130,6 +131,81 @@ class CheckoutTests(TestCase):
 
     def post(self, data):
         return self.client.post(self.url, data=json.dumps(data), content_type="application/json")
+
+    def test_admin_can_delete_sale_and_restore_stock_and_remove_payments(self):
+        self.post(self.body())
+        sale = Sale.objects.get()
+        CreditPayment.objects.create(
+            sale=sale,
+            user=self.cashier,
+            method=Payment.Method.CASH,
+            amount=Decimal("50.00"),
+        )
+
+        self.client.force_login(self.admin)
+        list_response = self.client.get(reverse("pos:sale_list"))
+        self.assertContains(list_response, reverse("pos:sale_delete", args=[sale.pk]))
+
+        self.client.force_login(self.cashier)
+        response = self.client.post(reverse("pos:sale_delete", args=[sale.pk]))
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(Sale.objects.filter(pk=sale.pk).exists())
+
+        self.client.force_login(self.admin)
+        response = self.client.post(reverse("pos:sale_delete", args=[sale.pk]))
+
+        self.assertRedirects(response, reverse("pos:sale_list"))
+        self.assertFalse(Sale.objects.filter(pk=sale.pk).exists())
+        self.assertFalse(Payment.objects.filter(sale_id=sale.pk).exists())
+        self.assertFalse(CreditPayment.objects.filter(sale_id=sale.pk).exists())
+        self.assertEqual(current_stock(self.product), Decimal("5"))
+        reversal = StockMovement.objects.get(
+            reference=sale.invoice_no,
+            movement_type=StockMovement.Type.SALE_RETURN,
+        )
+        self.assertEqual(reversal.quantity, Decimal("2"))
+        self.assertEqual(reversal.note, "Sale deleted")
+
+    def test_sale_with_a_return_cannot_be_deleted(self):
+        self.post(self.body())
+        sale = Sale.objects.get()
+        SaleReturn.objects.create(
+            return_no="AF-R-2026-TEST",
+            sale=sale,
+            processed_by=self.admin,
+            refund_method=Payment.Method.CASH,
+            refund_total=Decimal("100.00"),
+        )
+        self.client.force_login(self.admin)
+
+        response = self.client.post(reverse("pos:sale_delete", args=[sale.pk]), follow=True)
+
+        self.assertTrue(Sale.objects.filter(pk=sale.pk).exists())
+        self.assertEqual(current_stock(self.product), Decimal("3"))
+        self.assertTrue(Payment.objects.filter(sale_id=sale.pk).exists())
+        self.assertContains(response, "cannot be permanently deleted")
+
+    def test_deleting_a_voided_sale_does_not_restore_stock_twice(self):
+        self.post(self.body())
+        sale = Sale.objects.get()
+        self.client.force_login(self.admin)
+        self.client.post(
+            reverse("pos:sale_void", args=[sale.pk]),
+            {"reason": "Entered incorrectly"},
+        )
+
+        response = self.client.post(reverse("pos:sale_delete", args=[sale.pk]))
+
+        self.assertRedirects(response, reverse("pos:sale_list"))
+        self.assertFalse(Sale.objects.filter(pk=sale.pk).exists())
+        self.assertEqual(current_stock(self.product), Decimal("5"))
+        self.assertEqual(
+            StockMovement.objects.filter(
+                reference=sale.invoice_no,
+                movement_type=StockMovement.Type.SALE_RETURN,
+            ).count(),
+            1,
+        )
 
     def test_sale_is_saved_and_stock_goes_down(self):
         response = self.post(self.body())
@@ -372,6 +448,18 @@ class CashMovementTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'data-promo-url="/api/promotions/"')
 
+    def test_pos_screen_enables_camera_barcode_scanning(self):
+        response = self.client.get(reverse("pos:screen"))
+        scan_button = re.search(
+            r'<button\b[^>]*\bid="scanBtn"[^>]*>',
+            response.content.decode(),
+        )
+
+        self.assertIsNotNone(scan_button)
+        self.assertNotRegex(scan_button.group(0), r"\bdisabled\b")
+        self.assertContains(response, 'id="dlgScanBarcode"')
+        self.assertContains(response, 'id="barcodeReader"')
+
     def test_pos_header_links_to_website_orders(self):
         response = self.client.get(reverse("pos:screen"))
         self.assertEqual(response.status_code, 200)
@@ -517,18 +605,126 @@ class BillPrintTests(TestCase):
         self.assertContains(response, self.sale.invoice_no)
         self.assertContains(response, "500.00")
 
-    def test_receipt_shows_gst_split(self):
+    def test_receipt_shows_included_tax(self):
         response = self.client.get(reverse("pos:receipt", args=[self.sale.pk]))
-        self.assertContains(response, "Includes GST")
-        self.assertContains(response, "CGST")
-        self.assertContains(response, "SGST")
-        self.assertContains(response, "38.14")
-
-    def test_invoice_shows_the_gst_split(self):
-        response = self.client.get(reverse("pos:invoice", args=[self.sale.pk]))
-        self.assertContains(response, "CGST")
+        self.assertContains(response, "Tax 18% (GST included)")
         self.assertContains(response, "76.27")
-        self.assertContains(response, "38.14")
+        self.assertContains(response, "₹")
+        self.assertContains(response, "Items count:")
+        self.assertContains(response, "2x ₹300.00 (-16.67%)")
+
+    def test_checkout_and_prints_keep_item_and_cart_discount_breakdown(self):
+        admin = User.objects.get(username="boss2")
+        self.client.force_login(admin)
+        product = self.sale.items.get().product
+        response = self.client.post(
+            reverse("pos:checkout"),
+            data=json.dumps({
+                "items": [{
+                    "product_id": product.pk,
+                    "quantity": "1",
+                    "discount": {"type": "percent", "value": "10"},
+                }],
+                "bill_discount": {"type": "percent", "value": "10"},
+                "payments": [{"method": "cash", "amount": "220.00"}],
+            }),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        result = response.json()
+        sale = Sale.objects.get(invoice_no=result["invoice_no"])
+        item = sale.items.get()
+        self.assertEqual((item.discount_type, item.discount_value), ("percent", Decimal("10.00")))
+        self.assertEqual(item.bill_discount_share, Decimal("22.50"))
+        self.assertEqual((sale.bill_discount_type, sale.bill_discount_value), ("percent", Decimal("10.00")))
+        self.assertEqual(result["receipt_subtotal"], "225.00")
+        self.assertEqual(result["cart_discount_amount"], "22.50")
+        self.assertEqual(result["paid_amount"], "202.50")
+        self.assertEqual(result["payment_lines"], [{"label": "Cash", "amount": "220.00"}])
+        self.assertEqual(result["change"], "17.50")
+        self.assertEqual(result["lines"][0]["discount_label"], "-25.00%")
+
+        receipt = self.client.get(reverse("pos:receipt", args=[sale.pk]))
+        self.assertContains(receipt, "1x ₹300.00 (-25.00%)")
+        self.assertContains(receipt, "Cart discount (10%)")
+        self.assertContains(receipt, "Subtotal:")
+        self.assertContains(receipt, "Paid amount:")
+        self.assertContains(receipt, "Change:")
+
+        invoice = self.client.get(reverse("pos:invoice", args=[sale.pk]))
+        self.assertContains(invoice, "MRP")
+        self.assertContains(invoice, "Cart discount (10%)")
+        self.assertContains(invoice, "Unit price")
+        self.assertContains(invoice, "Discount")
+        self.assertContains(invoice, "Total")
+        self.assertContains(invoice, "₹202.50")
+
+    def test_fixed_discount_metadata_and_mrp_savings_are_printed(self):
+        self.client.force_login(User.objects.get(username="boss2"))
+        product = self.sale.items.get().product
+        response = self.client.post(
+            reverse("pos:checkout"),
+            data=json.dumps({
+                "items": [{
+                    "product_id": product.pk,
+                    "quantity": "1",
+                    "discount": {"type": "amount", "value": "10.00"},
+                }],
+                "bill_discount": {"type": "amount", "value": "10.00"},
+                "payments": [{"method": "cash", "amount": "230.00"}],
+            }),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        sale = Sale.objects.get(invoice_no=response.json()["invoice_no"])
+        item = sale.items.get()
+        self.assertEqual((item.discount_type, item.discount_value), ("amount", Decimal("10.00")))
+        self.assertEqual(item.bill_discount_share, Decimal("10.00"))
+        self.assertEqual((sale.bill_discount_type, sale.bill_discount_value), ("amount", Decimal("10.00")))
+        self.assertContains(
+            self.client.get(reverse("pos:receipt", args=[sale.pk])),
+            "1x ₹300.00 (-20.00%)",
+        )
+        self.assertContains(
+            self.client.get(reverse("pos:receipt", args=[sale.pk])),
+            "Cart discount (₹10.00)",
+        )
+
+    def test_receipt_and_invoice_show_mrp_savings_as_a_percentage(self):
+        product = Product.objects.create(
+            name="Acrylic Box (12 x 8)",
+            sale_price=Decimal("1100.00"),
+            mrp=Decimal("1225.00"),
+        )
+        response = self.client.post(
+            reverse("pos:checkout"),
+            data=json.dumps({
+                "items": [{"product_id": product.pk, "quantity": "1"}],
+                "payments": [{"method": "cash", "amount": "1100.00"}],
+            }),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+
+        sale = Sale.objects.get(invoice_no=response.json()["invoice_no"])
+        self.assertEqual(response.json()["lines"][0]["discount_label"], "-10.20%")
+        receipt = self.client.get(reverse("pos:receipt", args=[sale.pk]))
+        self.assertContains(receipt, "1x ₹1,225.00 (-10.20%)")
+        invoice = self.client.get(reverse("pos:invoice", args=[sale.pk]))
+        self.assertContains(invoice, "10.20%")
+        self.assertContains(invoice, "₹1,100.00")
+        self.assertContains(invoice, "₹1,225.00")
+
+    def test_invoice_shows_line_tax_rate_and_included_tax_total(self):
+        response = self.client.get(reverse("pos:invoice", args=[self.sale.pk]))
+        self.assertContains(response, "Tax")
+        self.assertContains(response, "18%")
+        self.assertContains(response, "Tax 18% (GST included)")
+        self.assertContains(response, "76.27")
+        self.assertContains(response, "Payment status:")
+        self.assertContains(response, "Paid")
 
     def test_sale_detail_renders_items_payments_and_actions(self):
         self.client.force_login(User.objects.get(username="boss2"))

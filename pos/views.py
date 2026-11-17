@@ -1,5 +1,4 @@
 import json
-from .gst import split_tax
 import logging
 import uuid
 from datetime import date, datetime, time, timedelta
@@ -25,7 +24,10 @@ from django.db import transaction
 from django.urls import reverse
 from django.utils import timezone
 from .models import Payment, Sale, SaleItem, SaleReturn, SaleReturnItem
-from .services import CheckoutError, create_return, create_sale, to_paise, void_sale
+from .services import (
+    CheckoutError, cart_discount_label, create_return, create_sale, delete_sale,
+    receipt_line_data, tax_label, to_paise, void_sale,
+)
 from promotions.engine import rules_for
 from woosync.models import HOLDING, WebOrder
 from storeconfig import printing
@@ -148,6 +150,7 @@ def _sale_for(request, pk):
     return sale
 def _print_context(sale, items):
     ps = PrintSettings.load().as_context()
+    qty_total = sum((item["qty"] for item in items), Decimal("0"))
     order_no = None
     if ps["r_order_no"]:
         day = timezone.localtime(sale.created_at).date()
@@ -157,30 +160,22 @@ def _print_context(sale, items):
         "short_no": sale.invoice_no.rsplit("-", 1)[-1],
         "order_no": order_no,
         "items_count": len(items),
-        "qty_total": sum((i["qty"] for i in items), Decimal("0")),
+        "qty_total": qty_total,
+        "total_items_count": qty_total,
     }
 
 def _bill_context(request, sale):
-    items, groups = [], {}
+    items = []
     for it in sale.items.all():
-        taxable = it.line_total - it.tax_amount
+        receipt_line = receipt_line_data(sale, it)
         items.append({
             "name": it.product_name, "hsn": it.hsn_code, "qty": it.quantity, "unit": it.unit,
-            "price": it.unit_price, "discount": it.discount, "gst_rate": it.gst_rate,
-            "taxable": taxable, "tax": it.tax_amount, "total": it.line_total,
+            "price": it.unit_price, "base_rate": receipt_line["base_rate"],
+            "discount": it.discount, "discount_label": receipt_line["discount_label"],
+            "discount_percent_label": receipt_line["discount_percent_label"],
+            "gst_rate": it.gst_rate,
+            "tax": it.tax_amount, "total": it.line_total,
         })
-        g = groups.setdefault(it.gst_rate, {"rate": it.gst_rate, "taxable": Decimal("0"), "tax": Decimal("0")})
-        g["taxable"] += taxable
-        g["tax"] += it.tax_amount
-
-    # GST is shown split half and half (CGST + SGST), assuming the customer is in the same state
-    tax_summary = []
-    for rate in sorted(groups):
-        g = groups[rate]
-        if g["rate"] <= 0:
-            continue
-        cgst, sgst = split_tax(g["tax"])
-        tax_summary.append({**g, "half_rate": rate / 2, "cgst": cgst, "sgst": sgst})
 
     # Cash is stored after change was handed back; show what the customer actually handed over
     payments = list(sale.payments.all())
@@ -199,23 +194,26 @@ def _bill_context(request, sale):
     } for payment in credit_payments)
     if sale.change_due > 0 and not has_cash:
         pay_lines.append({"label": "Cash", "amount": sale.change_due, "reference": ""})
+    if not pay_lines and sale.total > 0:
+        pay_lines.append({"label": "Credit", "amount": Decimal("0"), "reference": ""})
     paid_total = sum((p.amount for p in payments), Decimal("0"))
     paid_total += sum((p.amount for p in credit_payments), Decimal("0"))
     refunded_total = sale.returns.aggregate(total=Sum("refund_total"))["total"] or Decimal("0")
+    balance_due = max(sale.total - paid_total - refunded_total, Decimal("0"))
 
     return {
         "sale": sale,
         "items": items,
         "pay_lines": pay_lines,
-        "tax_summary": tax_summary,
-        "taxable_total": sale.total - sale.tax_total,
+        "receipt_subtotal": sale.total + sale.bill_discount,
+        "cart_discount_label": cart_discount_label(sale),
+        "tax_label": tax_label(sale.items.all()),
         "paid_total": paid_total,
-        "balance_due": max(sale.total - paid_total - refunded_total, Decimal("0")),
-        "cgst_total": sum((g["cgst"] for g in tax_summary), Decimal("0")),
-        "sgst_total": sum((g["sgst"] for g in tax_summary), Decimal("0")),
+        "balance_due": balance_due,
+        "payment_status": "Paid" if balance_due == 0 else "Partially paid" if paid_total > 0 else "Due",
         "walk_in": sale.customer.is_system,
         "cashier_name": sale.cashier.get_full_name() or sale.cashier.username,
-                "store": sale.store_info or _store(),     # old bills use the current details
+        "store": sale.store_info or _store(),     # old bills use the current details
         "autoprint": request.GET.get("print") == "1",
         **_print_context(sale, items),
     }
@@ -510,6 +508,20 @@ def sale_void(request, pk):
     else:
         messages.success(request, f"{sale.invoice_no} was voided and its stock was put back.")
     return redirect("pos:sale_detail", pk=pk)
+
+
+@login_required
+@require_POST
+def sale_delete(request, pk):
+    if not request.user.is_admin_role:
+        raise PermissionDenied
+    try:
+        invoice_no = delete_sale(request.user, pk)
+    except CheckoutError as exc:
+        messages.error(request, str(exc))
+    else:
+        messages.success(request, f"{invoice_no} was deleted, its stock was restored, and its payment records were removed.")
+    return redirect("pos:sale_list")
 
 
 @login_required

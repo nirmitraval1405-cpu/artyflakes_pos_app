@@ -4,6 +4,7 @@
 {% block extra_css %}<link href="{% static 'css/inventory.css' %}" rel="stylesheet">{% endblock %}
 
 {% block content %}
+<div class="website-order-detail">
 <div class="page-head">
   <div>
     <h3>Website order #{{ order.number }} <span class="st {{ order.badge }}">{{ order.status }}</span></h3>
@@ -32,15 +33,15 @@
   <div class="col-lg-8">
     <section class="grid-panel">
       <div class="grid-wrap" style="min-height: 0;">
-        <table class="grid">
+        <table class="grid website-order-items">
           <thead><tr><th>Item</th><th>SKU</th><th class="num">Qty</th><th class="num">Total</th><th>POS product</th><th class="num">Stock taken</th></tr></thead>
           <tbody>
             {% for i in items %}
             <tr class="{% if i.quantity == 0 %}inactive{% endif %}">
-              <td style="white-space: normal;">{{ i.name }}</td><td>{{ i.sku }}</td>
-              <td class="num">{{ i.quantity|floatformat:"-3" }}</td><td class="num">{{ i.line_total|floatformat:"2g" }}</td>
-              <td>{% if i.product %}{{ i.product.name }}{% else %}<span class="st st-low">Not matched</span>{% endif %}</td>
-              <td class="num">{{ i.applied_qty|floatformat:"-3" }}</td>
+              <td data-label="Item" style="white-space: normal;">{{ i.name }}</td><td data-label="SKU">{{ i.sku }}</td>
+              <td class="num" data-label="Qty">{{ i.quantity|floatformat:"-3" }}</td><td class="num" data-label="Total">{{ i.line_total|floatformat:"2g" }}</td>
+              <td data-label="POS product">{% if i.product %}{{ i.product.name }}{% else %}<span class="st st-low">Not matched</span>{% endif %}</td>
+              <td class="num" data-label="Stock taken">{{ i.applied_qty|floatformat:"-3" }}</td>
             </tr>
             {% endfor %}
           </tbody>
@@ -62,5 +63,6 @@
       {% if order.handled %}<hr><div class="small text-muted">Handled by {{ order.handled_by.get_full_name|default:order.handled_by.username }} on {{ order.handled_at|date:"d-m-Y H:i" }}</div>{% endif %}
     </div></div>
   </div>
+</div>
 </div>
 {% endblock %}

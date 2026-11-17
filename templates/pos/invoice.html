@@ -9,6 +9,9 @@
   <style>
     @page { size: {% if ps.i_a5 %}A5{% else %}A4{% endif %}; margin: {% if ps.i_a5 %}8mm{% else %}12mm{% endif %}; }
     .i-sheet { width: {{ ps.i_sheet_mm }}mm; }
+    @media print {
+      .i-sheet { min-height: {% if ps.i_a5 %}194{% else %}273{% endif %}mm; }
+    }
     {% if ps.font_css %}body.invoice { font-family: {{ ps.font_css|safe }}; }{% endif %}
   </style>
 </head>
@@ -22,122 +25,93 @@
   {% if sale.status == 'voided' %}<div class="void-banner">VOIDED</div>{% endif %}
 
   <div class="i-head">
+    <div class="i-title">{{ ps.i_title|default:"INVOICE" }}</div>
     <div class="i-store">
-      <h1>{{ store.name }}</h1>
+      <h1>{{ store.name|default:"Artyflakes" }}</h1>
       {% if store.tagline %}<div>{{ store.tagline }}</div>{% endif %}
       {% if store.address %}<div>{{ store.address|linebreaksbr }}</div>{% endif %}
       {% if store.phone %}<div>Phone: {{ store.phone }}</div>{% endif %}
-      {% if store.gstin %}<div>GSTIN: {{ store.gstin }}</div>{% endif %}
-      {% if store.bank_account_number or store.bank_details %}
-      <div class="i-bank">
-        {% if store.bank_account_number %}<div>Bank account: {{ store.bank_account_number }}</div>{% endif %}
-        {% if store.bank_details %}<div>{{ store.bank_details|linebreaksbr }}</div>{% endif %}
-      </div>
-      {% endif %}
-    </div>
-    <div class="i-doc">
-      <h2>{% if ps.i_title %}{{ ps.i_title }}{% elif store.gstin %}TAX INVOICE{% else %}INVOICE{% endif %}</h2>
-      <table>
-        <tr><td>Invoice no.</td><td><strong>{{ sale.invoice_no }}</strong></td></tr>
-        <tr><td>Date</td><td>{{ sale.created_at|date:"d-m-Y H:i" }}</td></tr>
-        <tr><td>Cashier</td><td>{{ cashier_name }}</td></tr>
-      </table>
+      {% if store.email %}<div>Email: {{ store.email }}</div>{% endif %}
+      {% if store.gstin %}<div>Tax/GST No.: {{ store.gstin }}</div>{% endif %}
     </div>
   </div>
 
-  <div class="i-bill">
-    <b>Billed to</b>
-    {% if walk_in %}
-      Walk-in customer
-    {% else %}
-      <strong>{{ sale.customer.name }}</strong>
-      {% if ps.i_cust_code and sale.customer.code %}<br>Code: {{ sale.customer.code }}{% endif %}
-      {% if ps.i_cust_phone and sale.customer.phone %}<br>Phone: {{ sale.customer.phone }}{% endif %}
-      {% if ps.i_cust_email and sale.customer.email %}<br>Email: {{ sale.customer.email }}{% endif %}
-      {% if sale.customer.address %}<br>{{ sale.customer.address|linebreaksbr }}{% endif %}
-      {% if ps.i_cust_gstin and sale.customer.gstin %}<br>GSTIN: {{ sale.customer.gstin }}{% endif %}
-    {% endif %}
+  <div class="i-meta">
+    <div class="i-bill">
+      <b>Bill to</b>
+      {% if walk_in %}
+        Walk-in customer
+      {% else %}
+        <strong>{{ sale.customer.name }}</strong>
+        {% if ps.i_cust_code and sale.customer.code %}<br>Code: {{ sale.customer.code }}{% endif %}
+        {% if ps.i_cust_phone and sale.customer.phone %}<br>Phone: {{ sale.customer.phone }}{% endif %}
+        {% if ps.i_cust_email and sale.customer.email %}<br>Email: {{ sale.customer.email }}{% endif %}
+        {% if sale.customer.address %}<br>{{ sale.customer.address|linebreaksbr }}{% endif %}
+        {% if ps.i_cust_gstin and sale.customer.gstin %}<br>GSTIN: {{ sale.customer.gstin }}{% endif %}
+      {% endif %}
+    </div>
+    <div class="i-doc">
+      <table>
+        <tr><td>Invoice No.:</td><td><strong>{{ sale.invoice_no }}</strong></td></tr>
+        <tr><td>Date:</td><td>{{ sale.created_at|date:"d-m-Y" }}</td></tr>
+        <tr><td>Payment status:</td><td>{{ payment_status }}</td></tr>
+      </table>
+    </div>
   </div>
 
   <table class="i-items">
     <thead>
       <tr>
-        <th>#</th><th>Item</th><th>HSN</th><th class="n">Qty</th><th class="n">Rate (incl. GST)</th>
-        {% if ps.i_col_discount %}<th class="n">Disc.</th>{% endif %}
-        {% if ps.i_col_tax %}<th class="n">Taxable</th><th class="n">GST %</th><th class="n">GST</th>{% endif %}
-        <th class="n">Amount</th>
+        <th>#</th><th>Item</th><th class="n">Quantity</th><th class="n">MRP</th>
+        <th class="n">Unit price</th><th class="n">Tax</th><th class="n">Discount</th><th class="n">Total</th>
       </tr>
     </thead>
     <tbody>
       {% for it in items %}
       <tr>
         <td>{{ forloop.counter }}</td>
-        <td>{{ it.name }}</td>
-        <td>{{ it.hsn }}</td>
+        <td class="i-item-name">{{ it.name }}</td>
         <td class="n">{{ it.qty|floatformat:"-3" }}</td>
-        <td class="n">{{ it.price|floatformat:"2g" }}</td>
-        {% if ps.i_col_discount %}<td class="n">{{ it.discount|floatformat:"2g" }}</td>{% endif %}
-        {% if ps.i_col_tax %}
-        <td class="n">{{ it.taxable|floatformat:"2g" }}</td>
-        <td class="n">{{ it.gst_rate|floatformat:"-2" }}</td>
-        <td class="n">{{ it.tax|floatformat:"2g" }}</td>
-        {% endif %}
-        <td class="n">{{ it.total|floatformat:"2g" }}</td>
+        <td class="n">{% if it.base_rate %}₹{{ it.base_rate|floatformat:"2g" }}{% else %}—{% endif %}</td>
+        <td class="n">₹{{ it.price|floatformat:"2g" }}</td>
+        <td class="n">{% if it.gst_rate > 0 %}{{ it.gst_rate|floatformat:"-2" }}%{% else %}---{% endif %}</td>
+        <td class="n">{{ it.discount_percent_label }}</td>
+        <td class="n">₹{{ it.total|floatformat:"2g" }}</td>
       </tr>
+      {% empty %}
+      <tr><td colspan="8" class="i-empty">No items on this invoice.</td></tr>
       {% endfor %}
     </tbody>
   </table>
 
   <div class="i-lower">
-    <div>
-      {% if tax_summary %}
-      <table class="i-tax">
-        <thead>
-          <tr><th>GST rate</th><th class="n">Taxable</th><th class="n">CGST</th><th class="n">SGST</th></tr>
-        </thead>
-        <tbody>
-          {% for g in tax_summary %}
-          <tr>
-            <td>{{ g.rate|floatformat:"-2" }}%</td>
-            <td class="n">{{ g.taxable|floatformat:"2g" }}</td>
-            <td class="n">{{ g.half_rate|floatformat:"-2" }}% &nbsp; {{ g.cgst|floatformat:"2g" }}</td>
-            <td class="n">{{ g.half_rate|floatformat:"-2" }}% &nbsp; {{ g.sgst|floatformat:"2g" }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-      {% endif %}
-
-      {% if ps.i_payments %}
-      <div style="margin-top:10px;">
-        <b>Payment</b>
-        {% for p in pay_lines %}
-        <div>{{ p.label }}{% if p.reference %} ({{ p.reference }}){% endif %}: {{ p.amount|floatformat:"2g" }}</div>
-        {% endfor %}
-        {% if sale.change_due > 0 %}<div>Change returned: {{ sale.change_due|floatformat:"2g" }}</div>{% endif %}
-        {% if balance_due > 0 %}<div><b>Balance due: {{ balance_due|floatformat:"2g" }}</b></div>{% endif %}
-      </div>
-      {% endif %}
-
-      {% if sale.note %}<div style="margin-top:10px;"><b>Note</b><br>{{ sale.note }}</div>{% endif %}
-    </div>
-
-    <div>
+    {% if sale.note %}<div class="i-note"><b>Note</b><br>{{ sale.note }}</div>{% endif %}
+    <div class="i-summary">
       <table class="i-sum">
-        <tr><td>Subtotal (incl. GST)</td><td>{{ sale.subtotal|floatformat:"2g" }}</td></tr>
-        {% if sale.discount_total > 0 %}<tr><td>Discount</td><td>-{{ sale.discount_total|floatformat:"2g" }}</td></tr>{% endif %}
+        <tr><td>Items count</td><td>{{ total_items_count|floatformat:"-3" }}</td></tr>
+        <tr><td>Subtotal</td><td>₹{{ receipt_subtotal|floatformat:"2g" }}</td></tr>
+        {% if sale.bill_discount > 0 %}<tr><td>Cart discount ({{ cart_discount_label }})</td><td>-₹{{ sale.bill_discount|floatformat:"2g" }}</td></tr>{% endif %}
         {% if sale.tax_total > 0 %}
-        <tr><td>Taxable value</td><td>{{ taxable_total|floatformat:"2g" }}</td></tr>
-        <tr><td>CGST</td><td>{{ cgst_total|floatformat:"2g" }}</td></tr>
-        <tr><td>SGST</td><td>{{ sgst_total|floatformat:"2g" }}</td></tr>
+        <tr><td>{{ tax_label }}</td><td>₹{{ sale.tax_total|floatformat:"2g" }}</td></tr>
         {% endif %}
-        <tr class="grand"><td>Total</td><td>{{ sale.total|floatformat:"2g" }}</td></tr>
+        <tr class="grand"><td>TOTAL:</td><td>₹{{ sale.total|floatformat:"2g" }}</td></tr>
+        <tr class="payment-heading"><td colspan="2">Payment method:</td></tr>
+        {% for p in pay_lines %}
+        <tr><td>{{ p.label }}{% if p.reference %} ({{ p.reference }}){% endif %}</td><td>₹{{ p.amount|floatformat:"2g" }}</td></tr>
+        {% endfor %}
+        <tr><td>Paid amount</td><td>₹{{ paid_total|floatformat:"2g" }}</td></tr>
+        <tr><td>Change</td><td>₹{{ sale.change_due|floatformat:"2g" }}</td></tr>
+        <tr><td>Amount due</td><td>₹{{ balance_due|floatformat:"2g" }}</td></tr>
       </table>
     </div>
   </div>
 
   {% with foot=ps.i_footer|default:store.footer %}
-  <div class="i-foot" style="text-align: {{ ps.i_footer_align }};">{% if foot %}{{ foot|linebreaksbr }}<br>{% endif %}This is a computer-generated invoice.</div>
+  <div class="i-foot" style="text-align: {{ ps.i_footer_align }};">
+    {% if foot %}{{ foot|linebreaksbr }}<br>{% endif %}
+    Our Website &bull; www.Artyflakes.com<br>
+    Artyflakes Brand &bull; Manage By Hitesh Sales
+  </div>
   {% endwith %}
 </div>
 

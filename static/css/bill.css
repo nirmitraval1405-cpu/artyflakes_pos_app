@@ -48,6 +48,15 @@ body.receipt {
   text-align: center;
 }
 
+.r-meta {
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.r-spacer {
+  height: 6px;
+}
+
 .r-center h1 {
   font-size: calc(17px * var(--receipt-font-scale, 1));
   margin: 0 0 2px;
@@ -129,19 +138,25 @@ body.invoice {
   background: #fff;
   padding: 10mm;
   box-sizing: content-box;
+  display: flex;
+  flex-direction: column;
 }
 
 .i-head {
-  display: flex;
-  justify-content: space-between;
-  gap: 20px;
-  border-bottom: 2px solid #000;
-  padding-bottom: 8px;
+  border-bottom: 1px solid #777;
+  padding-bottom: 10px;
+}
+
+.i-title {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  margin-bottom: 8px;
 }
 
 .i-store h1 {
-  font-size: 22px;
-  margin: 0 0 3px;
+  font-size: 15px;
+  margin: 0 0 4px;
 }
 
 .i-logo {
@@ -152,59 +167,100 @@ body.invoice {
   object-fit: contain;
 }
 
+.i-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 12px 0;
+}
+
+.i-bill,
 .i-doc {
-  text-align: right;
-}
-
-.i-doc h2 {
-  margin: 0 0 4px;
-  font-size: 18px;
-  letter-spacing: .08em;
-}
-
-.i-doc table {
-  margin-left: auto;
-  text-align: left;
-}
-
-.i-doc td {
-  padding: 1px 0 1px 12px;
+  flex: 1;
+  min-width: 0;
 }
 
 .i-bill {
-  margin: 10px 0;
-  padding: 6px 8px;
-  border: 1px solid #999;
+  margin: 0;
+  padding: 0;
+  border: 0;
 }
 
 .i-bill b {
   display: block;
   font-size: 11px;
   text-transform: uppercase;
-  color: #555;
+  color: #000;
   margin-bottom: 2px;
+}
+
+.i-doc table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.i-doc td {
+  padding: 2px 0;
+  vertical-align: top;
+}
+
+.i-doc td:first-child {
+  width: 43%;
+  padding-right: 8px;
+  white-space: nowrap;
+}
+
+.i-doc td:last-child {
+  overflow-wrap: anywhere;
 }
 
 table.i-items,
 table.i-tax {
   width: 100%;
   border-collapse: collapse;
-  margin-top: 8px;
+  table-layout: fixed;
+  margin-top: 4px;
+}
+
+.i-items th:nth-child(1) { width: 5%; }
+.i-items th:nth-child(2) { width: 26%; }
+.i-items th:nth-child(3) { width: 8%; }
+.i-items th:nth-child(4) { width: 12%; }
+.i-items th:nth-child(5) { width: 13%; }
+.i-items th:nth-child(6) { width: 8%; }
+.i-items th:nth-child(7) { width: 13%; }
+.i-items th:nth-child(8) { width: 15%; }
+
+.i-items th {
+  text-align: center;
 }
 
 .i-items th,
 .i-items td,
 .i-tax th,
 .i-tax td {
-  border: 1px solid #777;
-  padding: 4px 5px;
+  border: 1px solid #999;
+  padding: 4px;
+  vertical-align: top;
 }
 
 .i-items th,
 .i-tax th {
-  background: #eee;
-  text-align: left;
-  font-size: 11px;
+  background: #f2f2f2;
+  font-size: 10px;
+}
+
+.i-items td {
+  font-size: 10px;
+}
+
+.i-item-name {
+  overflow-wrap: anywhere;
+}
+
+.i-empty {
+  text-align: center;
+  color: #555;
 }
 
 .i-items td.n,
@@ -217,22 +273,31 @@ table.i-tax {
 .i-lower {
   display: flex;
   justify-content: space-between;
-  gap: 16px;
+  gap: 12px;
   margin-top: 10px;
   align-items: flex-start;
 }
 
-.i-lower>div {
+.i-note {
   flex: 1;
+  overflow-wrap: anywhere;
+}
+
+.i-summary {
+  width: 82mm;
+  max-width: 100%;
+  margin-left: auto;
 }
 
 table.i-sum {
   width: 100%;
   border-collapse: collapse;
+  border: 1px solid #999;
 }
 
 .i-sum td {
-  padding: 3px 5px;
+  padding: 4px 6px;
+  border-bottom: 1px solid #ccc;
 }
 
 .i-sum td:last-child {
@@ -242,12 +307,17 @@ table.i-sum {
 .i-sum tr.grand td {
   border-top: 2px solid #000;
   border-bottom: 2px solid #000;
-  font-size: 15px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.i-sum tr.payment-heading td {
+  border-top: 1px solid #777;
   font-weight: 700;
 }
 
 .i-foot {
-  margin-top: 18px;
+  margin-top: auto;
   padding-top: 6px;
   border-top: 1px solid #999;
   text-align: center;
@@ -272,12 +342,12 @@ table.i-sum {
     overflow-x: auto;
   }
 
-  .i-head,
+  .i-meta,
   .i-lower {
     flex-wrap: wrap;
   }
 
-  .i-head {
+  .i-meta {
     gap: .75rem;
   }
 
@@ -290,7 +360,11 @@ table.i-sum {
   }
 
   .i-items {
-    min-width: 680px;
+    min-width: 620px;
+  }
+
+  .i-summary {
+    width: 100%;
   }
 
   .i-tax {
@@ -329,6 +403,16 @@ table.i-sum {
     margin: 0;
     width: auto;
     padding: 0;
+  }
+
+  .i-meta,
+  .i-lower {
+    flex-wrap: nowrap;
+  }
+
+  .i-summary {
+    width: 82mm;
+    max-width: none;
   }
 
   .i-items th,
@@ -382,7 +466,7 @@ body.receipt * {
   .i-items td,
   .i-tax th,
   .i-tax td,
-  .i-bill,
+  .i-sum,
   .i-foot {
     border-color: #000;
   }

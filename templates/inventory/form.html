@@ -1,5 +1,10 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}{{ title }} · Artyflakes POS{% endblock %}
+{% block extra_css %}
+{{ block.super }}
+<link href="{% static 'css/inventory.css' %}?v=product-barcode-scanner-1" rel="stylesheet">
+{% endblock %}
 
 {% block content %}
 <div class="page-head">
@@ -49,6 +54,9 @@
               <button class="btn btn-outline-primary btn-sm" type="button" id="generate-barcode">
                 <i class="bi bi-upc-scan me-1"></i>Generate Barcode
               </button>
+              <button class="btn btn-outline-primary btn-sm" type="button" id="scan-product-barcode">
+                <i class="bi bi-camera me-1"></i>Scan Barcode
+              </button>
               <button class="btn btn-outline-secondary btn-sm d-none" type="button" id="regenerate-barcode">
                 <i class="bi bi-arrow-clockwise me-1"></i>Regenerate Barcode
               </button>
@@ -82,6 +90,30 @@
     </form>
   </div>
 </div>
+
+<div class="modal fade" id="productBarcodeScanner" tabindex="-1" aria-labelledby="productBarcodeScannerTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="productBarcodeScannerTitle">Scan product barcode</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close scanner"></button>
+      </div>
+      <div class="modal-body">
+        <p class="product-barcode-scan-status" id="productBarcodeScanStatus" role="status" aria-live="polite">
+          Point the rear camera at a product barcode.
+        </p>
+        <div class="product-barcode-reader" id="productBarcodeReader" aria-label="Camera viewfinder"></div>
+        <div class="product-barcode-detected" id="productBarcodeDetected" aria-live="polite" hidden>
+          <i class="bi bi-check-circle-fill me-1"></i>Barcode detected
+        </div>
+      </div>
+      <div class="modal-footer">
+        <select class="form-select form-select-sm product-barcode-camera-select" id="productBarcodeCamera" aria-label="Switch camera" hidden></select>
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel scan</button>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -99,6 +131,12 @@
   const generate = document.getElementById("generate-barcode");
   const regenerate = document.getElementById("regenerate-barcode");
   const error = document.getElementById("barcode-error");
+  const scanButton = document.getElementById("scan-product-barcode");
+  const scannerModalElement = document.getElementById("productBarcodeScanner");
+  const scannerStatus = document.getElementById("productBarcodeScanStatus");
+  const scannerReader = document.getElementById("productBarcodeReader");
+  const cameraSelect = document.getElementById("productBarcodeCamera");
+  const detectedNotice = document.getElementById("productBarcodeDetected");
   if (!barcodeField || !config) return;
 
   const updateControls = () => {
@@ -152,6 +190,287 @@
       error.textContent = "Could not copy the barcode. Please copy it from the input field.";
       error.classList.remove("d-none");
     }
+  });
+
+  const scannerModal = bootstrap.Modal.getOrCreateInstance(scannerModalElement);
+  let scanner = null;
+  let scannerLibraryLoad = null;
+  let scannerSession = 0;
+  let scannerStarting = false;
+  let scannerHandled = false;
+  let scannerCameraList = [];
+  let keyboardScanArmed = false;
+  let keyboardScanBuffer = "";
+  let keyboardScanLastKeyAt = 0;
+  let keyboardScanTimer = null;
+
+  const loadScannerLibrary = () => {
+    if (window.Html5Qrcode && window.Html5QrcodeSupportedFormats) return Promise.resolve();
+    if (!scannerLibraryLoad) {
+      scannerLibraryLoad = new Promise((resolve, reject) => {
+        const script = document.createElement("script");
+        script.src = "https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js";
+        script.async = true;
+        script.integrity = "sha384-c9d8RFSL+u3exBOJ4Yp3HUJXS4znl9f+z66d1y54ig+ea249SpqR+w1wyvXz/lk+";
+        script.crossOrigin = "anonymous";
+        script.referrerPolicy = "no-referrer";
+        script.onload = () => {
+          if (window.Html5Qrcode && window.Html5QrcodeSupportedFormats) {
+            resolve();
+          } else {
+            scannerLibraryLoad = null;
+            reject(new Error("Barcode scanning support could not be initialized."));
+          }
+        };
+        script.onerror = () => {
+          script.remove();
+          scannerLibraryLoad = null;
+          reject(new Error("Could not load barcode scanning support. Check your internet connection and try again."));
+        };
+        document.head.appendChild(script);
+      });
+    }
+    return scannerLibraryLoad;
+  };
+
+  const cameraErrorMessage = (exception) => {
+    if (exception && (exception.name === "NotAllowedError" || exception.name === "PermissionDeniedError")) {
+      return "Camera permission was denied. Allow camera access in your browser and try again.";
+    }
+    if (exception && (exception.name === "NotFoundError" || exception.name === "DevicesNotFoundError")) {
+      return "No camera was found on this device.";
+    }
+    if (exception && (exception.name === "NotReadableError" || exception.name === "TrackStartError")) {
+      return "The camera is busy in another app. Close it there and try again.";
+    }
+    return exception && exception.message
+      ? exception.message
+      : "Unable to open the camera. Check camera permissions and try again.";
+  };
+
+  const scannerConfig = () => {
+    const scanWidth = Math.min(320, Math.max(180, window.innerWidth - 96));
+    return {fps: 10, qrbox: {width: scanWidth, height: 120}, aspectRatio: 1.7778};
+  };
+
+  const disposeScanner = async (activeScanner) => {
+    try {
+      if (activeScanner.isScanning) await activeScanner.stop();
+    } catch (exception) {
+      console.error("Could not stop the product barcode camera", exception);
+    }
+    try {
+      activeScanner.clear();
+    } catch (exception) {
+      console.error("Could not clear the product barcode camera preview", exception);
+    }
+  };
+
+  const clearKeyboardScan = () => {
+    keyboardScanBuffer = "";
+    keyboardScanLastKeyAt = 0;
+    window.clearTimeout(keyboardScanTimer);
+  };
+
+  const playScanBeep = () => {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return;
+    try {
+      const audioContext = new AudioContextClass();
+      const oscillator = audioContext.createOscillator();
+      const gain = audioContext.createGain();
+      oscillator.frequency.value = 880;
+      gain.gain.setValueAtTime(0.06, audioContext.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.12);
+      oscillator.connect(gain);
+      gain.connect(audioContext.destination);
+      oscillator.start();
+      oscillator.stop(audioContext.currentTime + 0.12);
+      oscillator.addEventListener("ended", () => { void audioContext.close(); }, {once: true});
+    } catch (exception) {
+      console.debug("Barcode confirmation sound is unavailable", exception);
+    }
+  };
+
+  const finishBarcodeScan = async (value, session) => {
+    const barcode = String(value || "").trim();
+    if (!barcode || session !== scannerSession || scannerHandled) return;
+
+    scannerHandled = true;
+    barcodeField.value = barcode;
+    barcodeField.dispatchEvent(new Event("input", {bubbles: true}));
+    scannerStatus.textContent = "Barcode detected.";
+    detectedNotice.hidden = false;
+    scannerReader.classList.add("is-detected");
+    barcodeField.classList.add("product-barcode-scan-success");
+    window.setTimeout(() => barcodeField.classList.remove("product-barcode-scan-success"), 900);
+    playScanBeep();
+    keyboardScanArmed = false;
+    clearKeyboardScan();
+    scannerModal.hide();
+  };
+
+  const populateCameraOptions = async (activeScanner, session) => {
+    try {
+      scannerCameraList = await window.Html5Qrcode.getCameras();
+    } catch (exception) {
+      console.error("Could not list product barcode cameras", exception);
+      return;
+    }
+    if (session !== scannerSession || scanner !== activeScanner) return;
+    cameraSelect.replaceChildren();
+    scannerCameraList.forEach((camera, index) => {
+      const option = document.createElement("option");
+      option.value = camera.id;
+      option.textContent = camera.label || `Camera ${index + 1}`;
+      cameraSelect.appendChild(option);
+    });
+    if (scannerCameraList.length < 2) {
+      cameraSelect.hidden = true;
+      return;
+    }
+
+    const rearCameraIndex = scannerCameraList.findIndex((camera) => /back|rear|environment|world/i.test(camera.label));
+    cameraSelect.value = scannerCameraList[Math.max(rearCameraIndex, 0)].id;
+    cameraSelect.hidden = false;
+    cameraSelect.onchange = async () => {
+      if (!activeScanner.isScanning || scannerStarting) return;
+      const switchSession = scannerSession;
+      scannerStarting = true;
+      cameraSelect.disabled = true;
+      scannerStatus.textContent = "Switching camera...";
+      try {
+        await activeScanner.stop();
+        await activeScanner.start(
+          cameraSelect.value,
+          scannerConfig(),
+          (decodedText) => { void finishBarcodeScan(decodedText, scannerSession); },
+          () => {},
+        );
+        if (switchSession !== scannerSession || scanner !== activeScanner) {
+          if (scanner === activeScanner) scanner = null;
+          await disposeScanner(activeScanner);
+        } else {
+          scannerStatus.textContent = "Camera ready. Center the barcode in the frame.";
+        }
+      } catch (exception) {
+        if (switchSession === scannerSession) scannerStatus.textContent = cameraErrorMessage(exception);
+        console.error("Could not switch product barcode camera", exception);
+      } finally {
+        scannerStarting = false;
+        cameraSelect.disabled = false;
+      }
+    };
+  };
+
+  const startBarcodeScanner = async () => {
+    if (scannerStarting) {
+      scannerStatus.textContent = "The camera is still starting. Please wait.";
+      scannerModal.show();
+      return;
+    }
+    scannerModal.show();
+    scannerStatus.textContent = "Loading barcode scanner...";
+    detectedNotice.hidden = true;
+    scannerReader.classList.remove("is-detected");
+    keyboardScanArmed = true;
+    scannerHandled = false;
+    clearKeyboardScan();
+    const session = ++scannerSession;
+
+    if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      scannerStatus.textContent = "Camera access requires a secure HTTPS connection and a browser that supports cameras. You can still scan with a hardware scanner.";
+      return;
+    }
+
+    try {
+      await loadScannerLibrary();
+      if (session !== scannerSession) return;
+
+      const formats = window.Html5QrcodeSupportedFormats;
+      const scannerFormats = [
+        formats.EAN_13,
+        formats.EAN_8,
+        formats.UPC_A,
+        formats.CODE_128,
+        formats.CODE_39,
+        formats.QR_CODE,
+      ];
+      const activeScanner = new window.Html5Qrcode("productBarcodeReader", {
+        formatsToSupport: scannerFormats,
+        verbose: false,
+      });
+      scanner = activeScanner;
+      scannerStarting = true;
+      scannerStatus.textContent = "Requesting camera access...";
+      try {
+        await activeScanner.start(
+          {facingMode: "environment"},
+          scannerConfig(),
+          (decodedText) => { void finishBarcodeScan(decodedText, session); },
+          () => {},
+        );
+      } finally {
+        scannerStarting = false;
+      }
+
+      if (session !== scannerSession) {
+        if (scanner === activeScanner) scanner = null;
+        await disposeScanner(activeScanner);
+        return;
+      }
+      scannerStatus.textContent = "Camera ready. Center the barcode in the frame.";
+      await populateCameraOptions(activeScanner, session);
+    } catch (exception) {
+      scannerStarting = false;
+      const failedScanner = scanner;
+      scanner = null;
+      if (failedScanner) await disposeScanner(failedScanner);
+      if (session === scannerSession) {
+        scannerStatus.textContent = cameraErrorMessage(exception);
+      }
+      console.error("Product barcode camera startup failed", exception);
+    }
+  };
+
+  scanButton.addEventListener("click", startBarcodeScanner);
+  barcodeField.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") event.preventDefault();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (!keyboardScanArmed || event.isComposing || event.ctrlKey || event.altKey || event.metaKey) return;
+    const target = event.target;
+    if (target !== barcodeField && target instanceof HTMLElement &&
+        (target.isContentEditable || /^(INPUT|SELECT|TEXTAREA)$/.test(target.tagName))) return;
+    if (event.key === "Enter") {
+      if (keyboardScanBuffer.length >= 3) {
+        event.preventDefault();
+        event.stopPropagation();
+        void finishBarcodeScan(keyboardScanBuffer, scannerSession);
+      }
+      clearKeyboardScan();
+      return;
+    }
+    if (event.key.length !== 1) return;
+
+    const now = performance.now();
+    if (keyboardScanLastKeyAt && now - keyboardScanLastKeyAt > 120) keyboardScanBuffer = "";
+    keyboardScanBuffer += event.key;
+    keyboardScanLastKeyAt = now;
+    window.clearTimeout(keyboardScanTimer);
+    keyboardScanTimer = window.setTimeout(clearKeyboardScan, 180);
+  }, true);
+
+  scannerModalElement.addEventListener("hidden.bs.modal", () => {
+    scannerSession += 1;
+    keyboardScanArmed = false;
+    clearKeyboardScan();
+    cameraSelect.hidden = true;
+    cameraSelect.disabled = false;
+    cameraSelect.onchange = null;
+    const activeScanner = scanner;
+    scanner = null;
+    if (activeScanner && !scannerStarting) void disposeScanner(activeScanner);
   });
 })();
 </script>

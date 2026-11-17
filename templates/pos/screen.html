@@ -10,7 +10,7 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
   <link href="{% static 'css/app.css' %}" rel="stylesheet">
-  <link href="{% static 'css/pos.css' %}" rel="stylesheet">
+  <link href="{% static 'css/pos.css' %}?v=barcode-1" rel="stylesheet">
   <link href="{% static 'css/mobile-redesign.css' %}" rel="stylesheet">
 </head>
 <body class="pos-body">
@@ -34,23 +34,27 @@
 
   <!-- Top bar -->
   <header class="pos-top">
-    <a class="pos-title" href="{% url 'dashboard:home' %}" title="Back to dashboard">POS Billing System</a>
+    <div class="pos-top-account">
+      <a class="pos-title" href="{% url 'dashboard:home' %}" title="Back to dashboard">POS Billing System</a>
 
-    <div class="pos-search">
-      <i class="bi bi-search"></i>
-      <input id="posSearch" type="text" placeholder="Search product by name, code or barcode..." autocomplete="off" data-url="{% url 'pos:product_search' %}">
-      <button type="button" class="scan-btn" id="scanBtn" disabled title="Barcode scanners type into the search box"><i class="bi bi-upc-scan"></i> Scan Barcode</button>
-      <div class="pos-results" id="posResults" hidden></div>
+      <div class="pos-user">
+        <i class="bi bi-bell"></i>
+        <div class="pos-user-info">
+          <strong><i class="bi bi-person-circle"></i> {{ user.get_full_name|default:user.username }}</strong>
+          <small><span id="posDate"></span> &nbsp; <span id="posTime"></span></small>
+        </div>
+      </div>
     </div>
 
-    <a class="pos-pill pill-brand" href="{% url 'woosync:orders' %}" target="_blank" rel="noopener" title="Orders from the website"><i class="bi bi-globe2"></i> Website Orders{% if web_new %} <span class="pill-badge">{{ web_new }}</span>{% endif %}</a>
-
-    <div class="pos-user">
-      <i class="bi bi-bell"></i>
-      <div class="pos-user-info">
-        <strong><i class="bi bi-person-circle"></i> {{ user.get_full_name|default:user.username }}</strong>
-        <small><span id="posDate"></span> &nbsp; <span id="posTime"></span></small>
+    <div class="pos-top-controls">
+      <div class="pos-search">
+        <i class="bi bi-search"></i>
+        <input id="posSearch" type="text" placeholder="Search product by name, code or barcode..." autocomplete="off" data-url="{% url 'pos:product_search' %}">
+        <button type="button" class="scan-btn" id="scanBtn" aria-label="Scan barcode" title="Open the camera to scan a barcode"><i class="bi bi-upc-scan"></i> <span class="scan-label">Scan Barcode</span></button>
+        <div class="pos-results" id="posResults" hidden></div>
       </div>
+
+      <a class="pos-pill pill-brand" href="{% url 'woosync:orders' %}" target="_blank" rel="noopener" title="Orders from the website"><i class="bi bi-globe2"></i> Website Orders{% if web_new %} <span class="pill-badge">{{ web_new }}</span>{% endif %}</a>
     </div>
   </header>
 
@@ -95,18 +99,18 @@
 
     <!-- Right: buttons -->
     <aside class="pos-keys">
-      <div class="key-row cols-3">
-        <button class="key k-blue" data-action="search"><i class="bi bi-search"></i><span><b class="key-hint">F3</b> Search</span></button>
-        <button class="key k-blue" data-action="quantity"><i class="bi bi-123"></i><span><b class="key-hint">F4</b> Quantity</span></button>
+      <div class="key-row key-row-primary cols-3">
+        <button class="key k-blue" data-action="search" data-mobile-hide><i class="bi bi-search"></i><span><b class="key-hint">F3</b> Search</span></button>
+        <button class="key k-blue" data-action="quantity" data-mobile-hide><i class="bi bi-123"></i><span><b class="key-hint">F4</b> Quantity</span></button>
         <button class="key k-blue" data-action="new"><i class="bi bi-file-earmark-plus"></i><span><b class="key-hint">F8</b> New Sale</span></button>
       </div>
-      <div class="key-row cols-3">
-        <button class="key k-green" data-action="cash"><i class="bi bi-cash-stack"></i><span>Cash</span></button>
-        <button class="key k-blue" data-action="card"><i class="bi bi-credit-card"></i><span>Card</span></button>
-        <button class="key k-lilac" data-action="cheque"><i class="bi bi-card-checklist"></i><span>Cheque</span></button>
+      <div class="key-row key-row-payment cols-3">
+        <button class="key k-green" data-action="cash" data-mobile-hide><i class="bi bi-cash-stack"></i><span>Cash</span></button>
+        <button class="key k-blue" data-action="card" data-mobile-hide><i class="bi bi-credit-card"></i><span>Card</span></button>
+        <button class="key k-lilac" data-action="cheque" data-mobile-hide><i class="bi bi-card-checklist"></i><span>Cheque</span></button>
       </div>
-      <div class="key-row cols-4">
-        <button class="key k-gold" data-x="drawer"><i class="bi bi-inbox"></i><span>Cash Drawer</span></button>
+      <div class="key-row key-row-tools cols-4">
+        <button class="key k-gold" data-x="drawer" data-mobile-hide><i class="bi bi-inbox"></i><span>Cash Drawer</span></button>
         <button class="key k-blue" data-action="discount"><i class="bi bi-percent"></i><span><b class="key-hint">F2</b> Discount</span></button>
         <button class="key k-blue" data-x="price"><i class="bi bi-tag"></i><span>Price</span></button>
         <button class="key k-blue" data-action="customer"><i class="bi bi-person"></i><span>Customer</span></button>
@@ -116,10 +120,10 @@
         <button class="key k-pink" data-x="refund"><i class="bi bi-arrow-counterclockwise"></i><span>Refund</span></button>
         <button class="key k-pay span-2" data-action="pay"><i class="bi bi-credit-card-2-front"></i><span><b class="key-hint">F10</b> Payment</span></button>
       </div>
-      <div class="key-row cols-4">
-        <button class="key k-blue" data-x="lock"><i class="bi bi-lock"></i><span>Lock</span></button>
-        <button class="key k-blue" disabled title="Coming soon"><i class="bi bi-arrow-left-right"></i><span><b class="key-hint">F7</b> Transfer</span></button>
-        <button class="key k-pink" data-action="void"><i class="bi bi-x-circle"></i><span>Void Order</span></button>
+      <div class="key-row key-row-management cols-4">
+        <button class="key k-blue" data-x="lock" data-mobile-hide><i class="bi bi-lock"></i><span>Lock</span></button>
+        <button class="key k-blue" data-mobile-hide disabled title="Coming soon"><i class="bi bi-arrow-left-right"></i><span><b class="key-hint">F7</b> Transfer</span></button>
+        <button class="key k-pink" data-action="void" data-mobile-hide><i class="bi bi-x-circle"></i><span>Void Order</span></button>
         <button class="key k-blue" data-action="menu"><i class="bi bi-three-dots"></i><span>More</span></button>
       </div>
     </aside>
@@ -394,6 +398,18 @@
     </div>
   </div>
 
+  <!-- Camera barcode scanner -->
+  <div class="dlg dlg-scan" id="dlgScanBarcode" hidden role="dialog" aria-modal="true" aria-labelledby="barcodeScanHeading">
+    <h5 id="barcodeScanHeading">Scan product barcode</h5>
+    <p class="barcode-scan-status" id="barcodeScanStatus" role="status" aria-live="polite">
+      Point the rear camera at a product barcode.
+    </p>
+    <div class="barcode-reader" id="barcodeReader" aria-label="Camera preview"></div>
+    <div class="dlg-actions">
+      <button type="button" class="btn btn-outline-secondary" data-close>Cancel scan</button>
+    </div>
+  </div>
+
   <!-- Result -->
   <div class="dlg" id="dlgDone" hidden role="dialog" aria-modal="true" aria-label="Sale complete">
     <div class="done-icon"><i class="bi bi-check-circle-fill"></i></div>
@@ -539,7 +555,7 @@
 
 {{ print_dialog|json_script:"printDialogData" }}
 
-<script src="{% static 'js/pos.js' %}"></script>
+<script src="{% static 'js/pos.js' %}?v=barcode-1"></script>
 <script src="{% static 'js/pos-done.js' %}"></script>
 <script src="{% static 'js/pos-extras.js' %}"></script>
 </body>

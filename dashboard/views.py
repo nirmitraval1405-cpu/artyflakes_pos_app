@@ -1,5 +1,5 @@
 import calendar
-from datetime import timedelta
+from datetime import date, timedelta
 from decimal import Decimal
 
 from django.conf import settings
@@ -72,6 +72,13 @@ def _shift_year(d, years):
         return d.replace(year=d.year + years)
     except ValueError:                      # 29 February
         return d.replace(year=d.year + years, day=28)
+
+
+def _parse_dashboard_date(value):
+    try:
+        return date.fromisoformat(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def period_bounds(key, today):
@@ -341,11 +348,19 @@ def home(request):
         return redirect("pos:screen")
 
     today = timezone.localdate()
+    selected_date = _parse_dashboard_date(request.GET.get("date", "").strip())
+    date_filter_active = selected_date is not None
     key = request.GET.get("range", "today")
     if key not in dict(RANGES):
         key = "today"
-    (start, end), (p_start, p_end) = period_bounds(key, today)
-    label = PREV_LABEL[key]
+    if date_filter_active:
+        key = "today"
+        start = end = selected_date
+        p_start = p_end = selected_date - timedelta(days=1)
+        label = "previous day"
+    else:
+        (start, end), (p_start, p_end) = period_bounds(key, today)
+        label = PREV_LABEL[key]
 
     cur = _metrics(start, end)
     prev = _metrics(p_start, p_end)
@@ -423,15 +438,19 @@ def home(request):
 
     recent = Sale.objects.select_related("customer").order_by("-created_at")[:5]
     sales_statistics = _sales_statistics(key, start, end)
+    if date_filter_active:
+        sales_statistics["period"] = f"Selected date · {selected_date:%d-%m-%Y}"
 
     context = {
         "today": today,
+        "selected_date": selected_date or today,
+        "date_filter_active": date_filter_active,
         "backup_warning": backup_warning(
             read_backup_status(), settings.BACKUP_STALE_HOURS
         ),
         "ranges": RANGES,
         "range_key": key,
-        "range_label": dict(RANGES)[key],
+        "range_label": "Selected date" if date_filter_active else dict(RANGES)[key],
         "period_text": f"{start:%d-%m-%Y}" + ("" if start == end else f" to {end:%d-%m-%Y}"),
         "today_purchases": inr(purchase_cur),
         "primary_cards": primary_cards,

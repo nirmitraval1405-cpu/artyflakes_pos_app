@@ -91,9 +91,21 @@ class BarcodeEndpointTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'data-generate-url="/inventory/products/barcode/generate/"')
+        self.assertContains(response, 'id="scan-product-barcode"')
+        self.assertContains(response, 'id="productBarcodeScanner"')
+        self.assertContains(response, 'id="productBarcodeCamera"')
         self.assertContains(response, "requestBarcode")
         self.assertContains(response, "Opening stock")
         self.assertContains(response, 'name="opening_stock"')
+
+    def test_product_edit_form_includes_camera_scanner(self):
+        product = Product.objects.create(name="Scanner product")
+
+        response = self.client.get(reverse("inventory:product_update", args=[product.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="scan-product-barcode"')
+        self.assertContains(response, "Scan Barcode")
 
     def test_product_creation_keeps_optional_barcode_blank(self):
         with tempfile.TemporaryDirectory() as media_root, override_settings(MEDIA_ROOT=media_root):

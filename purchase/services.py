@@ -270,3 +270,53 @@ def cancel_purchase(user, purchase_id, reason):
             warnings.append(f"\u20b9{purchase.amount_paid:,.2f} was already paid to the supplier. Recover it outside the system.")
 
     return purchase, warnings
+
+
+def delete_purchase(user, purchase_id):
+    """Permanently remove a purchase and its payment records, reversing received stock."""
+    if not user.is_admin_role:
+        raise PurchaseError("Only an admin can delete a purchase.", status=403)
+
+    warnings = []
+    with transaction.atomic():
+        purchase = Purchase.objects.select_for_update().filter(pk=purchase_id).first()
+        if purchase is None:
+            raise PurchaseError("Purchase not found.", status=404)
+
+        if purchase.status == Purchase.Status.COMPLETED:
+            received = list(StockMovement.objects.filter(
+                reference=purchase.purchase_no,
+                movement_type=StockMovement.Type.PURCHASE,
+            ))
+            StockMovement.objects.bulk_create([
+                StockMovement(
+                    product_id=movement.product_id,
+                    quantity=-movement.quantity,
+                    movement_type=StockMovement.Type.PURCHASE_RETURN,
+                    reference=purchase.purchase_no,
+                    note="Purchase deleted",
+                    created_by=user,
+                )
+                for movement in received
+            ])
+
+            for product in with_stock(Product.objects.filter(
+                pk__in={movement.product_id for movement in received}
+            )):
+                if product.stock < 0:
+                    warnings.append(
+                        f"{product.name}: stock is now {qty_fmt(product.stock)}. "
+                        "Some of it was already sold, so please check the count."
+                    )
+        elif purchase.status not in (Purchase.Status.CANCELLED, Purchase.Status.DRAFT):
+            raise PurchaseError("This purchase has an unsupported status and cannot be deleted.")
+
+        if purchase.amount_paid > 0:
+            warnings.append(
+                f"\u20b9{purchase.amount_paid:,.2f} was recorded as paid to the supplier. "
+                "The app payment records were removed; recover the money outside the system."
+            )
+
+        purchase_no = purchase.purchase_no
+        purchase.delete()
+    return purchase_no, warnings

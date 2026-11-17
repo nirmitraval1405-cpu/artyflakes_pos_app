@@ -1,4 +1,4 @@
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from promotions.engine import best_discount, rules_for
 from django.db import IntegrityError, transaction
 from django.db.models import Sum
@@ -9,7 +9,9 @@ from inventory.stock import current_stock, qty_fmt
 from people.models import Contact
 from storeconfig.models import StoreSettings
 
-from .models import InvoiceCounter, Payment, ReturnCounter, Sale, SaleItem, SaleReturn, SaleReturnItem
+from .models import (
+    CreditPayment, InvoiceCounter, Payment, ReturnCounter, Sale, SaleItem, SaleReturn, SaleReturnItem,
+)
 
 MAX_LINES = 100
 MAX_RUPEES = Decimal("10000000")        # sanity limit: Rs 1 crore per amount
@@ -127,7 +129,9 @@ def compute_bill(lines, bill_kind=None, bill_value=0):
         total = r["gross"] - discount
         gst_bp = ln["gst_bp"]
         tax = div_round(total * gst_bp, 10000 + gst_bp)    # GST already inside the price
-        result_lines.append({"gross": r["gross"], "promo": r["promo"], "discount": discount, "tax": tax, "total": total})
+        result_lines.append({
+            "gross": r["gross"], "promo": r["promo"], "discount": discount,
+            "bill_discount_share": r["share"], "tax": tax, "total": total})
 
     return {
         "lines": result_lines,
@@ -139,32 +143,116 @@ def compute_bill(lines, bill_kind=None, bill_value=0):
         "total": sum(l["total"] for l in result_lines),
     }
 
+def _percentage_text(value):
+    return f"{Decimal(value).normalize():f}%"
+
+
+def cart_discount_label(sale):
+    if sale.bill_discount_type == "percent" and sale.bill_discount_value > 0:
+        return _percentage_text(sale.bill_discount_value)
+    return f"\u20b9{sale.bill_discount_value:,.2f}"
+
+
+def tax_label(items):
+    rates = {item.gst_rate for item in items if item.gst_rate > 0}
+    if len(rates) == 1:
+        return f"Tax {_percentage_text(rates.pop())} (GST included)"
+    return "Tax (GST included)"
+
+
+def receipt_line_data(sale, item):
+    share = item.bill_discount_share
+    if share is None:
+        share = Decimal("0")
+        if sale.bill_discount > 0 and sale.total > 0:
+            share = (
+                sale.bill_discount * item.line_total / sale.total
+            ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+    base_rate = item.mrp or item.unit_price
+    savings = max(
+        base_rate * item.quantity - item.line_total - share,
+        Decimal("0"),
+    ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    base_total = base_rate * item.quantity
+    percent_savings = (
+        (savings * 100 / base_total).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        if base_total > 0 else Decimal("0")
+    )
+    discount_label = f"-{percent_savings:.2f}%" if savings > 0 else ""
+    discount_percent_label = f"{percent_savings:.2f}%"
+    return {
+        "base_rate": base_rate,
+        "discount_label": discount_label,
+        "discount_percent_label": discount_percent_label,
+    }
+
+
 # ---------- Checkout ----------
 def _result(sale, warnings, duplicate=False):
-    paid = sale.payments.aggregate(total=Sum("amount"))["total"] or Decimal("0")
+    items = list(sale.items.all())
+    receipt_lines = []
+    for item in items:
+        receipt_line = receipt_line_data(sale, item)
+        receipt_lines.append({
+            "name": item.product_name,
+            "qty": f"{item.quantity.normalize():f}",
+            "price": f"{item.unit_price:,.2f}",
+            "base_rate": f"{receipt_line['base_rate']:,.2f}",
+            "discount_label": receipt_line["discount_label"],
+            "amount": f"{item.line_total:,.2f}",
+        })
+    payments = list(sale.payments.all())
+    credit_payments = list(sale.credit_payments.all())
+    paid = sum((payment.amount for payment in payments), Decimal("0"))
+    paid += sum((payment.amount for payment in credit_payments), Decimal("0"))
+    payment_lines = []
+    has_cash = False
+    for payment in payments:
+        amount = payment.amount
+        if payment.method == Payment.Method.CASH:
+            amount += sale.change_due
+            has_cash = True
+        payment_lines.append({
+            "label": payment.get_method_display(),
+            "amount": f"{amount:,.2f}",
+        })
+    payment_lines.extend({
+        "label": f"{payment.get_method_display()} credit collection",
+        "amount": f"{payment.amount:,.2f}",
+    } for payment in credit_payments)
+    if sale.change_due > 0 and not has_cash:
+        payment_lines.append({"label": "Cash", "amount": f"{sale.change_due:,.2f}"})
+    if not payment_lines and sale.total > paid:
+        payment_lines.append({"label": "Credit", "amount": "0.00"})
+
     return {
         "ok": True,
         "duplicate": duplicate,
         "sale_id": sale.pk,
         "invoice_no": sale.invoice_no,
         "created": timezone.localtime(sale.created_at).strftime("%d-%m-%Y %H:%M"),
+        "receipt_number": sale.invoice_no,
+        "receipt_created": timezone.localtime(sale.created_at).strftime("%d.%m.%Y. %H:%M:%S"),
+        "cashier_name": sale.cashier.get_full_name() or sale.cashier.username,
         "subtotal": f"{sale.subtotal:,.2f}",
         "discount": f"{sale.discount_total:,.2f}",
         "tax": f"{sale.tax_total:,.2f}",
+        "receipt_subtotal": f"{sale.total + sale.bill_discount:,.2f}",
+        "cart_discount_amount": f"{sale.bill_discount:,.2f}",
+        "cart_discount_label": cart_discount_label(sale),
+        "tax_label": tax_label(items),
+        "items_count": len(items),
+        "total_items_count": f"{sum((item.quantity for item in items), Decimal('0')).normalize():f}",
+        "paid_amount": f"{paid:,.2f}",
+        "payment_lines": payment_lines,
+        "store": sale.store_info or StoreSettings.load().as_store_info(),
         "total": f"{sale.total:.2f}",
         "paid": f"{sale.amount_paid:,.2f}",
         "due": f"{max(sale.total - paid, Decimal('0')):.2f}",
         "change": f"{sale.change_due:,.2f}",
         "customer_phone": "" if sale.customer.is_system else sale.customer.phone,
-        "lines": [
-            {
-                "name": i.product_name,
-                "qty": f"{i.quantity.normalize():f}",
-                "price": f"{i.unit_price:,.2f}",
-                "amount": f"{i.line_total:,.2f}",
-            }
-            for i in sale.items.all()
-        ],
+        "lines": receipt_lines,
         "warnings": warnings,
     }
 
@@ -308,6 +396,7 @@ def create_sale(user, data):
             sale = Sale.objects.create(
                 invoice_no=invoice_no, customer=customer, cashier=user, client_token=token,
                 subtotal=rupees(calc["subtotal"]), bill_discount=rupees(calc["bill_discount"]),
+                bill_discount_type=bill_kind or "none", bill_discount_value=rupees(bill_value),
                 discount_total=rupees(calc["discount_total"]), tax_total=rupees(calc["tax_total"]),
                 total=rupees(total), amount_paid=rupees(tendered), change_due=rupees(change),
                 note=str(data.get("note") or "")[:255],
@@ -323,6 +412,8 @@ def create_sale(user, data):
                     hsn_code=p.hsn_code, unit=p.unit, quantity=qty,
                     unit_price=rupees(line["price"]), mrp=p.mrp or p.sale_price, cost_price=p.cost_price,
                     gst_rate=p.gst_rate, discount=rupees(result["discount"]),
+                    discount_type=s["disc_kind"] or "none", discount_value=rupees(s["disc_value"]),
+                    bill_discount_share=rupees(result["bill_discount_share"]),
                     promo_discount=rupees(result["promo"]), promo_name=promo_name[:120],
                     tax_amount=rupees(result["tax"]), line_total=rupees(result["total"]),
                 ))
@@ -395,6 +486,42 @@ def void_sale(user, sale_id, reason):
         sale.void_reason = reason
         sale.save(update_fields=["status", "voided_at", "voided_by", "void_reason", "updated_at"])
     return sale
+
+
+def delete_sale(user, sale_id):
+    """Permanently remove a bill and its payment records, restoring its stock if needed."""
+    _require_admin(user)
+
+    with transaction.atomic():
+        sale = Sale.objects.select_for_update().filter(pk=sale_id).first()
+        if sale is None:
+            raise CheckoutError("Bill not found.", status=404)
+        if sale.returns.exists():
+            raise CheckoutError("This bill has returns and cannot be permanently deleted.")
+
+        if sale.status == Sale.Status.COMPLETED:
+            sold = StockMovement.objects.filter(
+                reference=sale.invoice_no,
+                movement_type=StockMovement.Type.SALE,
+            )
+            StockMovement.objects.bulk_create([
+                StockMovement(
+                    product_id=movement.product_id,
+                    quantity=-movement.quantity,
+                    movement_type=StockMovement.Type.SALE_RETURN,
+                    reference=sale.invoice_no,
+                    note="Sale deleted",
+                    created_by=user,
+                )
+                for movement in sold
+            ])
+        elif sale.status != Sale.Status.VOIDED:
+            raise CheckoutError("This bill has an unsupported status and cannot be deleted.")
+
+        invoice_no = sale.invoice_no
+        CreditPayment.objects.filter(sale=sale).delete()
+        sale.delete()
+    return invoice_no
 
 
 def create_return(user, sale_id, data):
