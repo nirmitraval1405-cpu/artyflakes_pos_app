@@ -3076,3 +3076,11 @@ At E:\artyflakes-pos\static\js\sync_woo.ps1:11 char:1
     + CategoryInfo          : NotSpecified: (CommandError: T...rted a problem.:String) [], RemoteException
     + FullyQualifiedErrorId : NativeCommandError
  
+2026-11-17 23:54:57 FAILED: 0 new orders, 0 updated, 0 stock updates. The website connection is not set up. Add WOO_URL, WOO_KEY and WOO_SECRET to the .env file, then restart the server.
+python.exe : CommandError: The sync reported a problem.
+At E:\artyflakes-pos\static\js\sync_woo.ps1:11 char:1
++ & $python manage.py sync_woo 2>&1 | Out-File -Append -Encoding utf8 $ ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (CommandError: T...rted a problem.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
